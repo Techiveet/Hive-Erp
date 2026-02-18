@@ -4,8 +4,8 @@ services:
   # -----------------------------
   - type: web
     name: laravel-backend
-    env: docker                 # CHANGED: Use 'env' instead of 'runtime'
-    rootDir: backend            # CHANGED: Use 'rootDir' instead of 'context'
+    env: docker
+    rootDir: backend
     dockerfilePath: ./Dockerfile
     plan: free
     region: oregon
@@ -18,33 +18,25 @@ services:
         value: false
       - key: DB_CONNECTION
         value: pgsql
+      - key: LOG_CHANNEL
+        value: stderr
       - key: DATABASE_URL
         fromDatabase:
           name: erp-postgres
           property: connectionString
-      # Add this so Laravel knows the frontend URL (for CORS)
-      - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: nextjs-frontend
-          property: url
+      # Note: Add FRONTEND_URL manually in the Render Dashboard after deployment
 
   # -----------------------------
   # NEXT.JS FRONTEND
   # -----------------------------
   - type: web
     name: nextjs-frontend
-    env: docker                 # CHANGED: Use 'env' instead of 'runtime'
-    rootDir: frontend           # CHANGED: Use 'rootDir' instead of 'context'
+    env: docker
+    rootDir: frontend
     dockerfilePath: ./Dockerfile
     plan: free
     region: oregon
-    envVars:
-      - key: NEXT_PUBLIC_API_URL
-        fromService:
-          type: web
-          name: laravel-backend
-          property: url
+    # Note: Add NEXT_PUBLIC_API_URL manually in the Render Dashboard after deployment
 
 databases:
   - name: erp-postgres
