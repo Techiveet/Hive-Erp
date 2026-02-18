@@ -1,9 +1,11 @@
 services:
-  # BACKEND
+  # -----------------------------
+  # LARAVEL BACKEND
+  # -----------------------------
   - type: web
     name: laravel-backend
-    runtime: docker
-    context: backend
+    env: docker                 # CHANGED: Use 'env' instead of 'runtime'
+    rootDir: backend            # CHANGED: Use 'rootDir' instead of 'context'
     dockerfilePath: ./Dockerfile
     plan: free
     region: oregon
@@ -20,12 +22,20 @@ services:
         fromDatabase:
           name: erp-postgres
           property: connectionString
+      # Add this so Laravel knows the frontend URL (for CORS)
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: nextjs-frontend
+          property: url
 
-  # FRONTEND
+  # -----------------------------
+  # NEXT.JS FRONTEND
+  # -----------------------------
   - type: web
     name: nextjs-frontend
-    runtime: docker
-    context: frontend
+    env: docker                 # CHANGED: Use 'env' instead of 'runtime'
+    rootDir: frontend           # CHANGED: Use 'rootDir' instead of 'context'
     dockerfilePath: ./Dockerfile
     plan: free
     region: oregon
