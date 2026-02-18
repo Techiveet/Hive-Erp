@@ -1,0 +1,124 @@
+services:
+  # 1. THE BRAIN (Laravel 12 + Octane + RoadRunner)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hive-backend
+    restart: unless-stopped
+    ports:
+      - "8085:8000"  # External:8085 -> Internal:8000
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      # NUCLEAR OPTION KEY (Do not change)
+      APP_KEY: base64:c29tZXJhbmRvbXN0cmluZ2ZvcmRldmVsb3BtZW50MjE=
+      APP_URL: http://localhost:8085
+      
+      # Database
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: hive
+      DB_USERNAME: hive
+      DB_PASSWORD: password
+      
+      # Performance
+      OCTANE_SERVER: roadrunner
+      
+      # Search Config
+      SCOUT_DRIVER: meilisearch
+      MEILISEARCH_HOST: http://meilisearch:7700
+      MEILISEARCH_KEY: masterKey
+      
+      # Cache & Queue
+      REDIS_HOST: redis
+      CACHE_STORE: redis
+      
+      # Hot Reloading
+      WATCHPACK_POLLING: "true"
+    depends_on:
+      db:
+        condition: service_healthy # Wait for DB to be ready
+      redis:
+        condition: service_started
+      meilisearch:
+        condition: service_healthy
+    # Start Octane with RoadRunner
+    command: php artisan octane:start --server=roadrunner --host=0.0.0.0 --port=8000
+
+  # 2. THE FACE (Next.js 16)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hive-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8085/api
+      INTERNAL_API_URL: http://backend:8000/api
+    depends_on:
+      - backend
+
+  # 3. DATABASE (Postgres 15)
+  db:
+    image: postgres:15-alpine
+    container_name: hive-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: hive
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: password
+    volumes:
+      - hive-db-data:/var/lib/postgresql/data
+    # Healthcheck to prevent backend crashes
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hive"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 4. CACHE (Redis)
+  redis:
+    image: redis:alpine
+    container_name: hive-redis
+
+  # 5. SEARCH (Meilisearch)
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    container_name: hive-search
+    ports:
+      - "7700:7700"
+    environment:
+      - MEILI_MASTER_KEY=masterKey
+      - MEILI_NO_ANALYTICS=true
+    volumes:
+      - hive-search-data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 6. DATABASE GUI (Adminer)
+  adminer:
+    image: adminer
+    container_name: hive-adminer
+    ports:
+      - "8090:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      - db
+
+volumes:
+  hive-db-data:
+  hive-search-data:
