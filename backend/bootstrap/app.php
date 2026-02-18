@@ -16,17 +16,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         // 1. ✅ SANCTUM STATEFUL AUTH
-        // Prepend ensures this runs before standard API throttling or auth
         $middleware->api(prepend: [
             EnsureFrontendRequestsAreStateful::class,
         ]);
 
         // 2. ✅ PROXY & CORS CONFIG
-        // Since you are on Windows/Docker, trust all proxies to handle local network routing
+        // Set to '*' for Render to correctly handle HTTPS termination and tenant headers
         $middleware->trustProxies(at: '*');
 
-        // 3. ✅ ALIASES FOR CLEANER ROUTES
-        // Allows you to use 'role:admin' or 'permission:edit' in your routes
+        // 3. ✅ ALIASES FOR PERMISSIONS
         $middleware->alias([
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
@@ -35,7 +33,6 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // 4. ✅ CUSTOM TENANT ERROR RENDERING
-        // If someone visits "unknown.localhost", return a clean Hive-styled JSON error
         $exceptions->render(function (TenantCouldNotBeIdentifiedOnDomainException $e, Request $request) {
             $host = $request->getHost();
             $subdomain = explode('.', $host)[0];

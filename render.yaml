@@ -1,6 +1,6 @@
 services:
   # -----------------------------
-  # LARAVEL BACKEND
+  # LARAVEL BACKEND (HIVE API)
   # -----------------------------
   - type: web
     name: laravel-backend
@@ -24,10 +24,9 @@ services:
         fromDatabase:
           name: erp-postgres
           property: connectionString
-      # Note: Add FRONTEND_URL manually in the Render Dashboard after deployment
 
   # -----------------------------
-  # NEXT.JS FRONTEND
+  # NEXT.JS FRONTEND (HIVE UI)
   # -----------------------------
   - type: web
     name: nextjs-frontend
@@ -36,7 +35,11 @@ services:
     dockerfilePath: ./Dockerfile
     plan: free
     region: oregon
-    # Note: Add NEXT_PUBLIC_API_URL manually in the Render Dashboard after deployment
+    envVars:
+      - key: NODE_VERSION
+        value: 20.x
+      - key: CI
+        value: false
 
 databases:
   - name: erp-postgres
