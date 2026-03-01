@@ -1,0 +1,210 @@
+services:
+  # 1. CACHE (Redis) - Placed at the top with a healthcheck so it starts first!
+  redis:
+    image: redis:alpine
+    container_name: hive-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hive-network
+
+  # 2. DATABASE (Postgres 17)
+  db:
+    image: postgres:17-alpine
+    container_name: hive-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: hive
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: password
+    volumes:
+      - hive-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hive"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hive-network
+
+  # 3. SEARCH (Meilisearch)
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    container_name: hive-search
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    environment:
+      - MEILI_MASTER_KEY=masterKey
+      - MEILI_NO_ANALYTICS=true
+    volumes:
+      - hive-search-data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hive-network
+
+  # 4. EMAIL CATCHER (Mailpit) 🚀 NEW
+  mailpit:
+    image: axllent/mailpit
+    container_name: hive-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP Port
+      - "8025:8025" # Web Dashboard Port
+    networks:
+      - hive-network
+
+  # 5. THE BRAIN (Laravel 12 + Octane + RoadRunner)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hive-backend
+    restart: unless-stopped
+    ports:
+      - "8085:8000"  # External:8085 -> Internal:8000
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: base64:c29tZXJhbmRvbXN0cmluZ2ZvcmRldmVsb3BtZW50MjE=
+      APP_URL: http://localhost:8085
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: hive
+      DB_USERNAME: hive
+      DB_PASSWORD: password
+      OCTANE_SERVER: roadrunner
+      SCOUT_DRIVER: meilisearch
+      MEILISEARCH_HOST: http://meilisearch:7700
+      MEILISEARCH_KEY: masterKey
+      REDIS_HOST: redis
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      # 🚀 Connect Backend to Mailpit
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_USERNAME: null
+      MAIL_PASSWORD: null
+      MAIL_ENCRYPTION: null
+      MAIL_FROM_ADDRESS: "no-reply@hive.os"
+      MAIL_FROM_NAME: "Hive ERP"
+      WATCHPACK_POLLING: "true"
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    command: php artisan octane:start --server=roadrunner --host=0.0.0.0 --port=8000
+    networks:
+      hive-network:
+        # Docker now knows to route these domains to this container
+        aliases:
+          - apple.localhost
+          - tesla.localhost
+          - spacex.localhost
+
+  # 6. THE WORKER (Background Jobs via Horizon)
+  queue:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hive-queue
+    restart: unless-stopped
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: base64:c29tZXJhbmRvbXN0cmluZ2ZvcmRldmVsb3BtZW50MjE=
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: hive
+      DB_USERNAME: hive
+      DB_PASSWORD: password
+      REDIS_HOST: redis
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      # 🚀 Queue workers need email config too, because they actually send the emails!
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_USERNAME: null
+      MAIL_PASSWORD: null
+      MAIL_ENCRYPTION: null
+      MAIL_FROM_ADDRESS: "no-reply@hive.os"
+      MAIL_FROM_NAME: "Hive ERP"
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    command: php artisan horizon
+    networks:
+      - hive-network
+
+  # 7. THE FACE (Next.js 16)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hive-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8085/api
+      INTERNAL_API_URL: http://backend:8000/api
+      WATCHPACK_POLLING: "true"
+      NEXT_WEBPACK_USEPOLLING: "true"
+    depends_on:
+      - backend
+    networks:
+      - hive-network
+
+  # 8. DATABASE GUI (Adminer)
+  adminer:
+    image: adminer
+    container_name: hive-adminer
+    restart: unless-stopped
+    ports:
+      - "8090:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - hive-network
+
+# Define the shared network and persistent volumes
+networks:
+  hive-network:
+    driver: bridge
+
+volumes:
+  hive-db-data:
+  hive-search-data:
