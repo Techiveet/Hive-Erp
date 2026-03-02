@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Permission;
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Cache;
@@ -36,7 +36,7 @@ class RoleController extends Controller
                 ->where('tenant_id', $tenantId)
                 ->where('guard_name', $context['guard'])
                 ->keys();
-            
+
             if ($rawIds->isEmpty()) {
                 $query->whereRaw('1 = 0');
             } else {

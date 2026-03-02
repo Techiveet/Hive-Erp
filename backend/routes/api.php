@@ -6,6 +6,7 @@ use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\TwoFactorController; // 🚀 ADDED IMPORT
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\Export\UserExportController;
@@ -24,6 +25,7 @@ Route::prefix('v1')->group(function () {
     // URIs will be: /api/v1/...
     // ==========================================
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/verify-2fa', [AuthController::class, 'verify2FA']); // 🚀 2FA: Public Verify
     Route::get('/password-policy', [AuthController::class, 'passwordPolicy']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
@@ -36,6 +38,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/user', [AuthController::class, 'user']);
         Route::post('/logout', [AuthController::class, 'logout']);
 
+        // 🚀 2FA: Protected Management Routes
+        Route::post('/2fa/enable', [TwoFactorController::class, 'enable']);
+        Route::post('/2fa/confirm', [TwoFactorController::class, 'confirm']);
+        Route::post('/2fa/disable', [TwoFactorController::class, 'destroy']);
+
         Route::get('/central/dashboard', function () {
             return response()->json([
                 'company' => 'HIVE.OS Central Command',
@@ -45,14 +52,13 @@ Route::prefix('v1')->group(function () {
             ]);
         });
 
-        // 🚀 CENTRAL ROLES (api/v1/roles)
-        Route::get('/roles/export', [RoleExportController::class, 'handleExport']); // 🚀 ADDED HERE
-        // 2. Add the export route INSIDE the Central Group (before the apiResource):
+        // CENTRAL ROLES
+        Route::get('/roles/export', [RoleExportController::class, 'handleExport']);
         Route::get('/permissions/export', [PermissionExportController::class, 'handleExport']);
         Route::get('/permissions', [RoleController::class, 'permissions']);
         Route::apiResource('roles', RoleController::class);
 
-        // 🚀 CENTRAL USERS (api/v1/users)
+        // CENTRAL USERS
         Route::get('/users/export', [UserExportController::class, 'handleExport']);
         Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
         Route::apiResource('users', UserController::class);
@@ -69,12 +75,18 @@ Route::prefix('v1')->group(function () {
     ])->prefix('tenant')->group(function () {
 
         Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/verify-2fa', [AuthController::class, 'verify2FA']); // 🚀 2FA: Public Verify
         Route::get('/password-policy', [AuthController::class, 'passwordPolicy']);
         Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::get('/user', [AuthController::class, 'user']);
             Route::post('/logout', [AuthController::class, 'logout']);
+
+            // 🚀 2FA: Protected Management Routes
+            Route::post('/2fa/enable', [TwoFactorController::class, 'enable']);
+            Route::post('/2fa/confirm', [TwoFactorController::class, 'confirm']);
+            Route::post('/2fa/disable', [TwoFactorController::class, 'destroy']);
 
             Route::get('/dashboard', function () {
                 return response()->json([
@@ -85,14 +97,13 @@ Route::prefix('v1')->group(function () {
                 ]);
             });
 
-            // 🚀 TENANT ROLES (api/v1/tenant/roles)
-            Route::get('/roles/export', [RoleExportController::class, 'handleExport']); // 🚀 ADDED HERE
-            // 2. Add the export route INSIDE the Central Group (before the apiResource):
+            // TENANT ROLES
+            Route::get('/roles/export', [RoleExportController::class, 'handleExport']);
             Route::get('/permissions/export', [PermissionExportController::class, 'handleExport']);
             Route::get('/permissions', [RoleController::class, 'permissions']);
             Route::apiResource('roles', RoleController::class);
 
-            // 🚀 TENANT USERS (api/v1/tenant/users)
+            // TENANT USERS
             Route::get('/users/export', [UserExportController::class, 'handleExport']);
             Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
             Route::apiResource('users', UserController::class);
