@@ -151,7 +151,6 @@ class FileManagerController extends Controller
         }
     }
 
-    // 🚀 Subtitle Upload Endpoint
     public function uploadSubtitle(Request $request, $id)
     {
         $request->validate([
@@ -198,24 +197,19 @@ class FileManagerController extends Controller
 
         return response(file_get_contents($media->getPath()), 200, [
             'Content-Type' => 'text/vtt',
-            'Access-Control-Allow-Origin' => '*' // 🚀 THE MAGIC KEY
+            'Access-Control-Allow-Origin' => '*'
         ]);
     }
 
-    // 🚀 FIXED: Subtitle Deletion Endpoint using Spatie
     public function deleteSubtitle($uuid)
     {
-        // 1. Find the subtitle using Spatie's Media model directly
         $media = \Spatie\MediaLibrary\MediaCollections\Models\Media::where('uuid', $uuid)->firstOrFail();
 
-        // 2. Security Check: Ensure the user actually owns the file this subtitle belongs to
         $fileEntry = FileEntry::find($media->model_id);
         if ($fileEntry && $fileEntry->user_id !== auth()->id()) {
             abort(403, 'Unauthorized action.');
         }
 
-        // 3. Spatie's delete() method automatically removes BOTH the DB record
-        // AND the physical .vtt file from your storage disk.
         $media->delete();
 
         return response()->json([
@@ -224,30 +218,27 @@ class FileManagerController extends Controller
         ], 200);
     }
 
-    // Inside FileManagerController.php
-
-public function getFileDetails($id)
-{
-    $fileEntry = FileEntry::with('media')->findOrFail($id);
-
-    $media = $fileEntry->getFirstMedia('file');
-
-    $qualities = [
-        'original' => $media->getUrl(),
-        'q_720p'   => $media->hasGeneratedConversion('720p') ? $media->getUrl('720p') : null,
-        'q_1080p'  => $media->hasGeneratedConversion('1080p') ? $media->getUrl('1080p') : null,
-        'q_4k'     => $media->hasGeneratedConversion('4k') ? $media->getUrl('4k') : null,
-    ];
-
-    return response()->json([
-        'file' => $fileEntry,
-        'video_versions' => array_filter($qualities) // Only send existing ones
-    ]);
-}
-
-public function serveStream($mediaId, $filename)
+    public function getFileDetails($id)
     {
-        // Path maps to: storage/app/public/123/processed/playlist.m3u8
+        $fileEntry = FileEntry::with('media')->findOrFail($id);
+
+        $media = $fileEntry->getFirstMedia('file');
+
+        $qualities = [
+            'original' => $media->getUrl(),
+            'q_720p'   => $media->hasGeneratedConversion('720p') ? $media->getUrl('720p') : null,
+            'q_1080p'  => $media->hasGeneratedConversion('1080p') ? $media->getUrl('1080p') : null,
+            'q_4k'     => $media->hasGeneratedConversion('4k') ? $media->getUrl('4k') : null,
+        ];
+
+        return response()->json([
+            'file' => $fileEntry,
+            'video_versions' => array_filter($qualities)
+        ]);
+    }
+
+    public function serveStream($mediaId, $filename)
+    {
         $path = storage_path("app/public/{$mediaId}/processed/{$filename}");
 
         if (!file_exists($path)) {
@@ -261,5 +252,62 @@ public function serveStream($mediaId, $filename)
             'Access-Control-Allow-Origin' => '*',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
         ]);
+    }
+
+    // 🚀 NEW: Secure Fetch to completely bypass Canvas CORS issues
+    public function downloadMedia($id)
+    {
+        $fileEntry = FileEntry::findOrFail($id);
+
+        if ($fileEntry->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized');
+        }
+
+        $media = $fileEntry->getFirstMedia('file');
+        if (!$media) abort(404);
+
+        return response()->file($media->getPath(), [
+            'Content-Type' => $media->mime_type,
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Headers' => 'Authorization, Content-Type',
+        ]);
+    }
+
+    public function saveEditedImage(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|image|max:20480',
+            'original_id' => 'required|exists:file_entries,id'
+        ]);
+
+        $originalEntry = FileEntry::findOrFail($request->original_id);
+
+        if ($originalEntry->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized');
+        }
+
+        try {
+            $newFileEntry = FileEntry::create([
+                'folder_id' => $originalEntry->folder_id,
+                'user_id' => auth()->id(),
+            ]);
+
+            $originalMedia = $originalEntry->getFirstMedia('file');
+            $baseName = $originalMedia ? pathinfo($originalMedia->file_name, PATHINFO_FILENAME) : 'edited_image';
+            $newName = $baseName . '_edited_' . time() . '.jpg';
+
+            $newFileEntry->addMedia($request->file('file'))
+                         ->usingName($newName)
+                         ->usingFileName($newName)
+                         ->toMediaCollection('file');
+
+            return response()->json([
+                'message' => 'Edited image saved successfully',
+                'file' => $newFileEntry->load('media')
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to save edited image: ' . $e->getMessage()], 500);
+        }
     }
 }

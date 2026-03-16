@@ -76,23 +76,24 @@ foreach ($centralDomains as $domain) {
 
             // 📂 FILE MANAGER ROUTES
             Route::prefix('files')->group(function () {
+                // 1. Static Routes (Must come FIRST)
                 Route::get('/', [FileManagerController::class, 'index']);
                 Route::post('/folder', [FileManagerController::class, 'createFolder']);
                 Route::post('/upload', [FileManagerController::class, 'uploadFile']);
+                Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage']);
 
-                // Subtitle Routes (Must come BEFORE generic /{type}/{id} routes)
+                // 2. Specific Parameter Routes
                 Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle']);
                 Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle']);
                 Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle']);
+                Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
+                Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia']); // 🚀 NEW ENDPOINT
 
-                // 🔒 CONSTRAINTS ADDED: Stop these from greedily hijacking other routes
+                // 3. Generic Catch-All Parameter Routes (Must come LAST)
                 Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])
                     ->whereIn('type', ['file', 'folder']);
-
                 Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])
                     ->whereIn('type', ['file', 'folder']);
-                    // Add this right below your subtitle routes in BOTH the Central and Tenant groups
-Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
             });
 
             // 🌐 DYNAMIC LOCALIZATION MANAGEMENT (Central Matrix)
@@ -189,23 +190,24 @@ Route::middleware([
 
         // 📂 FILE MANAGER ROUTES (Tenant - Strict Isolation)
         Route::prefix('files')->group(function () {
+            // 1. Static Routes (Must come FIRST)
             Route::get('/', [FileManagerController::class, 'index']);
             Route::post('/folder', [FileManagerController::class, 'createFolder']);
             Route::post('/upload', [FileManagerController::class, 'uploadFile']);
+            Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage']);
 
-            // Subtitle Routes (Aligned with Central command)
+            // 2. Specific Parameter Routes
             Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle']);
             Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle']);
             Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle']);
+            Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
+            Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia']); // 🚀 NEW ENDPOINT
 
-            // Generic Type Routes (Must come last)
+            // 3. Generic Catch-All Parameter Routes (Must come LAST)
             Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])
                 ->whereIn('type', ['file', 'folder']);
-
             Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])
                 ->whereIn('type', ['file', 'folder']);
-                // Add this right below your subtitle routes in BOTH the Central and Tenant groups
-Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
         });
 
         // 🌐 DYNAMIC LOCALIZATION MANAGEMENT (Tenant Matrix)
