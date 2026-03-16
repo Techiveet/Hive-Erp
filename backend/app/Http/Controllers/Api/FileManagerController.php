@@ -151,7 +151,7 @@ class FileManagerController extends Controller
         }
     }
 
-    // 🚀 NEW: Subtitle Upload Endpoint
+    // 🚀 Subtitle Upload Endpoint
     public function uploadSubtitle(Request $request, $id)
     {
         $request->validate([
@@ -192,7 +192,7 @@ class FileManagerController extends Controller
         return response()->json(['message' => ucfirst($type) . ' moved to recycle bin']);
     }
 
-   public function serveSubtitle($uuid)
+    public function serveSubtitle($uuid)
     {
         $media = \Spatie\MediaLibrary\MediaCollections\Models\Media::where('uuid', $uuid)->firstOrFail();
 
@@ -200,5 +200,27 @@ class FileManagerController extends Controller
             'Content-Type' => 'text/vtt',
             'Access-Control-Allow-Origin' => '*' // 🚀 THE MAGIC KEY
         ]);
+    }
+
+    // 🚀 FIXED: Subtitle Deletion Endpoint using Spatie
+    public function deleteSubtitle($uuid)
+    {
+        // 1. Find the subtitle using Spatie's Media model directly
+        $media = \Spatie\MediaLibrary\MediaCollections\Models\Media::where('uuid', $uuid)->firstOrFail();
+
+        // 2. Security Check: Ensure the user actually owns the file this subtitle belongs to
+        $fileEntry = FileEntry::find($media->model_id);
+        if ($fileEntry && $fileEntry->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // 3. Spatie's delete() method automatically removes BOTH the DB record
+        // AND the physical .vtt file from your storage disk.
+        $media->delete();
+
+        return response()->json([
+            'message' => 'Subtitle deleted successfully',
+            'deleted_uuid' => $uuid
+        ], 200);
     }
 }

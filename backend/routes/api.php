@@ -74,25 +74,24 @@ foreach ($centralDomains as $domain) {
             // 🚀 GLOBAL SEARCH ENGINE (Central)
             Route::get('/search', [GlobalSearchController::class, 'search']);
 
-            // 📂 FILE MANAGER ROUTES (Central)
-           // 📂 FILE MANAGER ROUTES
-        Route::prefix('files')->group(function () {
-            Route::get('/', [FileManagerController::class, 'index']);
-            Route::post('/folder', [FileManagerController::class, 'createFolder']);
-            Route::post('/upload', [FileManagerController::class, 'uploadFile']);
+            // 📂 FILE MANAGER ROUTES
+            Route::prefix('files')->group(function () {
+                Route::get('/', [FileManagerController::class, 'index']);
+                Route::post('/folder', [FileManagerController::class, 'createFolder']);
+                Route::post('/upload', [FileManagerController::class, 'uploadFile']);
 
-            // 🚀 Ensure this is plural "subtitles" to match the React frontend
-            Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle']);
-            Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle']);
+                // Subtitle Routes (Must come BEFORE generic /{type}/{id} routes)
+                Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle']);
+                Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle']);
+                Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle']);
 
+                // 🔒 CONSTRAINTS ADDED: Stop these from greedily hijacking other routes
+                Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])
+                    ->whereIn('type', ['file', 'folder']);
 
-            // 🔒 CONSTRAINTS ADDED: Stop these from greedily hijacking other routes
-            Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])
-                ->whereIn('type', ['file', 'folder']);
-
-            Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])
-                ->whereIn('type', ['file', 'folder']);
-        });
+                Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])
+                    ->whereIn('type', ['file', 'folder']);
+            });
 
             // 🌐 DYNAMIC LOCALIZATION MANAGEMENT (Central Matrix)
             Route::prefix('localization')->group(function () {
@@ -191,9 +190,18 @@ Route::middleware([
             Route::get('/', [FileManagerController::class, 'index']);
             Route::post('/folder', [FileManagerController::class, 'createFolder']);
             Route::post('/upload', [FileManagerController::class, 'uploadFile']);
-            Route::post('/{id}/subtitles', [FileManagerController::class, 'uploadSubtitle']); // 🚀 SUBTITLE ENDPOINT ADDED
-            Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite']);
-            Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy']);
+
+            // Subtitle Routes (Aligned with Central command)
+            Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle']);
+            Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle']);
+            Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle']);
+
+            // Generic Type Routes (Must come last)
+            Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])
+                ->whereIn('type', ['file', 'folder']);
+
+            Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])
+                ->whereIn('type', ['file', 'folder']);
         });
 
         // 🌐 DYNAMIC LOCALIZATION MANAGEMENT (Tenant Matrix)
