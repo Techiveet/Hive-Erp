@@ -5,15 +5,26 @@ namespace App\Models;
 use Laravel\Scout\Searchable;
 use Spatie\Permission\Models\Role as SpatieRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Role extends SpatieRole
 {
-    use HasFactory, Searchable;
+    use HasFactory, Searchable, LogsActivity;
 
     protected $fillable = [
         'name',
         'guard_name',
     ];
+
+    public function searchableAs()
+    {
+        $prefix = function_exists('tenant') && tenant('id')
+            ? 'tenant_' . tenant('id') . '_'
+            : 'central_';
+
+        return $prefix . $this->getTable();
+    }
 
     public function toSearchableArray(): array
     {
@@ -24,6 +35,7 @@ class Role extends SpatieRole
             'tenant_id'   => function_exists('tenant') && tenant('id') ? tenant('id') : 'central',
             'name'        => $this->name,
             'guard_name'  => $this->guard_name,
+            // 🚀 Meilisearch will index this array, allowing search by permission name
             'permissions' => $this->permissions->pluck('name')->toArray(),
         ];
     }
@@ -38,12 +50,12 @@ class Role extends SpatieRole
         return in_array($this->name, ['Super Admin', 'Admin']);
     }
 
-    /**
-     * Override the default Scout Key to prevent ID collisions
-     */
-    public function getScoutKey(): mixed
+    public function getActivitylogOptions(): LogOptions
     {
-        $tenantId = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
-        return $tenantId . '_' . $this->getKey();
+        return LogOptions::defaults()
+            ->logOnly(['name', 'guard_name'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('Roles & Permissions');
     }
 }

@@ -11,35 +11,37 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class PermissionsExport implements FromQuery, WithHeadings, WithMapping, WithStyles
 {
-    public function __construct(private Builder $query) {}
+    private int $rowCount = 0;
 
-    public function query()
-    {
-        return $this->query;
-    }
+    public function __construct(private Builder $query, private array $dictionary = []) {}
+
+    private function t($key, $default) { return $this->dictionary[$key] ?? $default; }
+
+    public function query() { return $this->query; }
 
     public function headings(): array
     {
         return [
-            'ID',
-            'Capability Code',
-            'Human-Readable Description',
-            'Security Scope',
-            'Created At',
+            '#',
+            $this->t('permissions.col_code', 'Capability Code'),
+            $this->t('permissions.col_desc', 'Human-Readable Description'),
+            $this->t('permissions.col_scope', 'Security Scope'),
         ];
     }
 
     public function map($permission): array
     {
-        // Convert "edit_users" to "Edit Users"
-        $description = 'Allows operator to ' . ucwords(str_replace('_', ' ', $permission->name));
+        $this->rowCount++;
+
+        $descContext = $this->t('permissions.allows_operator', 'Allows operator to');
+        $description = $descContext . ' ' . ucwords(str_replace('_', ' ', $permission->name));
+        $scope = $permission->guard_name === 'tenant' ? $this->t('permissions.tenant_node', 'Tenant Node') : $this->t('permissions.central', 'Central Command');
 
         return [
-            $permission->id,
+            $this->rowCount,
             $permission->name,
             $description,
-            $permission->guard_name === 'tenant' ? 'Tenant Node' : 'Central Command',
-            $permission->created_at->format('Y-m-d H:i:s'),
+            $scope,
         ];
     }
 

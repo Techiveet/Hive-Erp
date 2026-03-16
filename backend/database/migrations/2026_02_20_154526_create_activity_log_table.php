@@ -15,6 +15,8 @@ class CreateActivityLogTable extends Migration
             $table->nullableMorphs('subject', 'subject');
             $table->nullableMorphs('causer', 'causer');
             $table->json('properties')->nullable();
+            // 🚀 THE HIVE ERP MULTI-TENANCY FIX (Only add this line)
+            $table->string('tenant_id')->nullable()->index();
             $table->timestamps();
             $table->index('log_name');
         });

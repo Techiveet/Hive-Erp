@@ -11,48 +11,45 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class RolesExport implements FromQuery, WithHeadings, WithMapping, WithStyles
 {
-    public function __construct(private Builder $query) {}
+    private int $rowCount = 0;
 
-    public function query()
-    {
-        return $this->query;
-    }
+    public function __construct(private Builder $query, private array $dictionary = []) {}
+
+    private function t($key, $default) { return $this->dictionary[$key] ?? $default; }
+
+    public function query() { return $this->query; }
 
     public function headings(): array
     {
         return [
-            'ID',
-            'Clearance Designation',
-            'Active Capabilities (Permissions)',
-            'Total Capabilities',
-            'Established Date',
+            '#',
+            $this->t('roles.col_designation', 'Clearance Designation'),
+            $this->t('roles.col_capabilities', 'Active Capabilities (Permissions)'),
+            $this->t('roles.col_established', 'Established Date'),
         ];
     }
 
     public function map($role): array
     {
+        $this->rowCount++;
         $permissions = $role->permissions->pluck('name')->implode(', ');
-        
-        // Handle Super Admin god mode
+
         if ($role->name === 'Super Admin') {
-            $permissions = 'ALL PROTOCOLS (GOD MODE)';
+            $permissions = $this->t('roles.god_mode', 'ALL PROTOCOLS (GOD MODE)');
         } elseif (empty($permissions)) {
-            $permissions = 'No Access';
+            $permissions = $this->t('roles.no_access', 'No Access');
         }
 
         return [
-            $role->id,
+            $this->rowCount,
             $role->name,
             $permissions,
-            $role->name === 'Super Admin' ? 'ALL' : $role->permissions->count(),
             $role->created_at->format('Y-m-d H:i:s'),
         ];
     }
 
     public function styles(Worksheet $sheet)
     {
-        return [
-            1 => ['font' => ['bold' => true]], // Bold the first row (headings)
-        ];
+        return [ 1 => ['font' => ['bold' => true]] ];
     }
 }

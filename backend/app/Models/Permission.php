@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Laravel\Scout\Searchable;
 use Spatie\Permission\Models\Permission as SpatiePermission;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Permission extends SpatiePermission
 {
-    use Searchable;
+    use Searchable, LogsActivity;
 
     public function toSearchableArray(): array
     {
@@ -19,12 +21,19 @@ class Permission extends SpatiePermission
         ];
     }
 
-    /**
-     * Override the default Scout Key to prevent ID collisions
-     */
     public function getScoutKey(): mixed
     {
         $tenantId = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
         return $tenantId . '_' . $this->getKey();
+    }
+
+    // 🚀 INJECTED LOGGING RULES
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'guard_name'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('Roles & Permissions');
     }
 }

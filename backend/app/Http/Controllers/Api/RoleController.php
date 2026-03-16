@@ -8,6 +8,7 @@ use Spatie\Permission\Models\Permission;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class RoleController extends Controller
 {
@@ -27,38 +28,83 @@ class RoleController extends Controller
         $context = $this->getContext();
         $search = $request->input('search', '');
         $pageSize = $request->input('pageSize', 10);
-        $tenantId = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
+        $isTenant = function_exists('tenant') && tenant('id');
+        $tenantId = $isTenant ? tenant('id') : 'central';
 
         $query = Role::where('guard_name', $context['guard'])->with('permissions');
+        $engine = 'database';
 
         if (!empty($search)) {
-            $rawIds = Role::search($search)
-                ->where('tenant_id', $tenantId)
-                ->where('guard_name', $context['guard'])
-                ->keys();
+            $scoutDriver = config('scout.driver');
+            $meilisearchSuccess = false;
 
-            if ($rawIds->isEmpty()) {
-                $query->whereRaw('1 = 0');
+            // 🚀 ROUTE 1: MEILISEARCH ENGINE (With Timeout Protection)
+            if ($scoutDriver === 'meilisearch') {
+                try {
+                    $indexName = $isTenant ? "tenant_{$tenantId}_roles" : "central_roles";
+                    $scout = Role::search($search)->within($indexName);
+
+                    $scout->query(function ($q) use ($context) {
+                        $q->where('guard_name', $context['guard'])->with('permissions');
+                    });
+
+                    if ($request->has('nopaginate')) {
+                        $roles = $scout->get();
+                    } else {
+                        $roles = $scout->paginate($pageSize);
+                    }
+
+                    $engine = 'meilisearch';
+                    $meilisearchSuccess = true;
+                } catch (\Exception $e) {
+                    // If Meilisearch is down or timing out, log it and fallback instantly
+                    Log::warning("Meilisearch failed, falling back to Database Engine: " . $e->getMessage());
+                    $meilisearchSuccess = false;
+                }
+            }
+
+            // 🚀 ROUTE 2: DATABASE ENGINE (Supports searching Permission Names)
+            if (!$meilisearchSuccess) {
+                $query->where(function ($q) use ($search) {
+                    // Search Role Name
+                    $q->where('name', 'like', "%{$search}%")
+                      // ALSO Search Permission Names attached to the role
+                      ->orWhereHas('permissions', function ($pq) use ($search) {
+                          $pq->where('name', 'like', "%{$search}%");
+                      });
+                });
+
+                $query->orderBy('created_at', 'desc');
+
+                if ($request->has('nopaginate')) {
+                    $roles = $query->get();
+                } else {
+                    $roles = $query->paginate($pageSize);
+                }
+
+                $engine = $scoutDriver === 'meilisearch' ? 'database_fallback' : 'database';
+            }
+        } else {
+            // No Search Query
+            $query->orderBy('created_at', 'desc');
+
+            if ($request->has('nopaginate')) {
+                $roles = $query->get();
             } else {
-                $dbIds = collect($rawIds)->map(fn($id) => explode('_', $id)[1] ?? $id)->toArray();
-                $query->whereIn('id', $dbIds);
+                $roles = $query->paginate($pageSize);
             }
         }
 
-        $query->orderBy('created_at', 'desc');
-
-        if ($request->has('nopaginate')) {
-            return response()->json(['data' => $query->get()]);
-        }
-
-        $roles = $query->paginate($pageSize);
+        $data = $request->has('nopaginate') ? $roles : $roles->items();
+        $total = $request->has('nopaginate') ? count($roles) : $roles->total();
 
         return response()->json([
-            'data' => $roles->items(),
+            'data' => $data,
             'meta' => [
-                'total' => $roles->total(),
+                'total'   => $total,
                 'context' => $context['domain'],
-                'guard' => $context['guard']
+                'guard'   => $context['guard'],
+                'engine'  => $engine
             ]
         ]);
     }
@@ -110,7 +156,6 @@ class RoleController extends Controller
 
         $role = Role::where('id', $id)->where('guard_name', $guard)->firstOrFail();
 
-        // 🚀 CRITICAL SECURITY LOCK: Super Admin is completely immutable
         if ($role->name === 'Super Admin') {
             return response()->json(['message' => 'The Super Admin clearance level is hardcoded and cannot be modified.'], 403);
         }
@@ -121,7 +166,6 @@ class RoleController extends Controller
             'permissions.*' => ['string', Rule::exists('permissions', 'name')->where('guard_name', $guard)],
         ]);
 
-        // Secondary Lock: Prevent renaming of the regular 'Admin' role
         if ($role->name === 'Admin' && $request->name !== $role->name) {
             return response()->json(['message' => 'Core system roles cannot be renamed.'], 403);
         }

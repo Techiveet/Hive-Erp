@@ -1,0 +1,21 @@
+{
+    "dashboard": "ዳሽቦርድ",
+    "tenants": "የተከራይ ኖዶች",
+    "security": "ማንነት እና መዳረሻ",
+    "audit_logs": "የኦዲት መዝገቦች",
+    "storage": "ማከማቻ",
+    "settings": "ቅንብሮች",
+    "control_hub": "የመቆጣጠሪያ ማዕከል",
+    "disconnect": "ኖዱን አቋርጥ",
+    "theme": "ገጽታ",
+    "close": "ዝጋ",
+    "settings_general": "ጠቅላላ",
+    "settings_general_desc": "መሰረታዊ የስርዓት ውቅር።",
+    "settings_security_desc": "የማረጋገጫ እና የመዳረሻ ፖሊሲዎች።",
+    "settings_loc": "ቋንቋ መቀየሪያ",
+    "settings_loc_desc": "ተለዋዋጭ የስርዓት ቋንቋዎችን ያስተዳድሩ።",
+    "settings_notif": "ማሳወቂያዎች",
+    "settings_notif_desc": "የኢሜል እና የስርዓት ማንቂያዎች።",
+    "settings_locked": "ውቅረት ተቆልፏል",
+    "settings_audit_msg": "ማትሪክስ በአሁኑ ጊዜ የደህንነት ኦዲት እየተደረገበት ነው። ሞጁሎች በሚቀጥለው ጥገኝ ይከፈታሉ።"
+}

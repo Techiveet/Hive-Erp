@@ -5,6 +5,8 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Model; // <-- Add this import
 use Stancl\Tenancy\Tenancy;
+use Illuminate\Support\Facades\Gate;
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -31,5 +33,10 @@ class AppServiceProvider extends ServiceProvider
             }
         });
     }
+
+    // Implicitly grant "Super Admin" role all permissions
+        Gate::before(function ($user, $ability) {
+            return $user->hasRole('Super Admin', 'sanctum') ? true : null;
+        });
     }
 }

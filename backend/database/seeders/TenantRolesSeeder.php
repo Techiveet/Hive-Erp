@@ -18,8 +18,7 @@ class TenantRolesSeeder extends Seeder
         $perms = [
             'view_users', 'create_users', 'edit_users', 'delete_users', 'manage_users',
             'view_roles', 'create_roles', 'edit_roles', 'delete_roles', 'manage_roles',
-            'view_permissions', // 🚀 Added to Tenant Dictionary
-
+            'view_permissions',
             'view_logs', 'export_logs', 'manage_storage',
             'view_invoices', 'manage_invoices',
             'view_inventory', 'manage_inventory',
@@ -31,7 +30,7 @@ class TenantRolesSeeder extends Seeder
         }
 
         $roles = [
-            'Admin' => $perms,
+            'Super Admin' => $perms, // 🚀 FIX: Name changed to 'Super Admin' to align with UI creations
             'HR Manager' => ['view_users', 'create_users', 'edit_users', 'view_roles'],
             'Finance Controller' => ['view_invoices', 'manage_invoices', 'view_logs'],
             'Logistics Coordinator' => ['view_inventory', 'manage_inventory', 'manage_fleet'],

@@ -1,8 +1,7 @@
-# backend/Dockerfile
-FROM php:8.4-cli-alpine
+FROM php:8.4-cli-alpine3.20
 
 # 1. Install system dependencies
-# Includes libraries for Postgres, ZIP, GD (Images), and build tools for PECL
+# Includes libraries for Postgres, ZIP, GD (Images), FFmpeg (Video), and build tools for PECL
 RUN apk add --no-cache \
     postgresql-dev \
     libzip-dev \
@@ -14,6 +13,7 @@ RUN apk add --no-cache \
     libjpeg-turbo-dev \
     libpng-dev \
     zlib-dev \
+    ffmpeg \
     $PHPIZE_DEPS
 
 # 2. Configure and Install PHP extensions
@@ -22,8 +22,10 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_pgsql zip pcntl sockets opcache gd exif
 
 # 3. Performance & Resource Tuning
-# Increase memory limit to 2GB to prevent Composer "Memory Exhausted" errors
+# Increase limits to support 5MB chunked video uploads and prevent Composer memory limits
 RUN echo "memory_limit=2G" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
+    && echo "upload_max_filesize=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
+    && echo "post_max_size=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
     && echo "opcache.enable_cli=1" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
     && echo "opcache.jit_buffer_size=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
     && echo "opcache.jit=tracing" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini

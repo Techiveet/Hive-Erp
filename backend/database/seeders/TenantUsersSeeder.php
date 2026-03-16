@@ -24,12 +24,15 @@ class TenantUsersSeeder extends Seeder
                 'name' => ucfirst($tenantId) . ' Controller',
                 'password' => Hash::make('password'),
                 'email_verified_at' => now(),
+                'is_active' => true,
+                // 🚀 FIX: Explicitly force 2FA to remain disabled
+                'two_factor_secret' => null,
+                'two_factor_recovery_codes' => null,
             ]
         );
 
-        // 🚀 FIX: Set the property for logic, but DON'T call save() after setting it.
         $admin->guard_name = $guard;
-        $admin->assignRole('Admin');
+        $admin->assignRole('Super Admin');
 
         // 2. Department Heads
         $staff = [
@@ -44,21 +47,28 @@ class TenantUsersSeeder extends Seeder
                 [
                     'name' => $member['name'],
                     'password' => Hash::make('password'),
-                    'email_verified_at' => now()
+                    'email_verified_at' => now(),
+                    'is_active' => true,
+                    // 🚀 FIX: Explicitly force 2FA to remain disabled
+                    'two_factor_secret' => null,
+                    'two_factor_recovery_codes' => null,
                 ]
             );
 
-            // 🚀 FIX: Setting this property allows assignRole to find the right permission
-            // without needing a column in the DB.
             $user->guard_name = $guard;
             $user->assignRole($member['role']);
         }
 
         // 3. General Staff
-        User::factory(3)->create(['password' => Hash::make('password')])
-            ->each(function ($u) use ($guard) {
-                $u->guard_name = $guard;
-                $u->assignRole('Employee');
-            });
+        User::factory(3)->create([
+            'password' => Hash::make('password'),
+            'is_active' => true,
+            // 🚀 FIX: Explicitly force 2FA to remain disabled
+            'two_factor_secret' => null,
+            'two_factor_recovery_codes' => null,
+        ])->each(function ($u) use ($guard) {
+            $u->guard_name = $guard;
+            $u->assignRole('Employee');
+        });
     }
 }

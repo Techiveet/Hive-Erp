@@ -10,17 +10,16 @@ use Laravel\Scout\Searchable;
 
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
+    // 🚀 FIX: Removed 'LogsActivity'. We handle logging manually in the Controller.
     use HasDatabase, HasDomains, Searchable;
 
     protected $fillable = [
         'id',
-        'plan',         // Useful for filtering search by subscription tier
+        'name',
+        'plan',
         'data',
     ];
 
-    /**
-     * Define which data is stored in the central database for this tenant.
-     */
     public static function getCustomColumns(): array
     {
         return [
@@ -29,26 +28,35 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         ];
     }
 
-    /**
-     * Define exactly what data is sent to Meilisearch.
-     * Optimized for search performance.
-     */
-    public function toSearchableArray(): array
+    // 🚀 CRITICAL FIX 1: Lock the index name!
+    // Tenants belong to the central ecosystem. They should NOT have dynamic prefixes.
+    public function searchableAs()
     {
+        return 'central_tenants';
+    }
+
+    // 🚀 CRITICAL FIX 2: Meilisearch Primary Key Sanitization!
+    // Meilisearch strictly rejects IDs with dots (.) or spaces. We must format it for Scout.
+    public function getScoutKey()
+    {
+        return str_replace(['.', ' '], '-', $this->getKey());
+    }
+
+   public function toSearchableArray(): array
+    {
+        // 🚀 THE FIX: Explicitly eager load the domains relationship
+        // to satisfy Laravel's strict lazy loading prevention!
+        $this->loadMissing('domains');
+
         return [
-            'id'     => $this->id,
-            'plan'   => $this->plan ?? 'larva',
-            'domain' => $this->domains->first()?->domain,
-            // Add other high-level metadata you might want to search by globally
+            'id'         => $this->id,
+            'name'       => $this->name ?? $this->id,
+            'plan'       => $this->plan ?? 'Standard',
+            'domain'     => $this->domains->first()?->domain,
             'created_at' => $this->created_at?->timestamp,
         ];
     }
 
-    /**
-     * PERFORMANCE FIX:
-     * In an ERP, you don't want search indexing to slow down tenant creation.
-     * This tells Scout to perform the indexing in the background via Redis.
-     */
     public function shouldBeSearchable(): bool
     {
         return $this->id !== null;

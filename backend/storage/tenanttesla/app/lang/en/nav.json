@@ -1,0 +1,12 @@
+{
+    "dashboard": "Dashboard",
+    "tenants": "Tenant Nodes",
+    "security": "Identity & Access",
+    "audit_logs": "Audit Logs",
+    "storage": "Storage",
+    "settings": "Settings",
+    "control_hub": "Control Hub",
+    "disconnect": "Disconnect Node",
+    "theme": "Theme",
+    "close": "Close"
+}

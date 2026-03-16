@@ -3,19 +3,18 @@
 namespace App\Http\Controllers\Api\Export;
 
 use App\Models\Role;
+use App\Models\Language;
 use App\Exports\RolesExport;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\Response;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class RoleExportController extends Controller
 {
-    private function getGuard(): string
-    {
-        return (function_exists('tenancy') && tenancy()->initialized) ? 'tenant' : 'web';
-    }
+    private function getGuard(): string { return (function_exists('tenancy') && tenancy()->initialized) ? 'tenant' : 'web'; }
 
     public function getFilteredQuery(Request $request)
     {
@@ -24,28 +23,18 @@ class RoleExportController extends Controller
 
         $query = Role::where('guard_name', $guard)->with('permissions');
 
-        // 1. Manual ID Selection (Checkboxes)
         if ($request->filled('ids')) {
             $ids = is_array($request->ids) ? $request->ids : explode(',', $request->ids);
             $query->whereIn('id', $ids);
-        }
-        // 2. Meilisearch Integration (Scout)
-        elseif ($request->filled('search')) {
-            $rawIds = Role::search($request->search)
-                ->where('tenant_id', $tenantId)
-                ->where('guard_name', $guard)
-                ->keys();
-
-            if ($rawIds->isEmpty()) {
-                $query->whereRaw('1 = 0');
-            } else {
-                // Decode 'central_1' back into database ID '1'
+        } elseif ($request->filled('search')) {
+            $rawIds = Role::search($request->search)->where('tenant_id', $tenantId)->where('guard_name', $guard)->keys();
+            if ($rawIds->isEmpty()) $query->whereRaw('1 = 0');
+            else {
                 $dbIds = collect($rawIds)->map(fn($id) => explode('_', $id)[1] ?? $id)->toArray();
                 $query->whereIn('id', $dbIds);
             }
         }
 
-        // 3. Sorting Logic
         if ($request->filled('sortCol') && $request->filled('sortDir')) {
             $query->orderBy($request->sortCol, $request->sortDir);
         } else {
@@ -59,44 +48,45 @@ class RoleExportController extends Controller
     {
         $type = $request->query('type', $request->query('format', 'xlsx'));
 
-        abort_unless(
-            in_array($type, ['csv', 'excel', 'xlsx', 'pdf', 'print', 'copy']),
-            Response::HTTP_BAD_REQUEST,
-            'Invalid export format.'
-        );
+        abort_unless(in_array($type, ['csv', 'excel', 'xlsx', 'pdf', 'print', 'copy']), Response::HTTP_BAD_REQUEST, 'Invalid export format.');
+
+        $locale = $request->input('locale', 'en');
+        $cachePrefix = function_exists('tenant') && tenant('id') ? 'tenant_' . tenant('id') : 'central';
+
+        $dictionary = Cache::rememberForever("{$cachePrefix}_translations_{$locale}", function () use ($locale) {
+            $language = Language::where('code', $locale)->where('is_active', true)->first();
+            return $language ? $language->translations()->pluck('value', 'key')->toArray() : [];
+        });
+
+        $t = function($key, $default) use ($dictionary) { return $dictionary[$key] ?? $default; };
 
         $filename = 'hive_roles_matrix_' . now()->format('Y-m-d_His');
 
-        // Handle Excel/CSV
         if (in_array($type, ['csv', 'excel', 'xlsx'])) {
             $format = ($type === 'csv') ? \Maatwebsite\Excel\Excel::CSV : \Maatwebsite\Excel\Excel::XLSX;
-            return Excel::download(new RolesExport($this->getFilteredQuery($request)), "{$filename}.{$type}", $format);
+            return Excel::download(new RolesExport($this->getFilteredQuery($request), $dictionary), "{$filename}.{$type}", $format);
         }
 
-        // Handle PDF
         if ($type === 'pdf') {
             $roles = $this->getFilteredQuery($request)->get();
             $pdf = Pdf::loadView('exports.roles', [
-                'title' => 'Hive Security: Access Control Matrix',
+                'title' => $t('roles.title', 'Hive Security: Access Control Matrix'),
                 'data'  => $roles,
-            ])->setPaper('a4', 'landscape'); // Landscape is better for long permission lists
+            ])->setPaper('a4', 'landscape');
 
             return $pdf->download("{$filename}.pdf");
         }
 
-        // Handle Print/JSON for Frontend DataTable Copy
         if (in_array($type, ['print', 'copy'])) {
-            $roles = $this->getFilteredQuery($request)->get()->map(function($role, $index) {
-
+            $roles = $this->getFilteredQuery($request)->get()->map(function($role) use ($t) {
                 $perms = $role->permissions->pluck('name')->implode(', ');
-                if ($role->name === 'Super Admin') $perms = 'ALL PROTOCOLS (GOD MODE)';
-                if (empty($perms)) $perms = 'No Access';
+                if ($role->name === 'Super Admin') $perms = $t('roles.god_mode', 'ALL PROTOCOLS (GOD MODE)');
+                if (empty($perms)) $perms = $t('roles.no_access', 'No Access');
 
                 return [
-                    'serial' => $index + 1,
-                    'name'   => $role->name,
-                    'permissions' => $perms,
-                    'established' => $role->created_at->format('Y-m-d'),
+                    $t('roles.col_designation', 'Clearance Designation')   => $role->name,
+                    $t('roles.col_capabilities', 'Capabilities')           => $perms,
+                    $t('roles.col_established', 'Established')             => $role->created_at->format('Y-m-d'),
                 ];
             });
 

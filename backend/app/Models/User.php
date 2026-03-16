@@ -10,10 +10,12 @@ use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Builder;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Http\Request;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, Searchable, HasRoles, HasApiTokens;
+    use HasFactory, Notifiable, Searchable, HasRoles, HasApiTokens, LogsActivity;
 
     protected $fillable = [
         'name',
@@ -24,6 +26,7 @@ class User extends Authenticatable
         'two_factor_secret',
         'two_factor_recovery_codes',
         'two_factor_confirmed_at',
+        'email_verified_at',
     ];
 
     protected $hidden = [
@@ -60,21 +63,30 @@ class User extends Authenticatable
             : 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF';
     }
 
-    public function toSearchableArray(): array
+    public function searchableAs()
     {
-        $this->loadMissing('roles');
-        
-        return [
-            'id'         => (int) $this->id,
-            'tenant_id'  => function_exists('tenant') && tenant('id') ? tenant('id') : 'central',
-            'name'       => $this->name,
-            'email'      => $this->email,
-            'roles'      => $this->roles->pluck('name')->toArray(),
-            'guard_name' => $this->guard_name,
-            'is_active'  => (bool) $this->is_active,
-            'created_at' => (int) ($this->created_at?->timestamp ?? now()->timestamp),
-        ];
+        $prefix = function_exists('tenant') && tenant('id')
+            ? 'tenant_' . tenant('id') . '_'
+            : 'central_';
+
+        return $prefix . $this->getTable(); // e.g. "central_users" or "tenant_apple_users"
     }
+
+   public function toSearchableArray(): array
+{
+    // Ensure relationships are loaded for indexing
+    $this->loadMissing('roles');
+
+    return [
+        // Primary key must be an integer or string Meilisearch can index
+        'id'         => (int) $this->id,
+        'name'       => $this->name,
+        'email'      => $this->email,
+        'roles'      => $this->roles->pluck('name')->toArray(),
+        'is_active'  => (bool) $this->is_active,
+        'created_at' => (int) $this->created_at?->timestamp,
+    ];
+}
 
     public function scopeFilter(Builder $query, Request $request): Builder
     {
@@ -100,12 +112,13 @@ class User extends Authenticatable
         return $query->with('roles');
     }
 
-    /**
-     * Override the default Scout Key to prevent ID collisions between tenants in Meilisearch.
-     */
-    public function getScoutKey(): mixed
+    // 🚀 INJECTED LOGGING RULES
+    public function getActivitylogOptions(): LogOptions
     {
-        $tenantId = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
-        return $tenantId . '_' . $this->getKey();
+        return LogOptions::defaults()
+            ->logOnly(['name', 'email', 'is_active'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('Identity & Access');
     }
 }

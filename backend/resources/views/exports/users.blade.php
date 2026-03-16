@@ -4,22 +4,21 @@
     <meta charset="utf-8">
     <title>{{ $title }}</title>
     <style>
-        @page {
-            margin: 80px 25px 50px 25px; /* Top, Right, Bottom, Left */
-        }
+        @page { margin: 80px 25px 50px 25px; }
         body {
+            /* Clean fallback to standard English PDF fonts */
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 10px;
             color: #334155;
         }
-        /* Repeating Header */
+
         header {
             position: fixed;
             top: -60px;
             left: 0px;
             right: 0px;
             height: 40px;
-            border-bottom: 2px solid #6366f1; /* Indigo Accent */
+            border-bottom: 2px solid #6366f1;
         }
         .brand {
             font-size: 16px;
@@ -27,6 +26,7 @@
             color: #1e1b4b;
             letter-spacing: 1.5px;
             margin: 0;
+            text-transform: uppercase;
         }
         .report-meta {
             font-family: 'Courier New', Courier, monospace;
@@ -35,7 +35,7 @@
             margin-top: 4px;
             text-transform: uppercase;
         }
-        /* Repeating Footer */
+
         footer {
             position: fixed;
             bottom: -35px;
@@ -45,21 +45,11 @@
             border-top: 1px solid #e2e8f0;
             padding-top: 8px;
         }
-        .footer-table {
-            width: 100%;
-            border: none;
-            margin: 0;
-        }
-        .footer-table td {
-            border: none;
-            padding: 0;
-            font-size: 8px;
-            color: #94a3b8;
-        }
+        .footer-table { width: 100%; border: none; margin: 0; }
+        .footer-table td { border: none; padding: 0; font-size: 8px; color: #94a3b8; }
         .text-right { text-align: right; }
         .text-left { text-align: left; }
 
-        /* Main Table */
         .data-table {
             width: 100%;
             border-collapse: collapse;
@@ -80,24 +70,28 @@
             border-bottom: 1px solid #f1f5f9;
             vertical-align: middle;
         }
-        .data-table tr:nth-child(even) {
-            background-color: #fdfdfd;
+        .data-table tr:nth-child(even) { background-color: #fdfdfd; }
+
+        .badge {
+            font-weight: bold;
+            font-size: 8px;
+            text-transform: uppercase;
         }
-        .status-active { color: #059669; font-weight: bold; }
-        .status-inactive { color: #dc2626; font-weight: bold; }
+        .status-active { color: #059669; font-weight: bold; text-transform: uppercase; }
+        .status-inactive { color: #dc2626; font-weight: bold; text-transform: uppercase; }
         .font-bold { font-weight: bold; color: #0f172a; }
     </style>
 </head>
 <body>
     <header>
-        <h1 class="brand">HIVE.OS :: {{ strtoupper($title) }}</h1>
+        <h1 class="brand">HIVE.OS :: {{ $title }}</h1>
         <div class="report-meta">REPORT_TYPE: USER_REGISTRY | GENERATED: {{ now()->format('Y-m-d H:i:s T') }}</div>
     </header>
 
     <footer>
         <table class="footer-table">
             <tr>
-                <td class="text-left">HIVE.OS Enterprise Resource Planning - Internal System Audit</td>
+                <td class="text-left">Generated from HIVE.OS — Created by Techive Technology Solutions</td>
                 <td class="text-right">
                     <script type="text/php">
                         if (isset($pdf)) {
@@ -106,7 +100,7 @@
                             $text = "PAGE {PAGE_NUM} OF {PAGE_COUNT}";
                             $font = $fontMetrics->get_font("Helvetica", "normal");
                             $size = 7;
-                            $color = array(0.58, 0.63, 0.72); // #94a3b8
+                            $color = array(0.58, 0.63, 0.72);
                             $pdf->page_text($x, $y, $text, $font, $size, $color);
                         }
                     </script>
@@ -120,11 +114,11 @@
             <thead>
                 <tr>
                     <th width="5%">#</th>
-                    <th width="25%">Operator Name</th>
-                    <th width="30%">System Email</th>
-                    <th width="15%">Role</th>
-                    <th width="10%">Status</th>
-                    <th width="15%">Provisioned</th>
+                    <th width="25%">{{ $t('users.col_operator', 'Operator Name') }}</th>
+                    <th width="30%">{{ $t('users.email_address', 'System Email') }}</th>
+                    <th width="15%">{{ $t('users.col_clearance', 'Role') }}</th>
+                    <th width="10%">{{ $t('users.col_status', 'Status') }}</th>
+                    <th width="15%">{{ $t('users.col_provisioned', 'Provisioned') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -135,7 +129,7 @@
                         <td>{{ $user->email }}</td>
                         <td>{{ $user->roles->first()?->name ?? 'Member' }}</td>
                         <td class="{{ $user->is_active ? 'status-active' : 'status-inactive' }}">
-                            {{ $user->is_active ? 'ACTIVE' : 'LOCKED' }}
+                            {{ $user->is_active ? $t('global.active', 'ACTIVE') : $t('global.locked', 'LOCKED') }}
                         </td>
                         <td>{{ $user->created_at->format('Y-m-d') }}</td>
                     </tr>

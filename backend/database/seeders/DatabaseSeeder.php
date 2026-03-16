@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             CentralRolesSeeder::class,
             CentralUsersSeeder::class,
             TenantsSeeder::class, // This spawns everything else!
+            LanguageSeeder::class,
         ]);
     }
 }

@@ -6,20 +6,14 @@ return [
     |--------------------------------------------------------------------------
     | Cross-Origin Resource Sharing (CORS) Configuration
     |--------------------------------------------------------------------------
-    |
-    | Here you may configure your settings for cross-origin resource sharing
-    | or "CORS". This determines what cross-origin operations may execute
-    | in web browsers. You are free to adjust these settings as needed.
-    |
-    | To learn more: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
-    |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    // 🚀 THE FIX: Added 'storage/*' to the end of this array!
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'storage/*'],
 
     'allowed_methods' => ['*'],
 
-    // 🚀 THE FIX: Allow wildcard subdomains on port 3000
+    // 🚀 Allow wildcard subdomains on port 3000
     'allowed_origins' => [
         'http://localhost:3000',     // Central App
         'http://127.0.0.1:3000',     // Central App IPv4

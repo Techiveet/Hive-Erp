@@ -13,8 +13,6 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-
-// 🚀 FIXED: Added the missing import for PasswordRule
 use Illuminate\Validation\Rules\Password as PasswordRule;
 
 use App\Mail\UserCreated;
@@ -45,50 +43,84 @@ class UserController extends Controller
         return (function_exists('tenancy') && tenancy()->initialized) ? 'tenant' : 'web';
     }
 
+    /**
+     * 🚀 SMART SEARCH ROUTER
+     */
     public function index(Request $request)
     {
-        $query = User::with('roles');
+        $isTenant = function_exists('tenant') && tenant('id');
+        $tenantId = $isTenant ? tenant('id') : null;
 
-        if ($request->filled('search')) {
-            $tenantId = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
+        $search = $request->input('search', '');
+        $status = $request->input('status', 'all');
+        $role = $request->input('role', 'all');
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
 
-            $rawIds = User::search($request->search)
-                ->where('tenant_id', $tenantId)
-                ->keys();
-            
-            if ($rawIds->isEmpty()) {
-                $query->whereRaw('1 = 0');
-            } else {
-                $dbIds = collect($rawIds)->map(fn($id) => explode('_', $id)[1] ?? $id)->toArray();
-                $query->whereIn('id', $dbIds);
-            }
-        }
+        if (!empty($search)) {
+            // 🚀 ROUTE 1: MEILISEARCH ENGINE
+            $indexName = $isTenant ? "tenant_{$tenantId}_users" : "central_users";
 
-        if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('is_active', $request->status === 'active');
-        }
+            $scout = User::search($search)->within($indexName);
 
-        if ($request->filled('role') && $request->role !== 'all') {
-            $query->whereHas('roles', fn($q) => $q->where('name', $request->role));
-        }
+            // Apply strict Database filters AFTER Meilisearch grabs the relevant IDs
+            $scout->query(function ($query) use ($status, $role, $dateFrom, $dateTo) {
+                $query->with('roles');
+                $this->applyDatabaseFilters($query, $status, $role, $dateFrom, $dateTo);
+            });
 
-        if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
-
-        $query->orderByRaw('id = 1 DESC');
-        
-        if ($request->filled('sort_by') && $request->filled('sort_direction')) {
-            $query->orderBy($request->sort_by, $request->sort_direction);
+            // Let Meilisearch sort by relevance automatically!
+            $users = $scout->paginate($request->input('pageSize', 10));
+            $engine = 'meilisearch';
         } else {
-            $query->orderBy('created_at', 'desc');
+            // 🚀 ROUTE 2: DATABASE ENGINE
+            $query = User::with('roles');
+            $this->applyDatabaseFilters($query, $status, $role, $dateFrom, $dateTo);
+
+            $query->orderByRaw('id = 1 DESC'); // Always keep Core Overlord on top
+
+            $sortCol = $request->input('sort_by');
+            $sortDir = $request->input('sort_direction');
+
+            if ($sortCol && $sortDir) {
+                $query->orderBy($sortCol, $sortDir);
+            } else {
+                $query->orderBy('created_at', 'desc');
+            }
+
+            $users = $query->paginate($request->input('pageSize', 10));
+            $engine = 'database';
         }
 
-        $perPage = $request->input('pageSize', 10);
-        return response()->json($query->paginate($perPage));
+        // Return standard Laravel Pagination format with our custom Engine Metadata
+        $response = $users->toArray();
+        $response['meta'] = [
+            'engine' => $engine
+        ];
+
+        return response()->json($response);
+    }
+
+    /**
+     * Shared filter application for dates, roles, and status
+     */
+    private function applyDatabaseFilters($query, $status, $role, $dateFrom, $dateTo)
+    {
+        if ($status !== 'all') {
+            $query->where('is_active', $status === 'active');
+        }
+
+        if ($role !== 'all') {
+            $query->whereHas('roles', fn($q) => $q->where('name', $role));
+        }
+
+        if (!empty($dateFrom)) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        if (!empty($dateTo)) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
     }
 
     public function store(Request $request)
@@ -154,7 +186,6 @@ class UserController extends Controller
             'role'          => 'sometimes|string|exists:roles,name',
             'avatar'        => 'nullable|image|max:2048',
             'remove_avatar' => 'nullable|boolean',
-            // 🚀 Enforcing network security rules
             'password'      => ['nullable', 'string', PasswordRule::min(6)->mixedCase()->numbers()->symbols()]
         ]);
 
@@ -170,7 +201,6 @@ class UserController extends Controller
 
         $userData = $request->only(['name', 'email']);
 
-        // 🚀 ONLY update password if they typed a new one
         if ($request->filled('password')) {
             $userData['password'] = Hash::make($request->input('password'));
             Log::info("Password manually updated for user ID: {$user->id}");
@@ -186,10 +216,8 @@ class UserController extends Controller
         try {
             if ($user->wasChanged()) {
                 $changes = $user->getChanges();
-                
-                // Remove password hash from the email payload
-                unset($changes['password']); 
-                
+                unset($changes['password']);
+
                 if ($request->filled('password')) {
                     $changes['password_status'] = 'updated';
                 }
