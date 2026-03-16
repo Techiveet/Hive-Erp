@@ -91,6 +91,8 @@ foreach ($centralDomains as $domain) {
 
                 Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])
                     ->whereIn('type', ['file', 'folder']);
+                    // Add this right below your subtitle routes in BOTH the Central and Tenant groups
+Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
             });
 
             // 🌐 DYNAMIC LOCALIZATION MANAGEMENT (Central Matrix)
@@ -202,6 +204,8 @@ Route::middleware([
 
             Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])
                 ->whereIn('type', ['file', 'folder']);
+                // Add this right below your subtitle routes in BOTH the Central and Tenant groups
+Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
         });
 
         // 🌐 DYNAMIC LOCALIZATION MANAGEMENT (Tenant Matrix)

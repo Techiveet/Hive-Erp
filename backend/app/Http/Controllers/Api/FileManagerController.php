@@ -223,4 +223,43 @@ class FileManagerController extends Controller
             'deleted_uuid' => $uuid
         ], 200);
     }
+
+    // Inside FileManagerController.php
+
+public function getFileDetails($id)
+{
+    $fileEntry = FileEntry::with('media')->findOrFail($id);
+
+    $media = $fileEntry->getFirstMedia('file');
+
+    $qualities = [
+        'original' => $media->getUrl(),
+        'q_720p'   => $media->hasGeneratedConversion('720p') ? $media->getUrl('720p') : null,
+        'q_1080p'  => $media->hasGeneratedConversion('1080p') ? $media->getUrl('1080p') : null,
+        'q_4k'     => $media->hasGeneratedConversion('4k') ? $media->getUrl('4k') : null,
+    ];
+
+    return response()->json([
+        'file' => $fileEntry,
+        'video_versions' => array_filter($qualities) // Only send existing ones
+    ]);
+}
+
+public function serveStream($mediaId, $filename)
+    {
+        // Path maps to: storage/app/public/123/processed/playlist.m3u8
+        $path = storage_path("app/public/{$mediaId}/processed/{$filename}");
+
+        if (!file_exists($path)) {
+            abort(404, "Stream chunk not found.");
+        }
+
+        $mime = str_ends_with($filename, '.m3u8') ? 'application/vnd.apple.mpegurl' : 'video/MP2T';
+
+        return response()->file($path, [
+            'Content-Type' => $mime,
+            'Access-Control-Allow-Origin' => '*',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        ]);
+    }
 }

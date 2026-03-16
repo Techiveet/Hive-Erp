@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class FileEntry extends Model implements HasMedia
 {
@@ -26,25 +27,23 @@ class FileEntry extends Model implements HasMedia
         $this->addMediaCollection('subtitles');
     }
 
-    public function getMediaDetailsAttribute()
+public function getMediaDetailsAttribute()
     {
         $media = $this->getFirstMedia('file');
-        $customThumb = $this->getFirstMedia('custom_thumbnail');
-
         if (!$media) return null;
 
-        // Determine best thumbnail
         $thumbnailUrl = null;
-        if ($customThumb) {
-            $thumbnailUrl = $customThumb->getUrl();
+        if ($this->getFirstMedia('custom_thumbnail')) {
+            $thumbnailUrl = $this->getFirstMedia('custom_thumbnail')->getUrl();
+        } elseif ($media->hasGeneratedConversion('thumbnail')) {
+            $thumbnailUrl = $media->getUrl('thumbnail');
         } elseif (str_starts_with($media->mime_type, 'image/')) {
             $thumbnailUrl = $media->getUrl();
         }
 
-        // 🚀 THE FIX: Dynamically pull ALL saved subtitles and format them for React
         $subtitles = $this->getMedia('subtitles')->map(function ($sub) {
             return [
-                'uuid' => $sub->uuid, // 🚀 ADD THIS LINE
+                'uuid' => $sub->uuid,
                 'src' => $sub->getUrl(),
                 'srcLang' => $sub->getCustomProperty('language', 'en'),
                 'label' => $sub->getCustomProperty('label', 'Subtitle'),
@@ -61,8 +60,23 @@ class FileEntry extends Model implements HasMedia
             'url' => $media->getUrl(),
             'thumbnail' => $thumbnailUrl,
             'hls_path' => $this->hls_path,
-            'watermarked_path' => $this->watermarked_path,
-            'subtitles' => $subtitles, // 🚀 Now React will actually receive the subtitles!
+            'subtitles' => $subtitles,
+            // Fallback array while HLS is processing
+            'video_versions' => [
+                ['label' => 'Original', 'url' => $media->getUrl()]
+            ],
         ];
+    }
+
+    public function registerMediaConversions(\Spatie\MediaLibrary\MediaCollections\Models\Media $media = null): void
+    {
+        // Only generate ONE real image thumbnail for the video cover
+        if ($media && str_starts_with($media->mime_type, 'video/')) {
+            $this->addMediaConversion('thumbnail')
+                ->width(800)
+                ->height(450)
+                ->extractVideoFrameAtSecond(1)
+                ->performOnCollections('file');
+        }
     }
 }
