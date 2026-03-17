@@ -8,6 +8,7 @@ use App\Exports\UsersExport;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\Response;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -58,14 +59,35 @@ class UserExportController extends Controller
             'Invalid export format.'
         );
 
-        // 🚀 THE FIX: Force English ONLY for PDFs to prevent the ?????? issue
+        // Force English ONLY for PDFs to prevent font rendering issues with special characters
         $locale = $type === 'pdf' ? 'en' : $request->input('locale', 'en');
 
         $cachePrefix = function_exists('tenant') && tenant('id') ? 'tenant_' . tenant('id') : 'central';
 
         $dictionary = Cache::rememberForever("{$cachePrefix}_translations_{$locale}", function () use ($locale) {
-            $language = Language::where('code', $locale)->where('is_active', true)->first();
-            return $language ? $language->translations()->pluck('value', 'key')->toArray() : [];
+            try {
+                $language = Language::where('code', $locale)->where('is_active', true)->first();
+
+                if (!$language) return [];
+
+                // Scenario 1: Translations are stored in a JSON column cast to an array
+                if (isset($language->translations) && is_array($language->translations)) {
+                    return $language->translations;
+                }
+
+                // Scenario 2: Translations are stored in a separate table
+                // (Bypassing Eloquent relationships to prevent BadMethodCallException)
+                return DB::table('translations')
+                    ->where('locale', $locale)
+                    ->orWhere('language_id', $language->id)
+                    ->pluck('value', 'key')
+                    ->toArray();
+
+            } catch (\Exception $e) {
+                // Graceful fallback: If translations fail to load, return empty array
+                // The export will still work using the default English strings.
+                return [];
+            }
         });
 
         $t = function($key, $default) use ($dictionary) {

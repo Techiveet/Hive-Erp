@@ -76,20 +76,31 @@ foreach ($centralDomains as $domain) {
 
             // 📂 FILE MANAGER ROUTES
             Route::prefix('files')->group(function () {
-                // 1. Static Routes (Must come FIRST)
+                // 1. Exact Static Routes (Must come FIRST)
                 Route::get('/', [FileManagerController::class, 'index']);
                 Route::post('/folder', [FileManagerController::class, 'createFolder']);
                 Route::post('/upload', [FileManagerController::class, 'uploadFile']);
                 Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage']);
+
+                // Bulk & Trash Management
+                Route::post('/trash/empty', [FileManagerController::class, 'emptyTrash']);
+                Route::post('/trash/restore', [FileManagerController::class, 'restoreItems']);
+                Route::post('/trash/force-delete', [FileManagerController::class, 'forceDeleteItems']);
+
+                // Operations
+                Route::post('/rename', [FileManagerController::class, 'renameItem']);
+                Route::post('/move', [FileManagerController::class, 'moveItems']);
 
                 // 2. Specific Parameter Routes
                 Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle']);
                 Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle']);
                 Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle']);
                 Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
-                Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia']); // 🚀 NEW ENDPOINT
+                Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia']);
 
                 // 3. Generic Catch-All Parameter Routes (Must come LAST)
+                Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])
+                    ->whereIn('type', ['file', 'folder']);
                 Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])
                     ->whereIn('type', ['file', 'folder']);
                 Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])
@@ -112,15 +123,12 @@ foreach ($centralDomains as $domain) {
             Route::prefix('logs')->group(function () {
                 Route::get('/export', [ActivityLogExportController::class, 'handleExport']);
                 Route::post('/client-action', [ActivityLogController::class, 'logClientAction']);
-
                 Route::get('/archived', [ActivityLogController::class, 'archivedIndex']);
                 Route::delete('/archived/{id}', [ActivityLogController::class, 'destroyArchived']);
                 Route::post('/archived/bulk-delete', [ActivityLogController::class, 'bulkDestroyArchived']);
-
                 Route::get('/settings', [ActivityLogController::class, 'getSettings']);
                 Route::post('/settings', [ActivityLogController::class, 'updateSettings']);
                 Route::post('/archive', [ActivityLogController::class, 'archiveOldLogs']);
-
                 Route::get('/', [ActivityLogController::class, 'index']);
             });
 
@@ -190,20 +198,31 @@ Route::middleware([
 
         // 📂 FILE MANAGER ROUTES (Tenant - Strict Isolation)
         Route::prefix('files')->group(function () {
-            // 1. Static Routes (Must come FIRST)
+            // 1. Exact Static Routes (Must come FIRST)
             Route::get('/', [FileManagerController::class, 'index']);
             Route::post('/folder', [FileManagerController::class, 'createFolder']);
             Route::post('/upload', [FileManagerController::class, 'uploadFile']);
             Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage']);
+
+            // Bulk & Trash Management
+            Route::post('/trash/empty', [FileManagerController::class, 'emptyTrash']);
+            Route::post('/trash/restore', [FileManagerController::class, 'restoreItems']);
+            Route::post('/trash/force-delete', [FileManagerController::class, 'forceDeleteItems']);
+
+            // Operations
+            Route::post('/rename', [FileManagerController::class, 'renameItem']);
+            Route::post('/move', [FileManagerController::class, 'moveItems']);
 
             // 2. Specific Parameter Routes
             Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle']);
             Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle']);
             Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle']);
             Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
-            Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia']); // 🚀 NEW ENDPOINT
+            Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia']);
 
             // 3. Generic Catch-All Parameter Routes (Must come LAST)
+            Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])
+                ->whereIn('type', ['file', 'folder']);
             Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])
                 ->whereIn('type', ['file', 'folder']);
             Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])
@@ -216,7 +235,6 @@ Route::middleware([
             Route::post('/languages', [LocalizationController::class, 'addLanguage']);
             Route::post('/languages/default', [LocalizationController::class, 'setDefaultLanguage']);
             Route::delete('/languages/{code}', [LocalizationController::class, 'deleteLanguage']);
-
             Route::post('/translations/source', [LocalizationController::class, 'addSourceKey']);
             Route::post('/translations/update', [LocalizationController::class, 'updateTranslation']);
             Route::post('/translations/delete', [LocalizationController::class, 'deleteTranslation']);
@@ -227,15 +245,12 @@ Route::middleware([
         Route::prefix('logs')->group(function () {
             Route::get('/export', [ActivityLogExportController::class, 'handleExport']);
             Route::post('/client-action', [ActivityLogController::class, 'logClientAction']);
-
             Route::get('/archived', [ActivityLogController::class, 'archivedIndex']);
             Route::delete('/archived/{id}', [ActivityLogController::class, 'destroyArchived']);
             Route::post('/archived/bulk-delete', [ActivityLogController::class, 'bulkDestroyArchived']);
-
             Route::get('/settings', [ActivityLogController::class, 'getSettings']);
             Route::post('/settings', [ActivityLogController::class, 'updateSettings']);
             Route::post('/archive', [ActivityLogController::class, 'archiveOldLogs']);
-
             Route::get('/', [ActivityLogController::class, 'index']);
         });
 
