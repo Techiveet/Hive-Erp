@@ -8,19 +8,21 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    // 🚀 THE FIX: Added 'storage/*' to the end of this array!
+    // 🚀 Good!
     'paths' => ['api/*', 'sanctum/csrf-cookie', 'storage/*'],
 
     'allowed_methods' => ['*'],
 
-    // 🚀 Allow wildcard subdomains on port 3000
+    // 🚀 Exact matches go here
     'allowed_origins' => [
-        'http://localhost:3000',     // Central App
-        'http://127.0.0.1:3000',     // Central App IPv4
-        'http://*.localhost:3000',   // ALL Tenant Subdomains (apple, nike, etc.)
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
     ],
 
-    'allowed_origins_patterns' => [],
+    // 🚀 THE FIX: Wildcard subdomains MUST use Regex patterns here!
+    'allowed_origins_patterns' => [
+        '#^http://([a-zA-Z0-9-]+\.)?localhost:3000$#'
+    ],
 
     'allowed_headers' => ['*'],
 
@@ -28,7 +30,7 @@ return [
 
     'max_age' => 0,
 
-    // 🚀 CRITICAL: This must be true for Sanctum authentication to work across origins
+    // 🚀 Perfect!
     'supports_credentials' => true,
 
 ];

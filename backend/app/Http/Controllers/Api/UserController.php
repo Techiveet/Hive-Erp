@@ -43,9 +43,6 @@ class UserController extends Controller
         return (function_exists('tenancy') && tenancy()->initialized) ? 'tenant' : 'web';
     }
 
-    /**
-     * 🚀 SMART SEARCH ROUTER
-     */
     public function index(Request $request)
     {
         $isTenant = function_exists('tenant') && tenant('id');
@@ -58,26 +55,21 @@ class UserController extends Controller
         $dateTo = $request->input('date_to');
 
         if (!empty($search)) {
-            // 🚀 ROUTE 1: MEILISEARCH ENGINE
             $indexName = $isTenant ? "tenant_{$tenantId}_users" : "central_users";
-
             $scout = User::search($search)->within($indexName);
 
-            // Apply strict Database filters AFTER Meilisearch grabs the relevant IDs
             $scout->query(function ($query) use ($status, $role, $dateFrom, $dateTo) {
                 $query->with('roles');
                 $this->applyDatabaseFilters($query, $status, $role, $dateFrom, $dateTo);
             });
 
-            // Let Meilisearch sort by relevance automatically!
             $users = $scout->paginate($request->input('pageSize', 10));
             $engine = 'meilisearch';
         } else {
-            // 🚀 ROUTE 2: DATABASE ENGINE
             $query = User::with('roles');
             $this->applyDatabaseFilters($query, $status, $role, $dateFrom, $dateTo);
 
-            $query->orderByRaw('id = 1 DESC'); // Always keep Core Overlord on top
+            $query->orderByRaw('id = 1 DESC');
 
             $sortCol = $request->input('sort_by');
             $sortDir = $request->input('sort_direction');
@@ -92,7 +84,6 @@ class UserController extends Controller
             $engine = 'database';
         }
 
-        // Return standard Laravel Pagination format with our custom Engine Metadata
         $response = $users->toArray();
         $response['meta'] = [
             'engine' => $engine
@@ -101,23 +92,17 @@ class UserController extends Controller
         return response()->json($response);
     }
 
-    /**
-     * Shared filter application for dates, roles, and status
-     */
     private function applyDatabaseFilters($query, $status, $role, $dateFrom, $dateTo)
     {
         if ($status !== 'all') {
             $query->where('is_active', $status === 'active');
         }
-
         if ($role !== 'all') {
             $query->whereHas('roles', fn($q) => $q->where('name', $role));
         }
-
         if (!empty($dateFrom)) {
             $query->whereDate('created_at', '>=', $dateFrom);
         }
-
         if (!empty($dateTo)) {
             $query->whereDate('created_at', '<=', $dateTo);
         }
@@ -126,20 +111,16 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users,email',
-            'role'     => 'required|string|exists:roles,name',
-            'avatar'   => 'nullable|image|max:2048',
-            'password' => 'nullable|string|min:8'
+            'name'        => 'required|string|max:255',
+            'email'       => 'required|email|unique:users,email',
+            'role'        => 'required|string|exists:roles,name',
+            'avatar_path' => 'nullable|string', // 🚀 FIX: Accept string instead of image file
+            'password'    => 'nullable|string|min:8'
         ]);
 
         if ($validated['role'] === 'Super Admin') {
             return $this->error('Access Denied: Cannot provision Super Admin accounts via API.', 403);
         }
-
-        $avatarPath = $request->hasFile('avatar')
-            ? $request->file('avatar')->store('avatars', 'public')
-            : null;
 
         $rawPassword = $request->input('password') ?: Str::random(16);
 
@@ -148,7 +129,7 @@ class UserController extends Controller
             'email'       => $validated['email'],
             'password'    => Hash::make($rawPassword),
             'is_active'   => true,
-            'avatar_path' => $avatarPath,
+            'avatar_path' => $request->input('avatar_path'), // 🚀 FIX: Save the string path
         ]);
 
         $user->guard_name = $this->resolveGuard();
@@ -184,19 +165,16 @@ class UserController extends Controller
             'name'          => 'sometimes|string|max:255',
             'email'         => ['sometimes', 'email', Rule::unique('users')->ignore($user->id)],
             'role'          => 'sometimes|string|exists:roles,name',
-            'avatar'        => 'nullable|image|max:2048',
+            'avatar_path'   => 'nullable|string', // 🚀 FIX: Accept string instead of image
             'remove_avatar' => 'nullable|boolean',
             'password'      => ['nullable', 'string', PasswordRule::min(6)->mixedCase()->numbers()->symbols()]
         ]);
 
-        if ($request->input('remove_avatar') && $user->avatar_path) {
-            Storage::disk('public')->delete($user->avatar_path);
+        // 🚀 FIX: Handle avatar path strings natively
+        if ($request->input('remove_avatar')) {
             $user->avatar_path = null;
-        }
-
-        if ($request->hasFile('avatar')) {
-            if ($user->avatar_path) Storage::disk('public')->delete($user->avatar_path);
-            $user->avatar_path = $request->file('avatar')->store('avatars', 'public');
+        } elseif ($request->has('avatar_path')) {
+            $user->avatar_path = $request->input('avatar_path');
         }
 
         $userData = $request->only(['name', 'email']);
@@ -207,6 +185,7 @@ class UserController extends Controller
         }
 
         $user->update($userData);
+        $user->save(); // Ensure any avatar_path assignments are committed
 
         if ($request->has('role')) {
             $user->guard_name = $this->resolveGuard();

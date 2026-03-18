@@ -58,9 +58,14 @@ class User extends Authenticatable
 
     public function getAvatarUrlAttribute(): string
     {
-        return $this->avatar_path
-            ? asset('storage/' . $this->avatar_path)
-            : 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF';
+        // If no path is saved, return the default UI avatar immediately
+        if (!$this->avatar_path) {
+            return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF';
+        }
+
+        // 🚀 THE FIX: Return the raw string path exactly as it is in the database!
+        // The frontend's getStorageUrl() function will handle appending the port/host perfectly.
+        return $this->avatar_path;
     }
 
     public function searchableAs()
@@ -69,24 +74,22 @@ class User extends Authenticatable
             ? 'tenant_' . tenant('id') . '_'
             : 'central_';
 
-        return $prefix . $this->getTable(); // e.g. "central_users" or "tenant_apple_users"
+        return $prefix . $this->getTable();
     }
 
-   public function toSearchableArray(): array
-{
-    // Ensure relationships are loaded for indexing
-    $this->loadMissing('roles');
+    public function toSearchableArray(): array
+    {
+        $this->loadMissing('roles');
 
-    return [
-        // Primary key must be an integer or string Meilisearch can index
-        'id'         => (int) $this->id,
-        'name'       => $this->name,
-        'email'      => $this->email,
-        'roles'      => $this->roles->pluck('name')->toArray(),
-        'is_active'  => (bool) $this->is_active,
-        'created_at' => (int) $this->created_at?->timestamp,
-    ];
-}
+        return [
+            'id'         => (int) $this->id,
+            'name'       => $this->name,
+            'email'      => $this->email,
+            'roles'      => $this->roles->pluck('name')->toArray(),
+            'is_active'  => (bool) $this->is_active,
+            'created_at' => (int) $this->created_at?->timestamp,
+        ];
+    }
 
     public function scopeFilter(Builder $query, Request $request): Builder
     {
@@ -112,7 +115,6 @@ class User extends Authenticatable
         return $query->with('roles');
     }
 
-    // 🚀 INJECTED LOGGING RULES
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()

@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\LocalizationController;
 use App\Http\Controllers\Api\GlobalSearchController;
 use App\Http\Controllers\Api\FileManagerController;
+use App\Http\Controllers\Api\ProfileController; // 🚀 NEW: Import ProfileController
 use App\Http\Controllers\Api\Export\UserExportController;
 use App\Http\Controllers\Api\Export\RoleExportController;
 use App\Http\Controllers\Api\Export\PermissionExportController;
@@ -58,6 +59,10 @@ foreach ($centralDomains as $domain) {
             Route::get('/user', [AuthController::class, 'user']);
             Route::post('/logout', [AuthController::class, 'logout']);
 
+            // 🚀 NEW: Profile Management
+            Route::post('/profile/update', [ProfileController::class, 'updateProfile']);
+            Route::get('/profile/avatar', [ProfileController::class, 'getAvatar']); //
+
             Route::prefix('2fa')->group(function () {
                 Route::post('/enable', [TwoFactorController::class, 'enable']);
                 Route::post('/confirm', [TwoFactorController::class, 'confirm']);
@@ -76,13 +81,12 @@ foreach ($centralDomains as $domain) {
 
             // 📂 FILE MANAGER ROUTES
             Route::prefix('files')->group(function () {
-                // 1. Exact Static Routes (Must come FIRST)
                 Route::get('/', [FileManagerController::class, 'index']);
                 Route::post('/folder', [FileManagerController::class, 'createFolder']);
                 Route::post('/upload', [FileManagerController::class, 'uploadFile']);
                 Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage']);
 
-                // 🚀 AI & Magic Wand Routes
+                // AI & Magic Wand Routes
                 Route::post('/remove-background', [FileManagerController::class, 'removeBackground']);
                 Route::post('/remove-logo-background', [FileManagerController::class, 'removeLogoBackground']);
 
@@ -95,14 +99,12 @@ foreach ($centralDomains as $domain) {
                 Route::post('/rename', [FileManagerController::class, 'renameItem']);
                 Route::post('/move', [FileManagerController::class, 'moveItems']);
 
-                // 2. Specific Parameter Routes
                 Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle']);
                 Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle']);
                 Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle']);
                 Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
                 Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia']);
 
-                // 3. Generic Catch-All Parameter Routes (Must come LAST)
                 Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])
                     ->whereIn('type', ['file', 'folder']);
                 Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])
@@ -184,6 +186,10 @@ Route::middleware([
         Route::get('/user', [AuthController::class, 'user']);
         Route::post('/logout', [AuthController::class, 'logout']);
 
+        // 🚀 NEW: Profile Management
+        Route::post('/profile/update', [ProfileController::class, 'updateProfile']);
+        Route::get('/profile/avatar', [ProfileController::class, 'getAvatar']); // 🚀 NE
+
         Route::prefix('2fa')->group(function () {
             Route::post('/enable', [TwoFactorController::class, 'enable']);
             Route::post('/confirm', [TwoFactorController::class, 'confirm']);
@@ -202,13 +208,12 @@ Route::middleware([
 
         // 📂 FILE MANAGER ROUTES (Tenant - Strict Isolation)
         Route::prefix('files')->group(function () {
-            // 1. Exact Static Routes (Must come FIRST)
             Route::get('/', [FileManagerController::class, 'index']);
             Route::post('/folder', [FileManagerController::class, 'createFolder']);
             Route::post('/upload', [FileManagerController::class, 'uploadFile']);
             Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage']);
 
-            // 🚀 AI & Magic Wand Routes
+            // AI & Magic Wand Routes
             Route::post('/remove-background', [FileManagerController::class, 'removeBackground']);
             Route::post('/remove-logo-background', [FileManagerController::class, 'removeLogoBackground']);
 
@@ -221,14 +226,12 @@ Route::middleware([
             Route::post('/rename', [FileManagerController::class, 'renameItem']);
             Route::post('/move', [FileManagerController::class, 'moveItems']);
 
-            // 2. Specific Parameter Routes
             Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle']);
             Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle']);
             Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle']);
             Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
             Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia']);
 
-            // 3. Generic Catch-All Parameter Routes (Must come LAST)
             Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])
                 ->whereIn('type', ['file', 'folder']);
             Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])
