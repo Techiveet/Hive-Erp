@@ -1,5 +1,5 @@
 services:
-  # 1. CACHE (Redis) - Placed at the top with a healthcheck so it starts first!
+  # 1. CACHE (Redis)
   redis:
     image: redis:alpine
     container_name: hive-redis
@@ -53,7 +53,7 @@ services:
     networks:
       - hive-network
 
-  # 4. EMAIL CATCHER (Mailpit) 🚀 NEW
+  # 4. EMAIL CATCHER (Mailpit)
   mailpit:
     image: axllent/mailpit
     container_name: hive-mailpit
@@ -64,7 +64,20 @@ services:
     networks:
       - hive-network
 
-  # 5. THE BRAIN (Laravel 12 + Octane + RoadRunner)
+  # 🚀 5. AI BACKGROUND REMOVAL (rembg) - NEW
+ # 🚀 5. AI BACKGROUND REMOVAL (rembg)
+  rembg:
+    image: danielgatis/rembg:latest
+    container_name: hive-ai-rembg
+    restart: unless-stopped
+    # Add the host and port flags to force it to listen externally
+    command: s --host 0.0.0.0 --port 5000 
+    ports:
+      - "5000:5000"
+    networks:
+      - hive-network
+
+  # 6. THE BRAIN (Laravel 12 + Octane)
   backend:
     build:
       context: ./backend
@@ -72,7 +85,7 @@ services:
     container_name: hive-backend
     restart: unless-stopped
     ports:
-      - "8085:8000"  # External:8085 -> Internal:8000
+      - "8085:8000"
     volumes:
       - ./backend:/var/www/html
     environment:
@@ -93,15 +106,9 @@ services:
       REDIS_HOST: redis
       CACHE_STORE: redis
       QUEUE_CONNECTION: redis
-      # 🚀 Connect Backend to Mailpit
       MAIL_MAILER: smtp
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
-      MAIL_USERNAME: null
-      MAIL_PASSWORD: null
-      MAIL_ENCRYPTION: null
-      MAIL_FROM_ADDRESS: "no-reply@hive.os"
-      MAIL_FROM_NAME: "Hive ERP"
       WATCHPACK_POLLING: "true"
     depends_on:
       redis:
@@ -110,18 +117,17 @@ services:
         condition: service_healthy
       meilisearch:
         condition: service_healthy
-      mailpit:
+      rembg:
         condition: service_started
     command: php artisan octane:start --server=roadrunner --host=0.0.0.0 --port=8000
     networks:
       hive-network:
-        # Docker now knows to route these domains to this container
         aliases:
           - apple.localhost
           - tesla.localhost
           - spacex.localhost
 
-  # 6. THE WORKER (Background Jobs via Horizon)
+  # 7. THE WORKER (Background Jobs)
   queue:
     build:
       context: ./backend
@@ -132,38 +138,28 @@ services:
       - ./backend:/var/www/html
     environment:
       APP_ENV: local
-      APP_DEBUG: "true"
-      APP_KEY: base64:c29tZXJhbmRvbXN0cmluZ2ZvcmRldmVsb3BtZW50MjE=
       DB_CONNECTION: pgsql
       DB_HOST: db
-      DB_PORT: 5432
       DB_DATABASE: hive
       DB_USERNAME: hive
       DB_PASSWORD: password
       REDIS_HOST: redis
-      CACHE_STORE: redis
       QUEUE_CONNECTION: redis
-      # 🚀 Queue workers need email config too, because they actually send the emails!
       MAIL_MAILER: smtp
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
-      MAIL_USERNAME: null
-      MAIL_PASSWORD: null
-      MAIL_ENCRYPTION: null
-      MAIL_FROM_ADDRESS: "no-reply@hive.os"
-      MAIL_FROM_NAME: "Hive ERP"
     depends_on:
       redis:
         condition: service_healthy
       db:
         condition: service_healthy
-      mailpit:
+      rembg:
         condition: service_started
     command: php artisan horizon
     networks:
       - hive-network
 
-  # 7. THE FACE (Next.js 16)
+  # 8. THE FACE (Next.js 16)
   frontend:
     build:
       context: ./frontend
@@ -179,13 +175,12 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:8085/api
       INTERNAL_API_URL: http://backend:8000/api
       WATCHPACK_POLLING: "true"
-      NEXT_WEBPACK_USEPOLLING: "true"
     depends_on:
       - backend
     networks:
       - hive-network
 
-  # 8. DATABASE GUI (Adminer)
+  # 9. DATABASE GUI (Adminer)
   adminer:
     image: adminer
     container_name: hive-adminer
@@ -200,7 +195,6 @@ services:
     networks:
       - hive-network
 
-# Define the shared network and persistent volumes
 networks:
   hive-network:
     driver: bridge

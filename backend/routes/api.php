@@ -82,6 +82,10 @@ foreach ($centralDomains as $domain) {
                 Route::post('/upload', [FileManagerController::class, 'uploadFile']);
                 Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage']);
 
+                // 🚀 AI & Magic Wand Routes
+                Route::post('/remove-background', [FileManagerController::class, 'removeBackground']);
+                Route::post('/remove-logo-background', [FileManagerController::class, 'removeLogoBackground']);
+
                 // Bulk & Trash Management
                 Route::post('/trash/empty', [FileManagerController::class, 'emptyTrash']);
                 Route::post('/trash/restore', [FileManagerController::class, 'restoreItems']);
@@ -204,6 +208,10 @@ Route::middleware([
             Route::post('/upload', [FileManagerController::class, 'uploadFile']);
             Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage']);
 
+            // 🚀 AI & Magic Wand Routes
+            Route::post('/remove-background', [FileManagerController::class, 'removeBackground']);
+            Route::post('/remove-logo-background', [FileManagerController::class, 'removeLogoBackground']);
+
             // Bulk & Trash Management
             Route::post('/trash/empty', [FileManagerController::class, 'emptyTrash']);
             Route::post('/trash/restore', [FileManagerController::class, 'restoreItems']);
@@ -235,6 +243,7 @@ Route::middleware([
             Route::post('/languages', [LocalizationController::class, 'addLanguage']);
             Route::post('/languages/default', [LocalizationController::class, 'setDefaultLanguage']);
             Route::delete('/languages/{code}', [LocalizationController::class, 'deleteLanguage']);
+
             Route::post('/translations/source', [LocalizationController::class, 'addSourceKey']);
             Route::post('/translations/update', [LocalizationController::class, 'updateTranslation']);
             Route::post('/translations/delete', [LocalizationController::class, 'deleteTranslation']);

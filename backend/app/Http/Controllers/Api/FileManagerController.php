@@ -7,7 +7,13 @@ use App\Models\Folder;
 use App\Models\FileEntry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+
+// 🚀 Intervention Image v3 Imports
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 
 class FileManagerController extends Controller
 {
@@ -40,7 +46,6 @@ class FileManagerController extends Controller
             }
         }
 
-        // Calculate Storage Metrics
         $mediaItems = DB::table('media')
             ->join('file_entries', 'media.model_id', '=', 'file_entries.id')
             ->where('media.model_type', FileEntry::class)
@@ -125,10 +130,8 @@ class FileManagerController extends Controller
             mkdir(dirname($tempPath), 0777, true);
         }
 
-        // Append the current chunk to the temp file
         file_put_contents($tempPath, file_get_contents($file->getPathname()), FILE_APPEND);
 
-        // If we are not on the last chunk, return progress
         if ($chunkIndex < $totalChunks - 1) {
             return response()->json([
                 'message' => 'Chunk received',
@@ -136,7 +139,6 @@ class FileManagerController extends Controller
             ]);
         }
 
-        // Final Chunk received, process the file
         try {
             $fileEntry = FileEntry::create([
                 'folder_id' => $request->folder_id,
@@ -150,12 +152,10 @@ class FileManagerController extends Controller
 
             $media = $mediaUploader->toMediaCollection('file');
 
-            // Handle Optional Custom Thumbnail
             if ($request->hasFile('custom_thumbnail')) {
                 $fileEntry->addMedia($request->file('custom_thumbnail'))->toMediaCollection('custom_thumbnail');
             }
 
-            // Dispatch Video Transcoding Job
             if (str_starts_with($media->mime_type, 'video/') && class_exists(\App\Jobs\TranscodeVideoForStreaming::class)) {
                 \App\Jobs\TranscodeVideoForStreaming::dispatch($fileEntry);
             }
@@ -187,9 +187,13 @@ class FileManagerController extends Controller
 
             $originalMedia = $originalEntry->getFirstMedia('file');
             $baseName = $originalMedia ? pathinfo($originalMedia->file_name, PATHINFO_FILENAME) : 'edited_image';
-            $newName = $baseName . '_edited_' . time() . '.jpg';
 
-            $newFileEntry->addMedia($request->file('file'))
+            $uploadedFile = $request->file('file');
+            $extension = $uploadedFile->getClientOriginalExtension() ?: 'png';
+
+            $newName = $baseName . '_edited_' . time() . '.' . $extension;
+
+            $newFileEntry->addMedia($uploadedFile)
                          ->usingName($newName)
                          ->usingFileName($newName)
                          ->toMediaCollection('file');
@@ -225,7 +229,6 @@ class FileManagerController extends Controller
         } else {
             $media = $model->getFirstMedia('file');
             if ($media) {
-                // 🚀 BUG FIX: Safely grab the actual extension using pathinfo instead of current()
                 $extension = pathinfo($media->file_name, PATHINFO_EXTENSION);
                 $media->name = $request->name;
                 $media->file_name = $request->name . ($extension ? '.' . $extension : '');
@@ -246,7 +249,7 @@ class FileManagerController extends Controller
 
         foreach ($request->items as $item) {
             if ($item['type'] === 'folder') {
-                if ($item['id'] !== $destId) { // Prevent moving folder into itself
+                if ($item['id'] !== $destId) {
                     Folder::where('id', $item['id'])->where('user_id', auth()->id())->update(['parent_id' => $destId]);
                 }
             } else {
@@ -267,7 +270,6 @@ class FileManagerController extends Controller
 
     public function generateShareLink(Request $request, $type, $id)
     {
-        // Simple mock for share link. In production, attach to a 'share_links' table with expiration.
         $token = bin2hex(random_bytes(16));
         return response()->json(['link' => url("/shared/{$token}")]);
     }
@@ -299,7 +301,7 @@ class FileManagerController extends Controller
         $request->validate(['items' => 'required|array']);
         foreach ($request->items as $item) {
             $model = $item['type'] === 'folder' ? Folder::onlyTrashed()->find($item['id']) : FileEntry::onlyTrashed()->find($item['id']);
-            if ($model && $model->user_id === auth()->id()) $model->forceDelete(); // Spatie event cleans disk
+            if ($model && $model->user_id === auth()->id()) $model->forceDelete();
         }
         return response()->json(['message' => 'Items permanently deleted']);
     }
@@ -409,5 +411,124 @@ class FileManagerController extends Controller
             'file' => $fileEntry,
             'video_versions' => array_filter($qualities)
         ]);
+    }
+
+    // =========================================================================
+    // 🚀 6. PHOTO AI BACKGROUND REMOVAL (Via internal rembg container)
+    // =========================================================================
+
+    public function removeBackground(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|image|max:15360',
+        ]);
+
+        $file = $request->file('file');
+
+        try {
+            $response = Http::timeout(60)->attach(
+                'file',
+                file_get_contents($file->getPathname()),
+                $file->getClientOriginalName()
+            )->post('http://rembg:5000/api/remove');
+
+            if (!$response->successful()) {
+                Log::error('Local AI Failed: ' . $response->body());
+                return response()->json(['message' => 'AI Processor failed to isolate the subject.'], 422);
+            }
+
+            return response($response->body(), 200, [
+                'Content-Type' => 'image/png',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Access-Control-Allow-Origin' => '*',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('AI Exception: ' . $e->getMessage());
+            return response()->json(['message' => 'Server Error: Could not connect to the local AI microservice.'], 500);
+        }
+    }
+
+    // =========================================================================
+    // 🚀 7. PHP MAGIC WAND LOGO REMOVAL (With High-Quality Anti-Aliasing)
+    // =========================================================================
+
+    public function removeLogoBackground(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|image|max:20480',
+            'tolerance' => 'nullable|numeric'
+        ]);
+
+        try {
+            $manager = new \Intervention\Image\ImageManager(new \Intervention\Image\Drivers\Gd\Driver());
+            $image = $manager->read($request->file('file')->getPathname());
+
+            if ($image->width() > 3000) {
+                $image->scaleDown(width: 3000);
+            }
+
+            $gdImage = $image->core()->native();
+            $width = imagesx($gdImage);
+            $height = imagesy($gdImage);
+
+            $output = imagecreatetruecolor($width, $height);
+            imagealphablending($output, false);
+            imagesavealpha($output, true);
+
+            $transparent = imagecolorallocatealpha($output, 0, 0, 0, 127);
+            imagefill($output, 0, 0, $transparent);
+
+            $bgPixel = imagecolorat($gdImage, 0, 0);
+            $bgColors = imagecolorsforindex($gdImage, $bgPixel);
+
+            $tolerance = $request->input('tolerance', 45);
+            $softness = 25;
+
+            for ($x = 0; $x < $width; $x++) {
+                for ($y = 0; $y < $height; $y++) {
+                    $pixel = imagecolorat($gdImage, $x, $y);
+                    $colors = imagecolorsforindex($gdImage, $pixel);
+
+                    $distance = sqrt(
+                        pow($colors['red'] - $bgColors['red'], 2) +
+                        pow($colors['green'] - $bgColors['green'], 2) +
+                        pow($colors['blue'] - $bgColors['blue'], 2)
+                    );
+
+                    if ($distance <= $tolerance) {
+                        imagesetpixel($output, $x, $y, $transparent);
+                    }
+                    elseif ($distance <= $tolerance + $softness) {
+                        $ratio = ($distance - $tolerance) / $softness;
+                        $originalAlpha = isset($colors['alpha']) ? $colors['alpha'] : 0;
+                        $blendedAlpha = (int)(127 - ((127 - $originalAlpha) * $ratio));
+
+                        $color = imagecolorallocatealpha($output, $colors['red'], $colors['green'], $colors['blue'], $blendedAlpha);
+                        imagesetpixel($output, $x, $y, $color);
+                    } else {
+                        $alpha = isset($colors['alpha']) ? $colors['alpha'] : 0;
+                        $color = imagecolorallocatealpha($output, $colors['red'], $colors['green'], $colors['blue'], $alpha);
+                        imagesetpixel($output, $x, $y, $color);
+                    }
+                }
+            }
+
+            ob_start();
+            // 🚀 CRITICAL FIX: Save as max compression PNG (9) to prevent massive file sizes!
+            imagepng($output, null, 9);
+            $pngData = ob_get_clean();
+            imagedestroy($output);
+
+            return response($pngData, 200, [
+                'Content-Type' => 'image/png',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Access-Control-Allow-Origin' => '*',
+            ]);
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Magic Wand Exception: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to process logo background.'], 500);
+        }
     }
 }
