@@ -1,0 +1,14 @@
+{
+    "title": "Capability Dictionary",
+    "subtitle": "A read-only glossary of all hardcoded network capabilities available in the system.",
+    "indexed": "Indexed Protocols",
+    "search_placeholder": "Search capability codes...",
+    "col_code": "Capability Code",
+    "col_desc": "Human-Readable Context",
+    "col_scope": "Security Scope",
+    "col_actions": "Actions",
+    "allows_operator": "Allows the operator to",
+    "within_env": "within the active environment.",
+    "tenant_node": "Tenant Node",
+    "central": "Central Command"
+}

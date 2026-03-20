@@ -19,6 +19,7 @@
         "laravel/tinker": "^2.10.1",
         "maatwebsite/excel": "^3.1",
         "meilisearch/meilisearch-php": "^1.16",
+        "nwidart/laravel-modules": "^13.0",
         "pbmedia/laravel-ffmpeg": "^8.9",
         "pragmarx/google2fa-laravel": "^2.3",
         "spatie/laravel-activitylog": "^4.12",
@@ -91,6 +92,11 @@
     "extra": {
         "laravel": {
             "dont-discover": []
+        },
+        "merge-plugin": {
+            "include": [
+                "Modules/*/composer.json"
+            ]
         }
     },
     "config": {
@@ -99,7 +105,8 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "wikimedia/composer-merge-plugin": true
         }
     },
     "minimum-stability": "stable",

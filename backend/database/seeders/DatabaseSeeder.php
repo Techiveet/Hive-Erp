@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Modules\Identity\Database\Seeders\IdentityDatabaseSeeder;
+use Modules\Tenancy\Database\Seeders\TenancyDatabaseSeeder;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -16,10 +18,14 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            CentralRolesSeeder::class,
-            CentralUsersSeeder::class,
-            TenantsSeeder::class, // This spawns everything else!
-            LanguageSeeder::class,
+            // 1. Establish central roles and super admins
+            IdentityDatabaseSeeder::class,
+
+            // 2. Spawn tenant databases (this triggers the tenant-specific seeders)
+            TenancyDatabaseSeeder::class,
+
+            // 3. Establish global core settings and languages
+            CoreDatabaseSeeder::class,
         ]);
     }
 }

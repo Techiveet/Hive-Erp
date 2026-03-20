@@ -1,0 +1,10 @@
+{
+    "dashboard": "Dashboard",
+    "tenants": "Node Management",
+    "security": "Identity & Access",
+    "audit_logs": "System Audit Logs",
+    "storage": "Storage",
+    "settings": "Settings",
+    "profile": "Profile Settings",
+    "control_hub": "Control Hub"
+}

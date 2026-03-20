@@ -1,0 +1,5 @@
+{
+    "Identity": true,
+    "Tenancy": true,
+    "Core": true
+}

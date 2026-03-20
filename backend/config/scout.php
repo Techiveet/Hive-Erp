@@ -142,10 +142,10 @@ return [
 
         // Add or update this index-settings array!
        'index-settings' => [
-            \App\Models\User::class => [
+            \Modules\Identity\Models\User::class => [
                 'searchableAttributes' => ['name', 'email', 'roles'],
                 // 🚀 CRITICAL: Allow Meilisearch to filter by tenant
-                'filterableAttributes' => ['tenant_id', 'guard_name'], 
+                'filterableAttributes' => ['tenant_id', 'guard_name'],
                 'typoTolerance' => [
                     'enabled' => true,
                     'minWordSizeForTypos' => [
@@ -154,11 +154,11 @@ return [
                     ],
                 ],
             ],
-            
-            \App\Models\Role::class => [
+
+            \Modules\Identity\Models\Role::class => [
                 'searchableAttributes' => ['name', 'permissions'],
                 // 🚀 CRITICAL: Allow Meilisearch to filter by tenant and guard
-                'filterableAttributes' => ['tenant_id', 'guard_name'], 
+                'filterableAttributes' => ['tenant_id', 'guard_name'],
                 'typoTolerance' => [
                     'enabled' => true,
                     'minWordSizeForTypos' => [
@@ -168,7 +168,7 @@ return [
                 ],
             ],
 
-            \App\Models\Permission::class => [
+            \Modules\Identity\Models\Permission::class => [
                 'searchableAttributes' => ['name'],
                 'filterableAttributes' => ['tenant_id', 'guard_name'],
                 'typoTolerance' => [

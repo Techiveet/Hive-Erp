@@ -1,0 +1,11 @@
+{
+    "identity": "Identity",
+    "access": "Access",
+    "node_clearance": "Node Clearance",
+    "denied_desc": "Your current clearance level does not permit access to the Identity & Security matrix.",
+    "tab_operators": "Operators",
+    "tab_roles": "Access Roles",
+    "tab_permissions": "Permissions",
+    "matrix_tour": "Matrix Tour",
+    "encrypted": "Encrypted"
+}
