@@ -1,5 +1,6 @@
 {
     "Identity": true,
     "Tenancy": true,
-    "Core": true
+    "Core": true,
+    "ActivityObserver": true
 }

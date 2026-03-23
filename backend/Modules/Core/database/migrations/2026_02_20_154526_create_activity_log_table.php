@@ -12,10 +12,18 @@ class CreateActivityLogTable extends Migration
             $table->bigIncrements('id');
             $table->string('log_name')->nullable();
             $table->text('description');
-            $table->nullableMorphs('subject', 'subject');
+
+            // 🚀 FIX: Manually define morphs as STRINGS to support "apple"
+            $table->string('subject_type')->nullable();
+            $table->string('subject_id')->nullable();
+            $table->index(['subject_type', 'subject_id'], 'subject');
+
+            // Causer is usually a User (Int), so nullableMorphs is fine here
             $table->nullableMorphs('causer', 'causer');
+
             $table->json('properties')->nullable();
-            // 🚀 THE HIVE ERP MULTI-TENANCY FIX (Only add this line)
+
+            // 🚀 THE HIVE ERP MULTI-TENANCY FIX
             $table->string('tenant_id')->nullable()->index();
             $table->timestamps();
             $table->index('log_name');

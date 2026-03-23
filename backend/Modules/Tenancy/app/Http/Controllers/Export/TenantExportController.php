@@ -4,8 +4,9 @@ namespace Modules\Tenancy\Http\Controllers\Export;
 
 use Modules\Tenancy\Models\Tenant;
 use Modules\Core\Models\Language;
-use Modules\Core\Models\Translation; // 🚀 Added for the relationship bypass
-use Modules\Tenancy\Exports\TenantsExport; // 🚀 Updated to the new modular namespace
+use Modules\Core\Models\Setting; // 🚀 ADDED: Required for Logo Fetching
+use Modules\Core\Models\Translation;
+use Modules\Tenancy\Exports\TenantsExport;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
@@ -52,6 +53,58 @@ class TenantExportController extends Controller implements HasMiddleware
         return $query;
     }
 
+    /**
+     * 🚀 Resolves the physical path for PDF or Base64 for Frontend Print
+     */
+    protected function getResolvedLogo($asBase64 = false): string
+    {
+        $tenantPrefix = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
+        $cacheKey = "export_logo_final_v3_{$tenantPrefix}_" . ($asBase64 ? 'b64' : 'path');
+
+        return Cache::remember($cacheKey, now()->addHour(), function() use ($asBase64) {
+            $logoPath = Setting::where('key', 'logo_dark')->value('value');
+            $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
+
+            if (empty($logoPath)) {
+                return $fallback;
+            }
+
+            // Handle External URLs
+            if (filter_var($logoPath, FILTER_VALIDATE_URL)) {
+                if ($asBase64) {
+                    try {
+                        $data = file_get_contents($logoPath);
+                        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($data) ?: 'image/png';
+                        return 'data:' . $mime . ';base64,' . base64_encode($data);
+                    } catch (\Exception $e) {
+                        return $logoPath;
+                    }
+                }
+                return $logoPath;
+            }
+
+            // Handle Local Storage Paths
+            $cleanPath = ltrim($logoPath, '/');
+            if (!str_starts_with($cleanPath, 'storage/')) {
+                $cleanPath = 'storage/' . $cleanPath;
+            }
+
+            $fullPath = public_path($cleanPath);
+            $realPath = realpath($fullPath);
+
+            if ($realPath && file_exists($realPath)) {
+                if ($asBase64) {
+                    $mime = mime_content_type($realPath);
+                    $data = file_get_contents($realPath);
+                    return 'data:' . $mime . ';base64,' . base64_encode($data);
+                }
+                return 'file://' . $realPath;
+            }
+
+            return $fallback;
+        });
+    }
+
     public function handleExport(Request $request)
     {
         $type = $request->query('type', $request->query('format', 'xlsx'));
@@ -62,14 +115,12 @@ class TenantExportController extends Controller implements HasMiddleware
             'Invalid export format.'
         );
 
-        // 🚀 THE BYPASS: Safely fetch the dictionary without relying on the model relationship
         $locale = $request->input('locale', 'en');
         $cachePrefix = function_exists('tenant') && tenant('id') ? 'tenant_' . tenant('id') : 'central';
 
         $dictionary = Cache::rememberForever("{$cachePrefix}_translations_{$locale}", function () use ($locale) {
             $language = Language::where('code', $locale)->where('is_active', true)->first();
 
-            // Directly query the Translation model using the language ID to bypass Octane cache issues
             if ($language) {
                 return Translation::where('language_id', $language->id)->pluck('value', 'key')->toArray();
             }
@@ -98,9 +149,14 @@ class TenantExportController extends Controller implements HasMiddleware
         if ($type === 'pdf') {
             $data = $this->getFilteredQuery($request)->get();
             $pdf = Pdf::loadView('tenancy::exports.tenants-pdf', [
-                'title' => $t('tenants.title', 'Tenant Node Registry'),
-                'data'  => $data,
-            ])->setPaper('a4', 'landscape');
+                'title'   => $t('tenants.title', 'Tenant Node Registry'),
+                'data'    => $data,
+                't'       => $t, // Passed $t for Blade translations
+                'logoUrl' => $this->getResolvedLogo(true), // 🚀 Forced Base64 string for PDF
+            ])
+            ->setPaper('a4', 'landscape')
+            ->setWarnings(false)
+            ->setOptions(['isRemoteEnabled' => true, 'isHtml5ParserEnabled' => true]);
 
             return $pdf->download("{$filename}.pdf");
         }
@@ -121,7 +177,10 @@ class TenantExportController extends Controller implements HasMiddleware
                 ];
             });
 
-            return response()->json(['data' => $tenants]);
+            return response()->json([
+                'logo_url' => $this->getResolvedLogo(true), // 🚀 Send Base64 logo to React Frontend
+                'data'     => $tenants
+            ]);
         }
     }
 }

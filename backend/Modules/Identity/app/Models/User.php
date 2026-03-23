@@ -12,7 +12,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Http\Request;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
-use Modules\Identity\Database\Factories\UserFactory; // 🚀 Added for the factory bridge
+use Modules\Identity\Database\Factories\UserFactory;
 
 class User extends Authenticatable
 {
@@ -40,7 +40,7 @@ class User extends Authenticatable
     protected $appends = ['avatar_url'];
 
     /**
-     * 🚀 Manual Factory Bridge
+     * Manual Factory Bridge
      * Tells Laravel exactly where the factory for this modular model lives.
      */
     protected static function newFactory()
@@ -51,9 +51,9 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'is_active' => 'boolean',
+            'email_verified_at'       => 'datetime',
+            'password'                => 'hashed',
+            'is_active'               => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
         ];
     }

@@ -8,6 +8,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Modules\Core\Models\Setting; // 🚀 Added Settings Model
 
 class AdminStatusChanged extends Mailable implements ShouldQueue
 {
@@ -34,6 +35,9 @@ class AdminStatusChanged extends Mailable implements ShouldQueue
 
         $tenantId = function_exists('tenant') ? tenant('id') : null;
 
+        // 🚀 Fetch the dynamic logo
+        $logoUrl = $this->resolveBrandLogoUrl();
+
         return new Content(
             view: 'core::emails.universal',
             with: [
@@ -42,13 +46,35 @@ class AdminStatusChanged extends Mailable implements ShouldQueue
                 'user'          => $this->user,
                 'message_intro' => "Your Super Admin access for the '{$this->tenantName}' node has been {$statusText}. {$instruction}",
 
-                // 🚀 INJECT BUTTON DATA (Only show the button if they are active)
+                // INJECT BUTTON DATA (Only show the button if they are active)
                 'actionUrl'     => $this->isActive ? "http://{$tenantId}.localhost:3000/sign-in" : null,
                 'actionText'    => 'Login to Tenant Gateway',
 
                 'appName'       => 'HIVE.OS',
-                'logoUrl'       => 'https://techiveet.com/frontend/images/resources/logo1.png',
+                'logoUrl'       => $logoUrl, // 🚀 Passed to the view
             ],
         );
+    }
+
+    // 🚀 Added the resolver method
+    protected function resolveBrandLogoUrl(): string
+    {
+        $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
+
+        $logoPath = cache()->remember(
+            'mail_brand_logo_dark_path',
+            now()->addHour(),
+            fn () => Setting::where('key', 'logo_dark')->value('value')
+        );
+
+        if (empty($logoPath)) {
+            return $fallback;
+        }
+
+        if (filter_var($logoPath, FILTER_VALIDATE_URL)) {
+            return $logoPath;
+        }
+
+        return asset(ltrim($logoPath, '/'));
     }
 }

@@ -16,19 +16,33 @@ use Modules\Identity\Http\Controllers\Export\PermissionExportController;
 $centralDomains = ['localhost', '127.0.0.1', 'hive-os.com'];
 
 // =========================================================================
-// 1. CENTRAL COMMAND (Identity)
+// 1. CENTRAL COMMAND (Identity & Public System)
 // =========================================================================
 foreach ($centralDomains as $domain) {
     Route::domain($domain)->prefix('v1')->group(function () {
 
-        // Public
+        // 🚀 NEW: PUBLIC SYSTEM ROUTES (For Maintenance Mode Ticker)
+        Route::prefix('system')->group(function () {
+            Route::get('/status-ticker', function() {
+                return response()->json([
+                    'message' => get_system_setting('maintenance_message', 'HIVE.OS: System neural links are currently undergoing optimization.')
+                ]);
+            });
+        });
+
+
+
+        // Public Auth
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/verify-2fa', [AuthController::class, 'verify2FA']);
         Route::get('/password-policy', [AuthController::class, 'passwordPolicy']);
         Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
-        // Protected
+        // Protected Auth
         Route::middleware('auth:sanctum')->group(function () {
+            // Heartbeat Endpoint
+            Route::post('/ping', [AuthController::class, 'ping']);
+
             Route::get('/user', [AuthController::class, 'user']);
             Route::post('/logout', [AuthController::class, 'logout']);
             Route::post('/profile/update', [ProfileController::class, 'updateProfile']);
@@ -57,21 +71,33 @@ foreach ($centralDomains as $domain) {
 }
 
 // =========================================================================
-// 2. TENANT NODE (Identity)
+// 2. TENANT NODE (Identity & Public System)
 // =========================================================================
 Route::middleware([
     InitializeTenancyByDomain::class,
     PreventAccessFromCentralDomains::class
 ])->prefix('v1')->group(function () {
 
-    // Public
+    // 🚀 NEW: PUBLIC SYSTEM ROUTES FOR TENANTS (For Maintenance Mode Ticker)
+    Route::prefix('system')->group(function () {
+        Route::get('/status-ticker', function() {
+            return response()->json([
+                'message' => get_system_setting('maintenance_message', 'HIVE.OS: System neural links are currently undergoing optimization.')
+            ]);
+        });
+    });
+
+    // Public Auth
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/verify-2fa', [AuthController::class, 'verify2FA']);
     Route::get('/password-policy', [AuthController::class, 'passwordPolicy']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
-    // Protected
+    // Protected Auth
     Route::middleware('auth:sanctum')->group(function () {
+        // Heartbeat Endpoint
+        Route::post('/ping', [AuthController::class, 'ping']);
+
         Route::get('/user', [AuthController::class, 'user']);
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/profile/update', [ProfileController::class, 'updateProfile']);
@@ -83,8 +109,16 @@ Route::middleware([
             Route::post('/disable', [TwoFactorController::class, 'destroy']);
         });
 
-        // 🚀 THE FIX: If your frontend uses /tenant/ prefix, we define it here:
+        // THE FIX: If your frontend uses /tenant/ prefix, we define it here:
         Route::prefix('tenant')->group(function () {
+
+            // 🚀 Ensure Tenant explicitly has the status ticker route under the /tenant prefix as well just in case!
+            Route::get('/system/status-ticker', function() {
+                return response()->json([
+                    'message' => get_system_setting('maintenance_message', 'HIVE.OS: System neural links are currently undergoing optimization.')
+                ]);
+            });
+
             Route::prefix('roles')->group(function() {
                 Route::get('/export', [RoleExportController::class, 'handleExport']);
             });
@@ -98,7 +132,7 @@ Route::middleware([
             Route::apiResource('users', UserController::class);
         });
 
-        // 🚀 FALLBACK: Keep the standard paths just in case other parts of your app use them
+        // FALLBACK: Keep the standard paths just in case other parts of your app use them
         Route::prefix('roles')->group(function() {
             Route::get('/export', [RoleExportController::class, 'handleExport']);
         });

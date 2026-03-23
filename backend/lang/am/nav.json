@@ -10,6 +10,8 @@
     "disconnect": "ኖዱን አቋርጥ",
     "theme": "ገጽታ",
     "close": "ዝጋ",
+    "settings_brand": "የምርት ስም ቅንብሮች",
+    "settings_brand_desc": "አርማዎች፣ ቀለሞች እና እይታዎች።",
     "settings_general": "ጠቅላላ",
     "settings_general_desc": "መሰረታዊ የስርዓት ውቅር።",
     "settings_security_desc": "የማረጋገጫ እና የመዳረሻ ፖሊሲዎች።",

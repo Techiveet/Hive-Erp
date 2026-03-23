@@ -24,12 +24,8 @@ foreach ($centralDomains as $domain) {
         // Protected
         Route::middleware('auth:sanctum')->group(function () {
 
-            Route::get('/central/dashboard', function () {
-                return response()->json([
-                    'node' => 'CENTRAL_COMMAND',
-                    'stats' => ['active_tenants' => \Modules\Tenancy\Models\Tenant::count(), 'load' => 'optimal'],
-                ]);
-            });
+            // 🚀 REMOVED the hardcoded /central/dashboard closure from here!
+            // It is now safely handled by the Core module's DashboardController.
 
             Route::prefix('tenants')->group(function() {
                 Route::get('/export', [TenantExportController::class, 'handleExport']);
@@ -51,12 +47,11 @@ Route::middleware([
 ])->prefix('v1')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
-        // Tenant Node Dashboard Data
-        Route::get('/dashboard', function () {
-            return response()->json([
-                'company' => ucfirst(tenant('id')) . ' Corp',
-                'node_id' => tenant('id'),
-            ]);
-        });
+
+        // 🚀 REMOVED the hardcoded /dashboard closure from here!
+        // It is now safely handled by the Core module's DashboardController.
+
+        // Add any other tenant-specific tenancy routes here if needed in the future
+
     });
 });

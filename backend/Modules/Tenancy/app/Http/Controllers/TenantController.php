@@ -14,18 +14,22 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 use Modules\Tenancy\Mail\TenantStatusChanged;
-
 use Modules\Tenancy\Mail\AdminStatusChanged;
 use Modules\Tenancy\Mail\AdminCredentialsUpdated;
+use Modules\Tenancy\Mail\TenantCreated; // 🚀 Using our new Mailable
+use Modules\Core\Models\Setting;
+use Barryvdh\DomPDF\Facade\Pdf; // 🚀 Required for PDF generation
 
 use Stancl\Tenancy\Jobs\CreateDatabase;
 use Stancl\Tenancy\Jobs\MigrateDatabase;
+
 class TenantController extends Controller implements HasMiddleware
 {
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:view_tenants,sanctum', only: ['index', 'show']),
+            // 🚀 Added 'exportPdf' to the view permissions
+            new Middleware('permission:view_tenants,sanctum', only: ['index', 'show', 'exportPdf']),
             new Middleware('permission:provision_tenants,sanctum', only: ['store']),
             new Middleware('permission:edit_tenants,sanctum', only: ['update']),
             new Middleware('permission:suspend_tenants,sanctum', only: ['toggleStatus', 'toggleAdminStatus']),
@@ -81,7 +85,54 @@ class TenantController extends Controller implements HasMiddleware
         ], 200);
     }
 
-   public function store(Request $request)
+    // 🚀 THE NEW PDF EXPORT METHOD
+    public function exportPdf(Request $request)
+    {
+        $query = Tenant::with('domains');
+
+        // Apply the same search/sort so the PDF matches the user's view
+        if ($request->filled('search')) {
+            $search = strtolower($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->whereRaw('LOWER(id) LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(data->>\'name\') LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(data->>\'plan\') LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(data->>\'admin_email\') LIKE ?', ["%{$search}%"]);
+            });
+        }
+
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortDir = $request->input('sort_direction', 'desc');
+
+        if (in_array($sortBy, ['name', 'plan', 'is_active', 'admin_email', 'admin_active'])) {
+            $query->orderByRaw("data->>'$sortBy' $sortDir");
+        } else {
+            $query->orderBy($sortBy, $sortDir);
+        }
+
+        // Get all matching records (no pagination for reports)
+        $tenants = $query->get();
+
+        // Resolve Branding Logo
+        $logoPath = Setting::where('key', 'logo_dark')->value('value');
+        $logoUrl = $logoPath ? asset(ltrim($logoPath, '/')) : 'https://techiveet.com/frontend/images/resources/logo1.png';
+
+        $pdf = Pdf::loadView('tenancy::exports.tenants-pdf', [
+            'title'   => 'Tenant Nodes Directory',
+            'data'    => $tenants,
+            'logoUrl' => $logoUrl
+        ]);
+
+        // Log the export action to the audit log
+        activity('Tenant Management')
+            ->causedBy(auth()->user())
+            ->event('exported')
+            ->log("Exported Tenant Nodes Directory to PDF.");
+
+        return $pdf->download('network-nodes-' . now()->format('Ymd_His') . '.pdf');
+    }
+
+public function store(Request $request)
     {
         $request->validate([
             'id' => ['required', 'string', 'alpha_dash', 'max:20', Rule::unique('tenants', 'id')],
@@ -118,27 +169,30 @@ class TenantController extends Controller implements HasMiddleware
             }
 
             // 🚀 4. FORCE THE MIGRATIONS WITH EXPLICIT PATHS
-            // This guarantees it finds your modular migrations, even if the config is cached!
             \Illuminate\Support\Facades\Artisan::call('tenants:migrate', [
                 '--tenants' => [$tenant->id],
                 '--path' => [
-                    'database/migrations/tenant', // Checks the root just in case
+                    'database/migrations/tenant',
                     'Modules/Identity/database/migrations/tenant',
                     'Modules/Core/database/migrations/tenant',
                 ]
             ]);
 
             // 5. Run the internal seeding
-            $tenant->run(function () use ($request) {
+            $tenant->run(function () use ($request, $tenant) {
                 app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-                $admin = User::create([
-                    'name' => $request->admin_name,
-                    'email' => strtolower($request->admin_email),
-                    'password' => Hash::make($request->admin_password),
-                    'is_active' => true,
-                    'email_verified_at' => now(),
-                ]);
+                // 🚀 THE BULLETPROOF FIX: updateOrCreate prevents Unique Violations
+                // if a previous provisioning attempt left a ghost database behind.
+                $admin = User::updateOrCreate(
+                    ['email' => strtolower($request->admin_email)], // Search by this
+                    [
+                        'name' => $request->admin_name,
+                        'password' => Hash::make($request->admin_password),
+                        'is_active' => true,
+                        'email_verified_at' => now(),
+                    ] // Update or create with these details
+                );
 
                 $admin->guard_name = 'tenant';
 
@@ -147,14 +201,18 @@ class TenantController extends Controller implements HasMiddleware
 
                 try {
                     $token = \Illuminate\Support\Facades\Password::broker()->createToken($admin);
-                    Mail::to($admin->email)->send(new \App\Mail\UserCreated($admin, $token, $request->admin_password));
+                    // 🚀 Using the Custom Mailable we created
+                    Mail::to($admin->email)->send(new \Modules\Tenancy\Mail\TenantCreated($tenant, $admin, $request->admin_password, $token));
                 } catch (\Exception $mailEx) {
                     \Illuminate\Support\Facades\Log::warning("Welcome email failed: " . $mailEx->getMessage());
                 }
             });
 
             // 6. Log the activity
-            activity('Tenant Management')->causedBy(auth()->user() ?? null)->event('created')
+            activity('Tenant Management')
+                ->causedBy(auth()->user() ?? null)
+                ->performedOn($tenant) // 🚀 Tells React a node was created
+                ->event('created')
                 ->withProperties(['node_id' => $tenant->id])
                 ->log("Provisioned new Tenant Node [{$tenant->id}] with plan [{$tenant->plan}].");
 
@@ -239,9 +297,9 @@ class TenantController extends Controller implements HasMiddleware
             }
         }
 
-        // 🚀 FIX: Logged under Tenant Management
         activity('Tenant Management')
             ->causedBy(auth()->user())
+            ->performedOn($tenant)
             ->event('updated')
             ->withProperties(['node_id' => $tenant->id])
             ->log("Reconfigured Tenant Node [{$tenant->id}].");
@@ -266,9 +324,9 @@ class TenantController extends Controller implements HasMiddleware
             $tenant->deleteQuietly();
             $tenant->domains()->delete();
 
-            // 🚀 FIX: Logged under Tenant Management
             activity('Tenant Management')
                 ->causedBy(auth()->user())
+                ->performedOn($tenant)
                 ->event('deleted')
                 ->withProperties(['node_id' => $id])
                 ->log("Permanently purged Tenant Node [{$id}] from the network.");
@@ -292,9 +350,9 @@ class TenantController extends Controller implements HasMiddleware
             try { Mail::to($tenant->admin_email)->send(new TenantStatusChanged($tenant->name, $newState, $tenant->id)); } catch (\Exception $e) {}
         }
 
-        // 🚀 FIX: Logged under Tenant Management
         activity('Tenant Management')
             ->causedBy(auth()->user())
+            ->performedOn($tenant)
             ->event('updated')
             ->withProperties(['node_id' => $tenant->id])
             ->log("Node [{$tenant->id}] network status changed to: " . ($newState ? 'Online' : 'Suspended'));
@@ -318,9 +376,9 @@ class TenantController extends Controller implements HasMiddleware
             try { Mail::to($admin->email)->send(new AdminStatusChanged((object)['name' => $admin->name, 'email' => $admin->email], $adminNewState, $tenant->name)); } catch (\Exception $e) {}
         });
 
-        // 🚀 FIX: Logged under Tenant Management
         activity('Tenant Management')
             ->causedBy(auth()->user())
+            ->performedOn($tenant)
             ->event('updated')
             ->withProperties(['node_id' => $tenant->id])
             ->log("Node [{$tenant->id}] Super Admin access changed to: " . ($adminNewState ? 'Active' : 'Suspended'));

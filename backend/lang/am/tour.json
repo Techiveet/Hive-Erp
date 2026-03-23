@@ -105,5 +105,19 @@
     "sidebar_nav_title": "ዋና ማሰሻ",
     "sidebar_nav_desc": "ዳሽቦርድ፣ የኖድ አስተዳደር፣ የደህንነት ማትሪክስ እና የኦዲት መዝገቦችን ከዚህ ይድረሱ።",
     "sidebar_secondary_title": "የስርዓት ምርጫዎች",
-    "sidebar_secondary_desc": "የማከማቻ አቅምን፣ ዓለም አቀፍ ቅንብሮችን ያስተዳድሩ እና በገጽታዎች መካከል ይቀያይሩ።"
+    "sidebar_secondary_desc": "የማከማቻ አቅምን፣ ዓለም አቀፍ ቅንብሮችን ያስተዳድሩ እና በገጽታዎች መካከል ይቀያይሩ።",
+    "settings_header_title": "የስርዓት ምርጫዎች",
+    "settings_header_desc": "ይህ የኖድ ብራንዲንግ፣ ቋንቋዎች እና መሰረታዊ መዋቅሮች መቆጣጠሪያ ነው።",
+    "settings_tabs_title": "የቅንብሮች ማሰሻ",
+    "settings_tabs_desc": "በብራንድ እይታዎች፣ የደህንነት ፖሊሲዎች፣ ቋንቋዎች እና ማሳወቂያዎች መካከል እዚህ ይቀያይሩ።",
+    "brand_visuals_title": "ዋና የእይታ ማንነት",
+    "brand_visuals_desc": "አርማዎችዎን ይስቀሉ፣ የብሮውዘር አዶዎን ያዘጋጁ እና የኖድዎን ዋና የጽሑፍ እና የቀለም አቀማመጥ ይወስኑ።",
+    "brand_auth_title": "የማረጋገጫ በር",
+    "brand_auth_desc": "ኦፕሬተሮችዎ ከመግባታቸው በፊት የሚያዩትን የመግቢያ ዳራ እና የእንኳን ደህና መጡ መልእክት ያብጁ።",
+    "brand_docs_title": "የሰነድ ብራንዲንግ",
+    "brand_docs_desc": "ለሚመነጩ ፒዲኤፎች፣ ሪፖርቶች እና ሰነዶች የተወሰኑ ራስጌዎችን እና አርማዎችን ያዘጋጁ።",
+    "brand_seo_title": "SEO እና ነጭ ስያሜ",
+    "brand_seo_desc": "የማህበራዊ ሚዲያ ማጋሪያ ሜታዳታን ያዋቅሩ እና የ \"Powered by Hive\" የውሃ ምልክትን መደበቅ አለመደበቅዎን ይምረጡ።",
+    "settings_save_title": "ለውጦችን አስቀምጥ",
+    "settings_save_desc": "ቅንብሮችዎን ማስተካከል ሲጨርሱ ለውጦችዎን ወደ አውታረ መረብ ማትሪክስ ማስቀመጥዎን አይርሱ!"
 }

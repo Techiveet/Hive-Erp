@@ -108,45 +108,55 @@ class UserController extends Controller
         }
     }
 
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'email'       => 'required|email|unique:users,email',
-            'role'        => 'required|string|exists:roles,name',
-            'avatar_path' => 'nullable|string', // 🚀 FIX: Accept string instead of image file
-            'password'    => 'nullable|string|min:8'
-        ]);
+   public function store(Request $request)
+{
+    $validated = $request->validate([
+        'name'        => 'required|string|max:255',
+        'email'       => 'required|email|unique:users,email',
+        'role'        => 'required|string|exists:roles,name',
+        'avatar_path' => 'nullable|string',
+        'password'    => 'nullable|string|min:8',
+    ]);
 
-        if ($validated['role'] === 'Super Admin') {
-            return $this->error('Access Denied: Cannot provision Super Admin accounts via API.', 403);
-        }
-
-        $rawPassword = $request->input('password') ?: Str::random(16);
-
-        $user = User::create([
-            'name'        => $validated['name'],
-            'email'       => $validated['email'],
-            'password'    => Hash::make($rawPassword),
-            'is_active'   => true,
-            'avatar_path' => $request->input('avatar_path'), // 🚀 FIX: Save the string path
-        ]);
-
-        $user->guard_name = $this->resolveGuard();
-        $user->assignRole($validated['role']);
-
-        Cache::forget("user_stats_{$user->guard_name}");
-
-        try {
-            $token = Password::createToken($user);
-            Mail::to($user->email)->queue(new UserCreated($user, $token, $rawPassword));
-        } catch (\Exception $e) {
-            Log::warning("UserCreated email failed: " . $e->getMessage());
-        }
-
-        return $this->success($user, 'Node operator provisioned successfully.', 201);
+    if ($validated['role'] === 'Super Admin') {
+        return $this->error('Access Denied: Cannot provision Super Admin accounts via API.', 403);
     }
 
+    $rawPassword = $request->input('password') ?: \Illuminate\Support\Str::random(16);
+
+    $user = User::create([
+        'name'        => $validated['name'],
+        'email'       => $validated['email'],
+        'password'    => \Illuminate\Support\Facades\Hash::make($rawPassword),
+        'is_active'   => true,
+        'avatar_path' => $request->input('avatar_path'),
+    ]);
+
+    $user->guard_name = $this->resolveGuard();
+    $user->assignRole($validated['role']);
+
+    \Illuminate\Support\Facades\Cache::forget("user_stats_{$user->guard_name}");
+
+    try {
+        $token = \Illuminate\Support\Facades\Password::createToken($user);
+        $tenantId = function_exists('tenant') && tenant()
+            ? tenant('id')
+            : null;
+
+        \Illuminate\Support\Facades\Mail::to($user->email)->queue(
+            new \Modules\Identity\Mail\UserCreated(
+                user: $user,
+                token: $token,
+                rawPassword: $rawPassword,
+                tenantId: $tenantId
+            )
+        );
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::warning("UserCreated email failed: " . $e->getMessage());
+    }
+
+    return $this->success($user, 'Node operator provisioned successfully.', 201);
+}
     public function show($id)
     {
         $user = User::with('roles')->findOrFail($id);
@@ -248,5 +258,42 @@ class UserController extends Controller
 
         $status = $user->is_active ? 'activated' : 'deactivated';
         return $this->success($user, "Operator successfully {$status}.");
+    }
+
+    // 🚀 BULLETPROOF IMPERSONATION METHOD
+    public function impersonate(Request $request, $id)
+    {
+        try {
+            // 1. Get the authenticated ID
+            $currentUserId = $request->user()->id;
+
+            // 2. Explicitly fetch the user using the Identity Module's Model
+            // This guarantees the Spatie 'hasRole' and Sanctum 'createToken' traits are available!
+            $identityUser = User::find($currentUserId);
+
+            // 3. Security Check
+            if (!$identityUser || !$identityUser->hasRole('Super Admin')) {
+                return $this->error('CRITICAL: Insufficient clearance. Only Super Admins can impersonate users.', 403);
+            }
+
+            // 4. Fetch target user
+            $userToImpersonate = User::findOrFail($id);
+
+            if ($userToImpersonate->id === 1 || $userToImpersonate->id === '1') {
+                return $this->error('Cannot impersonate the Core Overlord.', 403);
+            }
+
+            // 5. Generate a new temporary token
+            $token = $userToImpersonate->createToken('impersonation_token')->plainTextToken;
+
+            return $this->success([
+                'token' => $token,
+                'user' => $userToImpersonate
+            ], 'Impersonation sequence activated.');
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Impersonation Error: ' . $e->getMessage());
+            return $this->error('System Crash: ' . $e->getMessage() . ' on line ' . $e->getLine(), 500);
+        }
     }
 }

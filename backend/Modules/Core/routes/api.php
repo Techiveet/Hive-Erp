@@ -1,15 +1,19 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
 use Modules\Core\Http\Controllers\ActivityLogController;
-use Modules\Core\Http\Controllers\LocalizationController;
+use Modules\Core\Http\Controllers\Settings\LocalizationController;
 use Modules\Core\Http\Controllers\GlobalSearchController;
 use Modules\Core\Http\Controllers\FileManagerController;
-use Modules\Core\Http\Controllers\BrandSettingsController;
+use Modules\Core\Http\Controllers\Settings\BrandSettingsController;
+use Modules\Core\Http\Controllers\Settings\GeneralSettingsController;
 use Modules\Core\Http\Controllers\Export\ActivityLogExportController;
+use Modules\Core\Http\Controllers\Dashboard\DashboardController;
+use Modules\Identity\Http\Controllers\UserController; // 🚀 ADDED: Import UserController
 
 $centralDomains = ['localhost', '127.0.0.1', 'hive-os.com'];
 
@@ -26,22 +30,30 @@ foreach ($centralDomains as $domain) {
         // Protected
         Route::middleware('auth:sanctum')->group(function () {
 
+            // 🚀 Register Broadcast Auth for the Central Domain
+            Broadcast::routes();
+
+            // 🚀 USER IMPERSONATION (Central)
+            Route::post('/central/users/{id}/impersonate', [UserController::class, 'impersonate']);
+
+            // 🚀 DASHBOARD
+            Route::get('/central/dashboard', [DashboardController::class, 'index']);
             Route::get('/search', [GlobalSearchController::class, 'search']);
 
             Route::prefix('settings')->group(function () {
                 Route::get('/brand', [BrandSettingsController::class, 'getBrandSettings']);
                 Route::post('/brand', [BrandSettingsController::class, 'updateBrandSettings']);
+                Route::get('/general', [GeneralSettingsController::class, 'index']);
+                Route::post('/general', [GeneralSettingsController::class, 'store']);
             });
 
-            // 🌐 DYNAMIC LOCALIZATION MANAGEMENT (With Fixes!)
+            // 🌐 DYNAMIC LOCALIZATION MANAGEMENT
             Route::prefix('localization')->group(function () {
                 Route::get('/languages', [LocalizationController::class, 'getLanguages']);
                 Route::post('/languages', [LocalizationController::class, 'addLanguage']);
                 Route::post('/languages/default', [LocalizationController::class, 'setDefaultLanguage']);
                 Route::delete('/languages/{code}', [LocalizationController::class, 'destroyLanguage']);
-
                 Route::get('/languages/{code}/translations', [LocalizationController::class, 'getTranslations']);
-
                 Route::post('/translations/source', [LocalizationController::class, 'addSourceKey']);
                 Route::post('/translations/source/delete', [LocalizationController::class, 'destroySourceKey']);
                 Route::post('/translations/update', [LocalizationController::class, 'updateTranslation']);
@@ -104,22 +116,30 @@ Route::middleware([
     // Protected
     Route::middleware('auth:sanctum')->group(function () {
 
+        // 🚀 Register Broadcast Auth for the Tenant Domains
+        Broadcast::routes();
+
+        // 🚀 USER IMPERSONATION (Tenant)
+        Route::post('/users/{id}/impersonate', [UserController::class, 'impersonate']);
+
+        // 🚀 DASHBOARD
+        Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/search', [GlobalSearchController::class, 'search']);
 
         Route::prefix('settings')->group(function () {
             Route::get('/brand', [BrandSettingsController::class, 'getBrandSettings']);
             Route::post('/brand', [BrandSettingsController::class, 'updateBrandSettings']);
+            Route::get('/general', [GeneralSettingsController::class, 'index']);
+            Route::post('/general', [GeneralSettingsController::class, 'store']);
         });
 
-        // 🌐 DYNAMIC LOCALIZATION MANAGEMENT (With Fixes!)
+        // 🌐 DYNAMIC LOCALIZATION MANAGEMENT
         Route::prefix('localization')->group(function () {
             Route::get('/languages', [LocalizationController::class, 'getLanguages']);
             Route::post('/languages', [LocalizationController::class, 'addLanguage']);
             Route::post('/languages/default', [LocalizationController::class, 'setDefaultLanguage']);
             Route::delete('/languages/{code}', [LocalizationController::class, 'destroyLanguage']);
-
             Route::get('/languages/{code}/translations', [LocalizationController::class, 'getTranslations']);
-
             Route::post('/translations/source', [LocalizationController::class, 'addSourceKey']);
             Route::post('/translations/source/delete', [LocalizationController::class, 'destroySourceKey']);
             Route::post('/translations/update', [LocalizationController::class, 'updateTranslation']);
@@ -129,7 +149,6 @@ Route::middleware([
 
         // 📂 FILE MANAGER
         Route::prefix('files')->group(function () {
-            // (Same exact file routes as central, you can copy/paste the block from above to keep it consistent)
             Route::get('/', [FileManagerController::class, 'index']);
             Route::post('/folder', [FileManagerController::class, 'createFolder']);
             Route::post('/upload', [FileManagerController::class, 'uploadFile']);

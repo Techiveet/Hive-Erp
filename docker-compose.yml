@@ -64,8 +64,7 @@ services:
     networks:
       - hive-network
 
-  # 🚀 5. AI BACKGROUND REMOVAL (rembg) - NEW
- # 🚀 5. AI BACKGROUND REMOVAL (rembg)
+  # 🚀 5. AI BACKGROUND REMOVAL (rembg)
   rembg:
     image: danielgatis/rembg:latest
     container_name: hive-ai-rembg
@@ -110,6 +109,9 @@ services:
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
       WATCHPACK_POLLING: "true"
+      # 🚀 TELL LARAVEL WHERE REVERB LIVES IN DOCKER
+      REVERB_HOST: reverb
+      PUSHER_HOST: reverb
     depends_on:
       redis:
         condition: service_healthy
@@ -138,6 +140,7 @@ services:
       - ./backend:/var/www/html
     environment:
       APP_ENV: local
+      APP_KEY: base64:c29tZXJhbmRvbXN0cmluZ2ZvcmRldmVsb3BtZW50MjE=
       DB_CONNECTION: pgsql
       DB_HOST: db
       DB_DATABASE: hive
@@ -148,6 +151,9 @@ services:
       MAIL_MAILER: smtp
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
+      # 🚀 TELL THE WORKER WHERE REVERB LIVES (For queued broadcasts)
+      REVERB_HOST: reverb
+      PUSHER_HOST: reverb
     depends_on:
       redis:
         condition: service_healthy
@@ -160,6 +166,7 @@ services:
       - hive-network
 
   # 8. THE FACE (Next.js 16)
+ # 8. THE FACE (Next.js 16)
   frontend:
     build:
       context: ./frontend
@@ -175,8 +182,12 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:8085/api
       INTERNAL_API_URL: http://backend:8000/api
       WATCHPACK_POLLING: "true"
+      # 🚀 ADD THESE TWO LINES: Forces Next.js to broadcast outside the container
+      HOSTNAME: "0.0.0.0"
+      PORT: 3000
     depends_on:
       - backend
+    command: sh -c "npm install --legacy-peer-deps && npm run dev"
     networks:
       - hive-network
 
@@ -192,6 +203,35 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - hive-network
+
+  # 🚀 10. WEBSOCKET ENGINE (Reverb) - NEW!
+  reverb:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hive-reverb
+    restart: unless-stopped
+    ports:
+      - "9000:9000" # Expose Reverb to your local browser
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      APP_ENV: local
+      APP_KEY: base64:c29tZXJhbmRvbXN0cmluZ2ZvcmRldmVsb3BtZW50MjE=
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_DATABASE: hive
+      DB_USERNAME: hive
+      DB_PASSWORD: password
+      REDIS_HOST: redis
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    command: php artisan reverb:start --host=0.0.0.0 --port=9000
     networks:
       - hive-network
 

@@ -8,6 +8,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Modules\Core\Models\Setting; // 🚀 Added Settings Model
 
 class TenantStatusChanged extends Mailable implements ShouldQueue
 {
@@ -16,7 +17,7 @@ class TenantStatusChanged extends Mailable implements ShouldQueue
     public function __construct(
         public string $tenantName,
         public bool $isActive,
-        public string $tenantId // 🚀 ADDED THIS
+        public string $tenantId
     ) {}
 
     public function envelope(): Envelope
@@ -32,6 +33,9 @@ class TenantStatusChanged extends Mailable implements ShouldQueue
             ? 'You may now log in and access your node.'
             : 'Please contact billing or support for more details.';
 
+        // 🚀 Fetch the dynamic logo
+        $logoUrl = $this->resolveBrandLogoUrl();
+
         return new Content(
            view: 'core::emails.universal',
             with: [
@@ -40,13 +44,35 @@ class TenantStatusChanged extends Mailable implements ShouldQueue
                 'message_intro' => "The workspace '{$this->tenantName}' has been {$statusText} by the Central Command. {$instruction}",
                 'user'          => (object) ['name' => 'Node Administrator'],
 
-                // 🚀 INJECT BUTTON DATA (Only show button if they are active)
+                // INJECT BUTTON DATA (Only show button if they are active)
                 'actionUrl'     => $this->isActive ? "http://{$this->tenantId}.localhost:3000/sign-in" : null,
                 'actionText'    => 'Access Node Gateway',
 
                 'appName'       => 'HIVE.OS',
-                'logoUrl'       => 'https://techiveet.com/frontend/images/resources/logo1.png',
+                'logoUrl'       => $logoUrl, // 🚀 Passed to the view
             ],
         );
+    }
+
+    // 🚀 Added the resolver method
+    protected function resolveBrandLogoUrl(): string
+    {
+        $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
+
+        $logoPath = cache()->remember(
+            'mail_brand_logo_dark_path',
+            now()->addHour(),
+            fn () => Setting::where('key', 'logo_dark')->value('value')
+        );
+
+        if (empty($logoPath)) {
+            return $fallback;
+        }
+
+        if (filter_var($logoPath, FILTER_VALIDATE_URL)) {
+            return $logoPath;
+        }
+
+        return asset(ltrim($logoPath, '/'));
     }
 }

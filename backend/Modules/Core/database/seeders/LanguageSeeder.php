@@ -10,9 +10,6 @@ use Modules\Core\Console\Commands\SyncLocalizationCommand;
 
 class LanguageSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         $isTenant = function_exists('tenant') && tenant('id');
@@ -20,10 +17,8 @@ class LanguageSeeder extends Seeder
 
         $this->command->info("\n🌍 Initializing Localization for: {$context}");
 
-        // 1. Ensure physical JSON files exist on disk before syncing
         $this->bootstrapPhysicalFiles();
 
-        // 2. Register core languages in the database
         $coreLanguages = [
             ['name' => 'English', 'code' => 'en', 'is_active' => true, 'is_default' => true],
             ['name' => 'Amharic', 'code' => 'am', 'is_active' => true, 'is_default' => false]
@@ -33,28 +28,20 @@ class LanguageSeeder extends Seeder
             Language::updateOrCreate(['code' => $langData['code']], $langData);
         }
 
-        // 3. 🚀 THE ULTIMATE FIX: Safely check if the command is registered in this process.
         $commands = Artisan::all();
         if (!isset($commands['localization:sync'])) {
             $this->command->warn("! [NOTE] Manually registering sync command for this process...");
-
-            // Resolve the Kernel and register the modular command class directly
             app(\Illuminate\Contracts\Console\Kernel::class)->registerCommand(app(SyncLocalizationCommand::class));
         }
 
         $this->command->info("⏳ Triggering localization sync...");
 
-        // 4. Execute the sync command
         Artisan::call('localization:sync');
 
-        // 5. Output the result using standard command helpers
         $this->command->line(Artisan::output());
         $this->command->info("✅ Localization matrix initialized and synced.");
     }
 
-    /**
-     * Create default JSON language files if they don't exist.
-     */
     protected function bootstrapPhysicalFiles(): void
     {
         $isTenant = function_exists('tenant') && tenant('id');
@@ -62,6 +49,49 @@ class LanguageSeeder extends Seeder
 
         $defaultMatrix = [
              'en' => [
+                'settings' => [
+                    'visual_identity' => 'Visual Identity',
+                    'visual_identity_desc' => 'Configure your main application branding and theme colors.',
+                    'logo_light' => 'Logo (Light Mode)',
+                    'logo_dark' => 'Logo (Dark Mode)',
+                    'favicon' => 'Browser Favicon',
+                    'sidebar_icon' => 'Sidebar Icon',
+                    'no_logo' => 'NO LOGO',
+                    'no_favicon' => 'NO FAVICON',
+                    'app_title' => 'App Title',
+                    'primary_color' => 'Primary Theme Color',
+                    'typography' => 'Typography Style',
+                    'font_inter' => 'Inter (Modern)',
+                    'font_space' => 'Space Grotesk (Tech)',
+                    'font_roboto' => 'Roboto (Corporate)',
+                    'auth_portal' => 'Authentication Portal',
+                    'auth_portal_desc' => 'Customize the login experience for your employees.',
+                    'login_bg' => 'Login Background Image',
+                    'no_bg' => 'NO BACKGROUND',
+                    'welcome_msg' => 'Welcome Message',
+                    'welcome_placeholder' => 'Sign in to access your secure control hub.',
+                    'doc_branding' => 'Document Branding',
+                    'doc_branding_desc' => 'Headers and logos applied to exported Payslips and Waybills.',
+                    'pdf_logo' => 'PDF Logo (High Contrast)',
+                    'use_main_logo' => 'USE MAIN LOGO',
+                    'company_tin' => 'Company TIN / Tax ID',
+                    'pdf_header_color' => 'PDF Header Color',
+                    'seo_whitelabel' => 'SEO & White-Labeling',
+                    'seo_whitelabel_desc' => 'Configure social sharing metadata and system watermarks.',
+                    'hide_watermark' => 'Hide "Powered by Hive"',
+                    'remove_branding' => 'Remove external branding',
+                    'og_image' => 'Social Share Image (OG Image)',
+                    'default_preview' => 'DEFAULT PREVIEW',
+                    'meta_desc' => 'Meta Description',
+                    'meta_placeholder' => 'Brief description of your company for Google Search...',
+                    'footer_text' => 'Footer Copyright Text',
+                    'commit_changes' => 'Commit Identity Changes',
+                    'select_asset' => 'Select Brand Asset',
+                    'choose_image' => 'Choose an optimized image for your interface.',
+                    'change_img' => 'Change',
+                    'asset_attached' => 'Asset attached!',
+                    'matrix_updated' => 'Identity Matrix Updated!'
+                ],
                 'global' => [
                     'cancel' => 'Cancel',
                     'update' => 'Update',
@@ -111,6 +141,8 @@ class LanguageSeeder extends Seeder
                     'disconnect' => 'Disconnect Node',
                     'theme' => 'Theme',
                     'close' => 'Close',
+                    'settings_brand' => 'Brand Settings',
+                    'settings_brand_desc' => 'Logos, colors, and visuals.',
                     'settings_general' => 'General',
                     'settings_general_desc' => 'Basic system configuration.',
                     'settings_security_desc' => 'Authentication and access policies.',
@@ -405,6 +437,18 @@ class LanguageSeeder extends Seeder
                     'close_inspection' => 'Close Inspection',
                 ],
                 'tour' => [
+                    'topbar_search_title' => 'Global Search',
+                    'topbar_search_desc' => 'Quickly find users, nodes, or settings across the entire ecosystem.',
+                    'topbar_lang_title' => 'Localization Engine',
+                    'topbar_lang_desc' => 'Switch the system language instantly. Translations are fetched dynamically from the live matrix.',
+                    'topbar_theme_title' => 'Interface Theme',
+                    'topbar_theme_desc' => 'Toggle between light, dark, or system-default visual modes.',
+                    'topbar_fullscreen_title' => 'Focus Mode',
+                    'topbar_fullscreen_desc' => 'Expand the dashboard to fill your entire screen for maximum focus.',
+                    'topbar_notif_title' => 'System Alerts',
+                    'topbar_notif_desc' => 'Review critical security alerts, system updates, and node status changes here.',
+                    'topbar_profile_title' => 'Operator Profile',
+                    'topbar_profile_desc' => 'Access your personal settings, view your active clearance level, or safely disconnect from the node.',
                     'node_mgmt_title' => 'Node Management',
                     'node_mgmt_desc' => 'This is the master command center for all active tenant nodes on the HIVE.OS network.',
                     'provision_title' => 'Provision a Node',
@@ -482,18 +526,6 @@ class LanguageSeeder extends Seeder
                     'perms_export_desc' => 'Download the full capabilities list.',
                     'perms_print_desc' => 'Print the system capabilities dictionary.',
                     'perms_refresh_desc' => 'Verify the latest indexed protocols.',
-                    'topbar_search_title' => 'Global Search',
-                    'topbar_search_desc' => 'Quickly find users, nodes, or settings across the entire ecosystem.',
-                    'topbar_lang_title' => 'Localization Engine',
-                    'topbar_lang_desc' => 'Switch the system language instantly. Translations are fetched dynamically from the live matrix.',
-                    'topbar_theme_title' => 'Interface Theme',
-                    'topbar_theme_desc' => 'Toggle between light, dark, or system-default visual modes.',
-                    'topbar_fullscreen_title' => 'Focus Mode',
-                    'topbar_fullscreen_desc' => 'Expand the dashboard to fill your entire screen for maximum focus.',
-                    'topbar_notif_title' => 'System Alerts',
-                    'topbar_notif_desc' => 'Review critical security alerts, system updates, and node status changes here.',
-                    'topbar_profile_title' => 'Operator Profile',
-                    'topbar_profile_desc' => 'Access your personal settings, view your active clearance level, or safely disconnect from the node.',
                     'nav_overview_title' => 'Dashboard Overview',
                     'nav_overview_desc' => 'Your main telemetry and system status view.',
                     'nav_tenants_title' => 'Node Management',
@@ -512,9 +544,68 @@ class LanguageSeeder extends Seeder
                     'sidebar_nav_desc' => 'Access the Dashboard, Node Management, Security Matrix, and Audit Logs from here.',
                     'sidebar_secondary_title' => 'System Preferences',
                     'sidebar_secondary_desc' => 'Manage storage capacity, global settings, and toggle your interface theme.',
+
+                    // 🚀 ADDED SETTINGS TOUR KEYS FOR ENGLISH
+                    'settings_header_title' => 'System Preferences',
+                    'settings_header_desc' => 'This is the master control panel for node branding, localization, and core infrastructure settings.',
+                    'settings_tabs_title' => 'Settings Navigation',
+                    'settings_tabs_desc' => 'Switch between Brand Visuals, Security Policies, Localization Engines, and Notifications here.',
+                    'brand_visuals_title' => 'Core Visual Identity',
+                    'brand_visuals_desc' => 'Upload your logos, set your browser favicon, and define the core typography and color scheme for your node.',
+                    'brand_auth_title' => 'Authentication Portal',
+                    'brand_auth_desc' => 'Customize the login background and welcome message your operators see before authenticating.',
+                    'brand_docs_title' => 'Document Branding',
+                    'brand_docs_desc' => 'Set specific high-contrast headers and logos for generated PDFs, reports, and waybills.',
+                    'brand_seo_title' => 'SEO & White-Labeling',
+                    'brand_seo_desc' => 'Configure social sharing metadata and choose whether to hide the "Powered by Hive" watermark.',
+                    'settings_save_title' => 'Commit Changes',
+                    'settings_save_desc' => 'Don\'t forget to commit your changes to the network matrix when you are done modifying your settings!',
                 ]
             ],
             'am' => [
+                'settings' => [
+                    'visual_identity' => 'የእይታ ማንነት',
+                    'visual_identity_desc' => 'ዋናውን የመተግበሪያ የምርት ስም እና የገጽታ ቀለሞችን ያዋቅሩ።',
+                    'logo_light' => 'አርማ (የብርሃን ሁነታ)',
+                    'logo_dark' => 'አርማ (የጨለማ ሁነታ)',
+                    'favicon' => 'የአሳሽ አዶ (Favicon)',
+                    'sidebar_icon' => 'የጎን አሞሌ አዶ',
+                    'no_logo' => 'አርማ የለም',
+                    'no_favicon' => 'አዶ የለም',
+                    'app_title' => 'የመተግበሪያ ርዕስ',
+                    'primary_color' => 'ዋና የገጽታ ቀለም',
+                    'typography' => 'የፊደል አጻጻፍ ዘይቤ',
+                    'font_inter' => 'ኢንተር (ዘመናዊ)',
+                    'font_space' => 'ስፔስ ግሮተስክ (ቴክኖሎጂ)',
+                    'font_roboto' => 'ሮቦቶ (ኮርፖሬት)',
+                    'auth_portal' => 'የማረጋገጫ ፖርታል',
+                    'auth_portal_desc' => 'ለሰራተኞችዎ የመግቢያ ልምድን ያብጁ።',
+                    'login_bg' => 'የመግቢያ ዳራ ምስል',
+                    'no_bg' => 'ዳራ የለም',
+                    'welcome_msg' => 'የእንኳን ደህና መጡ መልእክት',
+                    'welcome_placeholder' => 'ደህንነቱ የተጠበቀ የመቆጣጠሪያ ማዕከልዎን ለመድረስ ይግቡ።',
+                    'doc_branding' => 'የሰነድ የምርት ስም ማስተዋወቅ',
+                    'doc_branding_desc' => 'ወደ ውጭ ለሚላኩ የክፍያ ወረቀቶች እና ሰነዶች የሚተገበሩ አርማዎች።',
+                    'pdf_logo' => 'የፒዲኤፍ አርማ (ከፍተኛ ንፅፅር)',
+                    'use_main_logo' => 'ዋናውን አርማ ይጠቀሙ',
+                    'company_tin' => 'የድርጅት ቲን / የታክስ መታወቂያ',
+                    'pdf_header_color' => 'የፒዲኤፍ ራስጌ ቀለም',
+                    'seo_whitelabel' => 'ኤስኢኦ እና ነጭ-ስያሜ (White-Labeling)',
+                    'seo_whitelabel_desc' => 'የማህበራዊ ማጋሪያ ሜታዳታ እና የስርዓት ምልክቶችን ያዋቅሩ።',
+                    'hide_watermark' => '"Powered by Hive"ን ደብቅ',
+                    'remove_branding' => 'ውጫዊ የምርት ስሞችን ያስወግዱ',
+                    'og_image' => 'የማህበራዊ ማጋሪያ ምስል (OG Image)',
+                    'default_preview' => 'ነባሪ እይታ',
+                    'meta_desc' => 'የሜታ መግለጫ',
+                    'meta_placeholder' => 'ለጎግል ፍለጋ የኩባንያዎ አጭር መግለጫ...',
+                    'footer_text' => 'የግርጌ የቅጂ መብት ጽሑፍ',
+                    'commit_changes' => 'የማንነት ለውጦችን አስቀምጥ',
+                    'select_asset' => 'የምርት ስም ንብረት ይምረጡ',
+                    'choose_image' => 'ለእይታዎ የተመቻቸ ምስል ይምረጡ።',
+                    'change_img' => 'ቀይር',
+                    'asset_attached' => 'ንብረቱ ተያይዟል!',
+                    'matrix_updated' => 'የማንነት ማትሪክስ ተዘምኗል!'
+                ],
                 'global' => [
                     'cancel' => 'ሰርዝ',
                     'update' => 'አዘምን',
@@ -564,6 +655,8 @@ class LanguageSeeder extends Seeder
                     'disconnect' => 'ኖዱን አቋርጥ',
                     'theme' => 'ገጽታ',
                     'close' => 'ዝጋ',
+                    'settings_brand' => 'የምርት ስም ቅንብሮች',
+                    'settings_brand_desc' => 'አርማዎች፣ ቀለሞች እና እይታዎች።',
                     'settings_general' => 'ጠቅላላ',
                     'settings_general_desc' => 'መሰረታዊ የስርዓት ውቅር።',
                     'settings_security_desc' => 'የማረጋገጫ እና የመዳረሻ ፖሊሲዎች።',
@@ -857,127 +950,132 @@ class LanguageSeeder extends Seeder
                     'tenant_node' => 'የተከራይ ኖድ',
                     'central' => 'ማዕከላዊ መቆጣጠሪያ',
                 ],
+                // 🚀 ADDED FULL TOUR DICTIONARY FOR AMHARIC
                 'tour' => [
-                        // --- TOPBAR TOUR ---
-                        'topbar_search_title' => 'ዓለም አቀፍ ፍለጋ',
-                        'topbar_search_desc' => 'በጠቅላላው ስነ-ምህዳር ውስጥ ተጠቃሚዎችን፣ ኖዶችን ወይም ቅንብሮችን በፍጥነት ያግኙ።',
-                        'topbar_lang_title' => 'የአካባቢያዊነት ሞተር',
-                        'topbar_lang_desc' => 'የስርዓቱን ቋንቋ ወዲያውኑ ይቀይሩ። ትርጉሞች በቀጥታ ከማትሪክስ ይወሰዳሉ።',
-                        'topbar_theme_title' => 'የገጽታ ጭብጥ',
-                        'topbar_theme_desc' => 'በብርሃን፣ በጨለማ ወይም በስርዓት-ነባሪ የእይታ ሁነታዎች መካከል ይቀያይሩ።',
-                        'topbar_fullscreen_title' => 'የትኩረት ሁነታ',
-                        'topbar_fullscreen_desc' => 'ለከፍተኛ ትኩረት ዳሽቦርዱን መላውን ማያ ገጽዎ እንዲሞላ ያድርጉት።',
-                        'topbar_notif_title' => 'የስርዓት ማንቂያዎች',
-                        'topbar_notif_desc' => 'ወሳኝ የደህንነት ማንቂያዎችን፣ የስርዓት ዝመናዎችን እና የኖድ ሁኔታ ለውጦችን እዚህ ይገምግሙ።',
-                        'topbar_profile_title' => 'የኦፕሬተር መገለጫ',
-                        'topbar_profile_desc' => 'የግል ቅንብሮችዎን ይድረሱ፣ ንቁ የፈቃድ ደረጃዎን ይመልከቱ ወይም ከኖዱ በአስተማማኝ ሁኔታ ይውጡ።',
+                    'topbar_search_title' => 'ዓለም አቀፍ ፍለጋ',
+                    'topbar_search_desc' => 'በጠቅላላው ስነ-ምህዳር ውስጥ ተጠቃሚዎችን፣ ኖዶችን ወይም ቅንብሮችን በፍጥነት ያግኙ።',
+                    'topbar_lang_title' => 'የአካባቢያዊነት ሞተር',
+                    'topbar_lang_desc' => 'የስርዓቱን ቋንቋ ወዲያውኑ ይቀይሩ። ትርጉሞች በቀጥታ ከማትሪክስ ይወሰዳሉ።',
+                    'topbar_theme_title' => 'የገጽታ ጭብጥ',
+                    'topbar_theme_desc' => 'በብርሃን፣ በጨለማ ወይም በስርዓት-ነባሪ የእይታ ሁነታዎች መካከል ይቀያይሩ።',
+                    'topbar_fullscreen_title' => 'የትኩረት ሁነታ',
+                    'topbar_fullscreen_desc' => 'ለከፍተኛ ትኩረት ዳሽቦርዱን መላውን ማያ ገጽዎ እንዲሞላ ያድርጉት።',
+                    'topbar_notif_title' => 'የስርዓት ማንቂያዎች',
+                    'topbar_notif_desc' => 'ወሳኝ የደህንነት ማንቂያዎችን፣ የስርዓት ዝመናዎችን እና የኖድ ሁኔታ ለውጦችን እዚህ ይገምግሙ።',
+                    'topbar_profile_title' => 'የኦፕሬተር መገለጫ',
+                    'topbar_profile_desc' => 'የግል ቅንብሮችዎን ይድረሱ፣ ንቁ የፈቃድ ደረጃዎን ይመልከቱ ወይም ከኖዱ በአስተማማኝ ሁኔታ ይውጡ።',
+                    'node_mgmt_title' => 'የኖድ አስተዳደር',
+                    'node_mgmt_desc' => 'ይህ በስርዓቱ ላይ ላሉ ሁሉም የተከራይ ኖዶች ማስተዳደሪያ ነው።',
+                    'provision_title' => 'ኖድ አቅርብ',
+                    'provision_desc' => 'አዲስ መሰረተ ልማት ለመመደብ እዚህ ጠቅ ያድርጉ።',
+                    'matrix_search_title' => 'ማትሪክስ ፍለጋ',
+                    'matrix_search_desc' => 'ኖዶችን በመታወቂያ ወይም በስም ወዲያውኑ ያጣሩ።',
+                    'copy_title' => 'ወደ ክሊፕቦርድ ቅዳ',
+                    'copy_desc' => 'የአሁኑን እይታ ለሌሎች ለማጋራት ይቅዱ።',
+                    'export_title' => 'ውሂብ ወደ ውጭ ላክ',
+                    'export_desc' => 'ሙሉውን ዳታሴት በCSV ወይም በኤክሴል ያውርዱ።',
+                    'print_title' => 'ማትሪክስ አትም',
+                    'print_desc' => 'ኖዶችን በፒዲኤፍ ያትሙ።',
+                    'refresh_title' => 'አስገድዶ አዘምን',
+                    'refresh_desc' => 'ከአውታረ መረቡ የቅርብ ጊዜ መረጃዎችን ለመሳብ ጠረጴዛውን ያዘምኑ።',
+                    'matrix_title' => 'የኖድ ማትሪክስ',
+                    'matrix_desc' => 'የአውታረ መረቡን ሁኔታ በቅጽበት ይከታተሉ።',
+                    'inspect_title' => 'ኖዱን መርምር',
+                    'inspect_desc' => 'ስለዚህ የተወሰነ ኖድ ጥልቅ መረጃዎችን ይመልከቱ።',
+                    'power_title' => 'የአውታረ መረብ ኃይል',
+                    'power_desc' => 'የዚህን ኖድ ግንኙነት ወዲያውኑ ያግዱ ወይም ይመልሱ።',
+                    'clearance_title' => 'የኦፕሬተር ፈቃድ',
+                    'clearance_desc' => 'የዋና አስተዳዳሪን መግቢያ አንቃ ወይም አሰናክል።',
+                    'reconfig_title' => 'ኖድ እንደገና አዋቅር',
+                    'reconfig_desc' => 'የድርጅቱን ስም፣ እቅድ ወይም ማዞሪያ ያዘምኑ።',
+                    'purge_title' => 'የማጥፋት ፕሮቶኮል',
+                    'purge_desc' => 'ኖዱን በቋሚነት ለመሰረዝ ይህን ይጠቀሙ። በጥንቃቄ ይጠቀሙበት።',
+                    'audit_title' => 'የስርዓት ኦዲት መዝገቦች',
+                    'audit_desc' => 'ይህ የማይለወጥ መዝገብ በአውታረ መረቡ ላይ የተወሰዱትን እርምጃዎች ይመዘግባል።',
+                    'ledger_title' => 'የመዝገብ እይታዎች',
+                    'ledger_desc' => 'በቀጥታ መዝገቦች እና በቀዝቃዛ ካዝና መካከል ይቀያይሩ።',
+                    'scope_title' => 'የኖድ ወሰን',
+                    'scope_desc' => 'ከማዕከላዊ ወይም ከተወሰኑ ተከራይ ኖዶች የተገኙ መረጃዎችን ያጣሩ።',
+                    'time_title' => 'የጊዜ ክልል',
+                    'time_desc' => 'ክስተቶችን ለመፈለግ የተወሰኑ ቀናትን ይምረጡ።',
+                    'vault_title' => 'የካዝና መቆጣጠሪያዎች',
+                    'vault_desc' => 'የማቆያ ፖሊሲዎችን ያዋቅሩ ወይም መዝገቦችን ወደ ካዝና ይላኩ።',
+                    'deep_search_title' => 'ጥልቅ ፍለጋ',
+                    'deep_search_desc' => 'በኦፕሬተር ስም፣ በመግለጫ ወይም በሞጁል ይፈልጉ።',
+                    'forensic_title' => 'ፎረንሲክ ምርመራ',
+                    'forensic_desc' => 'የአንድ ክስተት ትክክለኛ የውሂብ እገዳን እና ሜታዳታን ይመርምሩ።',
+                    'tabs_nav_title' => 'የማንነት ማትሪክስ አሰሳ',
+                    'tabs_nav_desc' => 'በስርዓት ኦፕሬተሮች፣ የመዳረሻ ሚናዎች እና የኔትወርክ ፈቃዶች መካከል እዚህ ይቀያይሩ።',
+                    'users_header_title' => 'የስርዓት ኦፕሬተሮች',
+                    'users_header_desc' => 'በዚህ ኖድ ውስጥ የሚሰሩትን ሁሉንም የሰዎች እና የማሽን መለያዎች ያስተዳድሩ።',
+                    'users_provision_title' => 'ኦፕሬተር አቅርብ',
+                    'users_provision_desc' => 'አዲስ የኦፕሬተር ማንነት ይፍጠሩ እና የፈቃድ ደረጃ ይመድቡላቸው።',
+                    'users_search_desc' => 'በስም ወይም በኢሜል ኦፕሬተሮችን ወዲያውኑ ያግኙ።',
+                    'users_export_desc' => 'የኦፕሬተር ዝርዝሩን በደህና ያውርዱ።',
+                    'users_view_title' => 'ማንነትን መርምር',
+                    'users_view_desc' => 'ስለዚህ ኦፕሬተር ዝርዝር መረጃዎችን ይመልከቱ።',
+                    'users_status_title' => 'መዳረሻ ቀይር',
+                    'users_status_desc' => 'የኦፕሬተሩን አውታረ መረብ ግንኙነት ወዲያውኑ ይቆልፉ ወይም ይክፈቱ።',
+                    'users_edit_desc' => 'የፈቃድ ደረጃዎችን ወይም የምስጠራ ቁልፎችን ያሻሽሉ።',
+                    'users_purge_desc' => 'መዳረሻን በቋሚነት ይሻሩ እና ማንነትን ያጥፉ።',
+                    'roles_tab_desc' => 'ስርዓቱ በራስ ሰር ወደ የመዳረሻ ሚናዎች ማትሪክስ ተቀይሯል።',
+                    'roles_header_desc' => 'ኦፕሬተሮች በስርዓቱ ውስጥ ምን ማድረግ እንደሚችሉ እና እንደማይችሉ ይግለጹ።',
+                    'roles_provision_title' => 'አዲስ የፈቃድ ደረጃ',
+                    'roles_provision_desc' => 'አዲስ ሚና ይፍጠሩ እና ችሎታዎችን ከእሱ ጋር ያያይዙ።',
+                    'roles_search_desc' => 'የተወሰኑ የፈቃድ ደረጃዎችን ይፈልጉ።',
+                    'roles_copy_desc' => 'የሚናዎቹን ውቅር ወደ ክሊፕቦርድዎ ይቅዱ።',
+                    'roles_export_desc' => 'የፈቃድ ደረጃ ማትሪክሱን በደህና ያውርዱ።',
+                    'roles_print_desc' => 'የሁሉም ሚናዎች ሊታተም የሚችል ሪፖርት ያመንጩ።',
+                    'roles_refresh_desc' => 'ከአውታረ መረቡ የቅርብ ጊዜ ችሎታዎችን ይሳቡ።',
+                    'roles_view_title' => 'ፈቃድን መርምር',
+                    'roles_view_desc' => 'ከዚህ ሚና ጋር የተያያዙትን ትክክለኛ ችሎታዎች ይገምግሙ።',
+                    'roles_edit_title' => 'ፈቃድን ያሻሽሉ',
+                    'roles_edit_desc' => 'ችሎታዎችን ያክሉ ወይም ያስወግዱ።',
+                    'roles_purge_title' => 'ፈቃድን አጥፋ',
+                    'roles_purge_desc' => 'ይህን ሚና ሙሉ በሙሉ ይሰርዙ።',
+                    'perms_tab_desc' => 'በመጨረሻም ስርዓቱ የችሎታ መዝገበ ቃላቱን ከፍቷል።',
+                    'perms_header_title' => 'የችሎታ መዝገበ ቃላት',
+                    'perms_header_desc' => 'የሁሉም አውታረ መረብ ፈቃዶች ተነባቢ-ብቻ መዝገብ።',
+                    'perms_search_desc' => 'የተወሰኑ የችሎታ ኮዶችን ይፈልጉ።',
+                    'perms_copy_desc' => 'የመዝገበ ቃላቱን ካርታ ወደ ክሊፕቦርድዎ ይቅዱ።',
+                    'perms_export_desc' => 'ሙሉ የችሎታዎችን ዝርዝር ያውርዱ።',
+                    'perms_print_desc' => 'የስርዓት ችሎታዎች መዝገበ ቃላትን ያትሙ።',
+                    'perms_refresh_desc' => 'የቅርብ ጊዜዎቹን ፕሮቶኮሎች ያረጋግጡ።',
+                    'nav_overview_title' => 'የዳሽቦርድ አጠቃላይ እይታ',
+                    'nav_overview_desc' => 'የእርስዎ ዋና የስርዓት ሁኔታ እና ቴሌሜትሪ እይታ።',
+                    'nav_tenants_title' => 'የኖድ አስተዳደር',
+                    'nav_tenants_desc' => 'የተከለሉ የተከራይ ዳታቤዞችን ያቅርቡ እና ይቆጣጠሩ።',
+                    'nav_security_title' => 'ማንነት እና መዳረሻ',
+                    'nav_security_desc' => 'የስርዓት ኦፕሬተሮችን፣ የመዳረሻ ሚናዎችን እና የአውታረ መረብ ችሎታዎችን ያስተዳድሩ።',
+                    'nav_audit_title' => 'የስርዓት ኦዲት መዝገቦች',
+                    'nav_audit_desc' => 'የሁሉም የአውታረ መረብ እንቅስቃሴዎች የማይለወጡ የምስጠራ መዝገቦችን ይገምግሙ።',
+                    'nav_storage_title' => 'የማከማቻ አስተዳደር',
+                    'nav_storage_desc' => 'የስርዓት ማከማቻን፣ የፋይል ሰቀላዎችን እና የአቅም ገደቦችን ያስተዳድሩ።',
+                    'nav_settings_title' => 'የስርዓት ምርጫዎች',
+                    'nav_settings_desc' => 'ዓለም አቀፍ ቅንብሮችን፣ የደህንነት ፖሊሲዎችን እና ቋንቋዎችን ያዋቅሩ።',
+                    'sidebar_brand_title' => 'የHIVE.OS መቆጣጠሪያ ማዕከል',
+                    'sidebar_brand_desc' => 'ይህ የእርስዎ ማዕከላዊ የትእዛዝ ኮንሶል ነው። ለእርስዎ የሚገኙትን መሳሪያዎች በፍጥነት እንመልከት።',
+                    'sidebar_nav_title' => 'ዋና ማሰሻ',
+                    'sidebar_nav_desc' => 'ዳሽቦርድ፣ የኖድ አስተዳደር፣ የደህንነት ማትሪክስ እና የኦዲት መዝገቦችን ከዚህ ይድረሱ።',
+                    'sidebar_secondary_title' => 'የስርዓት ምርጫዎች',
+                    'sidebar_secondary_desc' => 'የማከማቻ አቅምን፣ ዓለም አቀፍ ቅንብሮችን ያስተዳድሩ እና በገጽታዎች መካከል ይቀያይሩ።',
 
-                        // --- TENANTS TOUR ---
-                        'node_mgmt_title' => 'የኖድ አስተዳደር',
-                        'node_mgmt_desc' => 'ይህ በስርዓቱ ላይ ላሉ ሁሉም የተከራይ ኖዶች ማስተዳደሪያ ነው።',
-                        'provision_title' => 'ኖድ አቅርብ',
-                        'provision_desc' => 'አዲስ መሰረተ ልማት ለመመደብ እዚህ ጠቅ ያድርጉ።',
-                        'matrix_search_title' => 'ማትሪክስ ፍለጋ',
-                        'matrix_search_desc' => 'ኖዶችን በመታወቂያ ወይም በስም ወዲያውኑ ያጣሩ።',
-                        'copy_title' => 'ወደ ክሊፕቦርድ ቅዳ',
-                        'copy_desc' => 'የአሁኑን እይታ ለሌሎች ለማጋራት ይቅዱ።',
-                        'export_title' => 'ውሂብ ወደ ውጭ ላክ',
-                        'export_desc' => 'ሙሉውን ዳታሴት በCSV ወይም በኤክሴል ያውርዱ።',
-                        'print_title' => 'ማትሪክስ አትም',
-                        'print_desc' => 'ኖዶችን በፒዲኤፍ ያትሙ።',
-                        'refresh_title' => 'አስገድዶ አዘምን',
-                        'refresh_desc' => 'ከአውታረ መረቡ የቅርብ ጊዜ መረጃዎችን ለመሳብ ጠረጴዛውን ያዘምኑ።',
-                        'matrix_title' => 'የኖድ ማትሪክስ',
-                        'matrix_desc' => 'የአውታረ መረቡን ሁኔታ በቅጽበት ይከታተሉ።',
-                        'inspect_title' => 'ኖዱን መርምር',
-                        'inspect_desc' => 'ስለዚህ የተወሰነ ኖድ ጥልቅ መረጃዎችን ይመልከቱ።',
-                        'power_title' => 'የአውታረ መረብ ኃይል',
-                        'power_desc' => 'የዚህን ኖድ ግንኙነት ወዲያውኑ ያግዱ ወይም ይመልሱ።',
-                        'clearance_title' => 'የኦፕሬተር ፈቃድ',
-                        'clearance_desc' => 'የዋና አስተዳዳሪን መግቢያ አንቃ ወይም አሰናክል።',
-                        'reconfig_title' => 'ኖድ እንደገና አዋቅር',
-                        'reconfig_desc' => 'የድርጅቱን ስም፣ እቅድ ወይም ማዞሪያ ያዘምኑ።',
-                        'purge_title' => 'የማጥፋት ፕሮቶኮል',
-                        'purge_desc' => 'ኖዱን በቋሚነት ለመሰረዝ ይህን ይጠቀሙ። በጥንቃቄ ይጠቀሙበት።',
-
-                        // --- AUDIT LOGS TOUR ---
-                        'audit_title' => 'የስርዓት ኦዲት መዝገቦች',
-                        'audit_desc' => 'ይህ የማይለወጥ መዝገብ በአውታረ መረቡ ላይ የተወሰዱትን እርምጃዎች ይመዘግባል።',
-                        'ledger_title' => 'የመዝገብ እይታዎች',
-                        'ledger_desc' => 'በቀጥታ መዝገቦች እና በቀዝቃዛ ካዝና መካከል ይቀያይሩ።',
-                        'scope_title' => 'የኖድ ወሰን',
-                        'scope_desc' => 'ከማዕከላዊ ወይም ከተወሰኑ ተከራይ ኖዶች የተገኙ መረጃዎችን ያጣሩ።',
-                        'time_title' => 'የጊዜ ክልል',
-                        'time_desc' => 'ክስተቶችን ለመፈለግ የተወሰኑ ቀናትን ይምረጡ።',
-                        'vault_title' => 'የካዝና መቆጣጠሪያዎች',
-                        'vault_desc' => 'የማቆያ ፖሊሲዎችን ያዋቅሩ ወይም መዝገቦችን ወደ ካዝና ይላኩ።',
-                        'deep_search_title' => 'ጥልቅ ፍለጋ',
-                        'deep_search_desc' => 'በኦፕሬተር ስም፣ በመግለጫ ወይም በሞጁል ይፈልጉ።',
-                        'forensic_title' => 'ፎረንሲክ ምርመራ',
-                        'forensic_desc' => 'የአንድ ክስተት ትክክለኛ የውሂብ እገዳን እና ሜታዳታን ይመርምሩ።',
-
-                        // --- SECURITY & IDENTITY TOUR ---
-                        'tabs_nav_title' => 'የማንነት ማትሪክስ አሰሳ',
-                        'tabs_nav_desc' => 'በስርዓት ኦፕሬተሮች፣ የመዳረሻ ሚናዎች እና የኔትወርክ ፈቃዶች መካከል እዚህ ይቀያይሩ።',
-                        'users_header_title' => 'የስርዓት ኦፕሬተሮች',
-                        'users_header_desc' => 'በዚህ ኖድ ውስጥ የሚሰሩትን ሁሉንም የሰዎች እና የማሽን መለያዎች ያስተዳድሩ።',
-                        'users_provision_title' => 'ኦፕሬተር አቅርብ',
-                        'users_provision_desc' => 'አዲስ የኦፕሬተር ማንነት ይፍጠሩ እና የፈቃድ ደረጃ ይመድቡላቸው።',
-                        'users_search_desc' => 'በስም ወይም በኢሜል ኦፕሬተሮችን ወዲያውኑ ያግኙ።',
-                        'users_export_desc' => 'የኦፕሬተር ዝርዝሩን በደህና ያውርዱ።',
-                        'users_view_title' => 'ማንነትን መርምር',
-                        'users_view_desc' => 'ስለዚህ ኦፕሬተር ዝርዝር መረጃዎችን ይመልከቱ።',
-                        'users_status_title' => 'መዳረሻ ቀይር',
-                        'users_status_desc' => 'የኦፕሬተሩን አውታረ መረብ ግንኙነት ወዲያውኑ ይቆልፉ ወይም ይክፈቱ።',
-                        'users_edit_desc' => 'የፈቃድ ደረጃዎችን ወይም የምስጠራ ቁልፎችን ያሻሽሉ።',
-                        'users_purge_desc' => 'መዳረሻን በቋሚነት ይሻሩ እና ማንነትን ያጥፉ።',
-
-                        // --- ROLES & CLEARANCE TOUR ---
-                        'roles_tab_desc' => 'ስርዓቱ በራስ ሰር ወደ የመዳረሻ ሚናዎች ማትሪክስ ተቀይሯል።',
-                        'roles_header_desc' => 'ኦፕሬተሮች በስርዓቱ ውስጥ ምን ማድረግ እንደሚችሉ እና እንደማይችሉ ይግለጹ።',
-                        'roles_provision_title' => 'አዲስ የፈቃድ ደረጃ',
-                        'roles_provision_desc' => 'አዲስ ሚና ይፍጠሩ እና ችሎታዎችን ከእሱ ጋር ያያይዙ።',
-                        'roles_search_desc' => 'የተወሰኑ የፈቃድ ደረጃዎችን ይፈልጉ።',
-                        'roles_copy_desc' => 'የሚናዎቹን ውቅር ወደ ክሊፕቦርድዎ ይቅዱ።',
-                        'roles_export_desc' => 'የፈቃድ ደረጃ ማትሪክሱን በደህና ያውርዱ።',
-                        'roles_print_desc' => 'የሁሉም ሚናዎች ሊታተም የሚችል ሪፖርት ያመንጩ።',
-                        'roles_refresh_desc' => 'ከአውታረ መረቡ የቅርብ ጊዜ ችሎታዎችን ይሳቡ።',
-                        'roles_view_title' => 'ፈቃድን መርምር',
-                        'roles_view_desc' => 'ከዚህ ሚና ጋር የተያያዙትን ትክክለኛ ችሎታዎች ይገምግሙ።',
-                        'roles_edit_title' => 'ፈቃድን ያሻሽሉ',
-                        'roles_edit_desc' => 'ችሎታዎችን ያክሉ ወይም ያስወግዱ።',
-                        'roles_purge_title' => 'ፈቃድን አጥፋ',
-                        'roles_purge_desc' => 'ይህን ሚና ሙሉ በሙሉ ይሰርዙ።',
-
-                        // --- PERMISSIONS TOUR ---
-                        'perms_tab_desc' => 'በመጨረሻም ስርዓቱ የችሎታ መዝገበ ቃላቱን ከፍቷል።',
-                        'perms_header_title' => 'የችሎታ መዝገበ ቃላት',
-                        'perms_header_desc' => 'የሁሉም አውታረ መረብ ፈቃዶች ተነባቢ-ብቻ መዝገብ።',
-                        'perms_search_desc' => 'የተወሰኑ የችሎታ ኮዶችን ይፈልጉ።',
-                        'perms_copy_desc' => 'የመዝገበ ቃላቱን ካርታ ወደ ክሊፕቦርድዎ ይቅዱ።',
-                        'perms_export_desc' => 'ሙሉ የችሎታዎችን ዝርዝር ያውርዱ።',
-                        'perms_print_desc' => 'የስርዓት ችሎታዎች መዝገበ ቃላትን ያትሙ።',
-                        'perms_refresh_desc' => 'የቅርብ ጊዜዎቹን ፕሮቶኮሎች ያረጋግጡ።',
-
-                        'nav_overview_title' => 'የዳሽቦርድ አጠቃላይ እይታ',
-                        'nav_overview_desc' => 'የእርስዎ ዋና የስርዓት ሁኔታ እና ቴሌሜትሪ እይታ።',
-                        'nav_tenants_title' => 'የኖድ አስተዳደር',
-                        'nav_tenants_desc' => 'የተከለሉ የተከራይ ዳታቤዞችን ያቅርቡ እና ይቆጣጠሩ።',
-                        'nav_security_title' => 'ማንነት እና መዳረሻ',
-                        'nav_security_desc' => 'የስርዓት ኦፕሬተሮችን፣ የመዳረሻ ሚናዎችን እና የአውታረ መረብ ችሎታዎችን ያስተዳድሩ።',
-                        'nav_audit_title' => 'የስርዓት ኦዲት መዝገቦች',
-                        'nav_audit_desc' => 'የሁሉም የአውታረ መረብ እንቅስቃሴዎች የማይለወጡ የምስጠራ መዝገቦችን ይገምግሙ።',
-                        'nav_storage_title' => 'የማከማቻ አስተዳደር',
-                        'nav_storage_desc' => 'የስርዓት ማከማቻን፣ የፋይል ሰቀላዎችን እና የአቅም ገደቦችን ያስተዳድሩ።',
-                        'nav_settings_title' => 'የስርዓት ምርጫዎች',
-                        'nav_settings_desc' => 'ዓለም አቀፍ ቅንብሮችን፣ የደህንነት ፖሊሲዎችን እና ቋንቋዎችን ያዋቅሩ።',
-                        'sidebar_brand_title' => 'የHIVE.OS መቆጣጠሪያ ማዕከል',
-                        'sidebar_brand_desc' => 'ይህ የእርስዎ ማዕከላዊ የትእዛዝ ኮንሶል ነው። ለእርስዎ የሚገኙትን መሳሪያዎች በፍጥነት እንመልከት።',
-                        'sidebar_nav_title' => 'ዋና ማሰሻ',
-                        'sidebar_nav_desc' => 'ዳሽቦርድ፣ የኖድ አስተዳደር፣ የደህንነት ማትሪክስ እና የኦዲት መዝገቦችን ከዚህ ይድረሱ።',
-                        'sidebar_secondary_title' => 'የስርዓት ምርጫዎች',
-                        'sidebar_secondary_desc' => 'የማከማቻ አቅምን፣ ዓለም አቀፍ ቅንብሮችን ያስተዳድሩ እና በገጽታዎች መካከል ይቀያይሩ።',
-                ],
+                    // 🚀 ADDED SETTINGS TOUR KEYS FOR AMHARIC
+                    'settings_header_title' => 'የስርዓት ምርጫዎች',
+                    'settings_header_desc' => 'ይህ የኖድ ብራንዲንግ፣ ቋንቋዎች እና መሰረታዊ መዋቅሮች መቆጣጠሪያ ነው።',
+                    'settings_tabs_title' => 'የቅንብሮች ማሰሻ',
+                    'settings_tabs_desc' => 'በብራንድ እይታዎች፣ የደህንነት ፖሊሲዎች፣ ቋንቋዎች እና ማሳወቂያዎች መካከል እዚህ ይቀያይሩ።',
+                    'brand_visuals_title' => 'ዋና የእይታ ማንነት',
+                    'brand_visuals_desc' => 'አርማዎችዎን ይስቀሉ፣ የብሮውዘር አዶዎን ያዘጋጁ እና የኖድዎን ዋና የጽሑፍ እና የቀለም አቀማመጥ ይወስኑ።',
+                    'brand_auth_title' => 'የማረጋገጫ በር',
+                    'brand_auth_desc' => 'ኦፕሬተሮችዎ ከመግባታቸው በፊት የሚያዩትን የመግቢያ ዳራ እና የእንኳን ደህና መጡ መልእክት ያብጁ።',
+                    'brand_docs_title' => 'የሰነድ ብራንዲንግ',
+                    'brand_docs_desc' => 'ለሚመነጩ ፒዲኤፎች፣ ሪፖርቶች እና ሰነዶች የተወሰኑ ራስጌዎችን እና አርማዎችን ያዘጋጁ።',
+                    'brand_seo_title' => 'SEO እና ነጭ ስያሜ',
+                    'brand_seo_desc' => 'የማህበራዊ ሚዲያ ማጋሪያ ሜታዳታን ያዋቅሩ እና የ "Powered by Hive" የውሃ ምልክትን መደበቅ አለመደበቅዎን ይምረጡ።',
+                    'settings_save_title' => 'ለውጦችን አስቀምጥ',
+                    'settings_save_desc' => 'ቅንብሮችዎን ማስተካከል ሲጨርሱ ለውጦችዎን ወደ አውታረ መረብ ማትሪክስ ማስቀመጥዎን አይርሱ!',
+                ]
             ]
         ];
 
@@ -988,13 +1086,11 @@ class LanguageSeeder extends Seeder
                 File::makeDirectory($dirPath, 0775, true, true);
             }
 
-            foreach ($files as $filename => $keys) {
+           foreach ($files as $filename => $keys) {
                 $filePath = "{$dirPath}/{$filename}.json";
 
-                // Safety: Do not overwrite existing translation files
-                if (!File::exists($filePath)) {
-                    File::put($filePath, json_encode($keys, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-                }
+                // 🚀 THE FIX: Force overwrite the files during seeding so new keys are always caught!
+                File::put($filePath, json_encode($keys, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             }
         }
     }

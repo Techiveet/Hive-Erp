@@ -9,6 +9,7 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
+        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
@@ -25,10 +26,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*',
         ]);
 
-        // 🚀 3. THE NEW EJECTION CHECKPOINT
+        // 🚀 3. THE NEW EJECTION & TIMEOUT CHECKPOINTS
         // Apply to all API routes so it intercepts every request instantly
         $middleware->api(append: [
             \App\Http\Middleware\EnsureActiveStatus::class,
+            \Modules\Core\Http\Middleware\EnforceDynamicSessionTimeout::class, // 🚀 ADDED HERE
         ]);
 
     })

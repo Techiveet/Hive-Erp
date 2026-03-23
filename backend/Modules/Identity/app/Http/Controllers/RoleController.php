@@ -57,7 +57,6 @@ class RoleController extends Controller
                     $engine = 'meilisearch';
                     $meilisearchSuccess = true;
                 } catch (\Exception $e) {
-                    // If Meilisearch is down or timing out, log it and fallback instantly
                     Log::warning("Meilisearch failed, falling back to Database Engine: " . $e->getMessage());
                     $meilisearchSuccess = false;
                 }
@@ -66,9 +65,7 @@ class RoleController extends Controller
             // 🚀 ROUTE 2: DATABASE ENGINE (Supports searching Permission Names)
             if (!$meilisearchSuccess) {
                 $query->where(function ($q) use ($search) {
-                    // Search Role Name
                     $q->where('name', 'like', "%{$search}%")
-                      // ALSO Search Permission Names attached to the role
                       ->orWhereHas('permissions', function ($pq) use ($search) {
                           $pq->where('name', 'like', "%{$search}%");
                       });
@@ -85,7 +82,6 @@ class RoleController extends Controller
                 $engine = $scoutDriver === 'meilisearch' ? 'database_fallback' : 'database';
             }
         } else {
-            // No Search Query
             $query->orderBy('created_at', 'desc');
 
             if ($request->has('nopaginate')) {
@@ -143,6 +139,13 @@ class RoleController extends Controller
             $role->syncPermissions($request->permissions);
         }
 
+        // 🚀 THE FIX: Broadcast that a Role was created so React counts UP (+1)
+        activity('Security Management')
+            ->causedBy(auth()->user())
+            ->performedOn($role)
+            ->event('created')
+            ->log("Provisioned new security role [{$role->name}].");
+
         return response()->json([
             'message' => "Role created successfully",
             'data' => $role->load('permissions')
@@ -176,6 +179,13 @@ class RoleController extends Controller
             $role->syncPermissions($request->permissions);
         }
 
+        // 🚀 THE FIX: Broadcast that a Role was updated (doesn't change count, but shows in live audit log)
+        activity('Security Management')
+            ->causedBy(auth()->user())
+            ->performedOn($role)
+            ->event('updated')
+            ->log("Reconfigured security role [{$role->name}].");
+
         return response()->json([
             'message' => 'Role updated successfully',
             'data' => $role->load('permissions')
@@ -191,7 +201,16 @@ class RoleController extends Controller
             return response()->json(['message' => 'Core system roles cannot be deleted.'], 403);
         }
 
+        $roleName = $role->name; // Save name before deleting
         $role->delete();
+
+        // 🚀 THE FIX: Broadcast that a Role was deleted so React counts DOWN (-1)
+        activity('Security Management')
+            ->causedBy(auth()->user())
+            // Note: We don't use ->performedOn() here because the model no longer exists!
+            ->event('deleted')
+            ->log("Purged security role [{$roleName}].");
+
         return response()->json(['message' => 'Role deleted successfully']);
     }
 }

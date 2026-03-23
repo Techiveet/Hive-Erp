@@ -4,85 +4,263 @@
     <meta charset="utf-8">
     <title>{{ $title }}</title>
     <style>
-        @page { margin: 80px 25px 50px 25px; }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; color: #334155; }
+        /* ----------------------------------------------------
+           GLOBAL SETUP & TYPOGRAPHY
+        ---------------------------------------------------- */
+        @page {
+            margin: 110px 30px 60px 30px; /* Top margin accommodates the fixed header */
+        }
 
-        header { position: fixed; top: -60px; left: 0px; right: 0px; height: 40px; border-bottom: 2px solid #ea580c; /* Amber Accent */ }
-        .brand { font-size: 16px; font-weight: 900; color: #1e1b4b; letter-spacing: 1.5px; margin: 0; }
-        .report-meta { font-family: 'Courier New', Courier, monospace; font-size: 8px; color: #64748b; margin-top: 4px; text-transform: uppercase; }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 9px;
+            color: #334155;
+            margin: 0;
+            padding: 0;
+        }
 
-        footer { position: fixed; bottom: -35px; left: 0px; right: 0px; height: 20px; border-top: 1px solid #e2e8f0; padding-top: 8px; }
-        .footer-table { width: 100%; border: none; margin: 0; }
-        .footer-table td { border: none; padding: 0; font-size: 8px; color: #94a3b8; }
-        .text-right { text-align: right; }
-        .text-left { text-align: left; }
+        /* ----------------------------------------------------
+           HEADER (Fixed to top of every page)
+        ---------------------------------------------------- */
+        header {
+            position: fixed;
+            top: -80px;
+            left: 0;
+            right: 0;
+            height: 60px;
+            border-bottom: 2px solid #1e293b; /* Deep slate corporate line */
+            padding-bottom: 10px;
+        }
 
-        .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .data-table th { background-color: #fff7ed; color: #9a3412; text-align: left; padding: 8px; border-bottom: 2px solid #fdba74; text-transform: uppercase; font-size: 8px; letter-spacing: 0.5px; }
-        .data-table td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; line-height: 1.4; }
-        .data-table tr:nth-child(even) { background-color: #fdfdfd; }
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
 
-        .god-mode { color: #ea580c; font-weight: bold; background: #ffedd5; padding: 2px 6px; border-radius: 4px; font-size: 8px; }
-        .no-access { color: #94a3b8; font-style: italic; font-size: 9px; }
-        .font-bold { font-weight: bold; color: #0f172a; }
+        .logo-td {
+            width: 160px;
+            vertical-align: middle;
+        }
+
+        .logo-img {
+            max-height: 40px;
+            width: auto;
+            display: block;
+        }
+
+        .title-td {
+            vertical-align: middle;
+            text-align: left;
+        }
+
+        .report-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0 0 3px 0;
+        }
+
+        .report-subtitle {
+            font-size: 9px;
+            color: #64748b;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .meta-td {
+            text-align: right;
+            vertical-align: middle;
+            font-size: 8px;
+            color: #475569;
+            line-height: 1.4;
+        }
+
+        .meta-label {
+            font-weight: bold;
+            color: #1e293b;
+        }
+
+        /* ----------------------------------------------------
+           FOOTER (Fixed to bottom of every page)
+        ---------------------------------------------------- */
+        footer {
+            position: fixed;
+            bottom: -30px;
+            left: 0;
+            right: 0;
+            height: 20px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 8px;
+        }
+
+        .footer-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8px;
+            color: #94a3b8;
+        }
+
+        .page-number:after {
+            content: counter(page);
+        }
+
+        /* ----------------------------------------------------
+           DATA TABLE
+        ---------------------------------------------------- */
+        .table-container {
+            margin-top: 10px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #ffffff;
+            table-layout: fixed; /* Ensures wide permission strings wrap correctly */
+        }
+
+        .data-table th {
+            background-color: #1e293b; /* Deep corporate blue/slate */
+            color: #ffffff;
+            font-size: 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 10px 8px;
+            text-align: left;
+            border: 1px solid #1e293b;
+        }
+
+        .data-table td {
+            padding: 8px 8px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: top;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+
+        /* Subtle zebra striping for readability */
+        .data-table tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        /* ----------------------------------------------------
+           UI ELEMENTS
+        ---------------------------------------------------- */
+        .designation-name {
+            font-weight: bold;
+            color: #0f172a;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        .capabilities-text {
+            font-family: 'Courier New', Courier, monospace;
+            color: #475569;
+            font-size: 8px;
+            line-height: 1.6;
+        }
+
+        .god-mode {
+            color: #dc2626;
+            font-weight: bold;
+            background-color: #fef2f2;
+            padding: 2px 4px;
+            border-radius: 2px;
+            border: 1px solid #fecaca;
+        }
     </style>
 </head>
 <body>
+
     <header>
-        <h1 class="brand">HIVE.OS :: {{ strtoupper($title) }}</h1>
-        <div class="report-meta">REPORT_TYPE: ACCESS_CONTROL_MATRIX | GENERATED: {{ now()->format('Y-m-d H:i:s T') }}</div>
+        <table class="header-table">
+            <tr>
+                <td class="logo-td">
+                    @if(!empty($logoUrl))
+                        <img src="{{ $logoUrl }}" class="logo-img">
+                    @endif
+                </td>
+                <td class="title-td">
+                    <h1 class="report-title">{{ $title }}</h1>
+                    <p class="report-subtitle">Access Control & Authorization Matrix</p>
+                </td>
+                <td class="meta-td">
+                    <span class="meta-label">Date Generated:</span> {{ now()->format('M d, Y - H:i:s T') }}<br>
+                    <span class="meta-label">Total Matrix Roles:</span> {{ count($data) }}<br>
+                    <span class="meta-label">Generated By:</span> {{ auth()->user()->name ?? 'System Engine' }}
+                </td>
+            </tr>
+        </table>
     </header>
 
     <footer>
         <table class="footer-table">
             <tr>
-                <td class="text-left">HIVE.OS Enterprise Resource Planning - Strictly Confidential Security Matrix</td>
-                <td class="text-right">
-                    <script type="text/php">
-                        if (isset($pdf)) {
-                            $x = $pdf->get_width() - 85;
-                            $y = $pdf->get_height() - 25;
-                            $text = "PAGE {PAGE_NUM} OF {PAGE_COUNT}";
-                            $font = $fontMetrics->get_font("Helvetica", "normal");
-                            $size = 7;
-                            $color = array(0.58, 0.63, 0.72);
-                            $pdf->page_text($x, $y, $text, $font, $size, $color);
-                        }
-                    </script>
-                </td>
+                <td style="text-align: left; width: 33%;">HIVE.OS Security Protocol</td>
+                <td style="text-align: center; width: 34%;">Strictly Confidential</td>
+                <td style="text-align: right; width: 33%;">Page <span class="page-number"></span></td>
             </tr>
         </table>
     </footer>
 
     <main>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th width="5%">ID</th>
-                    <th width="20%">Clearance Designation</th>
-                    <th width="60%">Network Capabilities</th>
-                    <th width="15%">Established</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($data as $role)
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td>{{ $role->id }}</td>
-                        <td class="font-bold">{{ $role->name }}</td>
-                        <td>
-                            @if($role->name === 'Super Admin')
-                                <span class="god-mode">ALL PROTOCOLS (GOD MODE)</span>
-                            @elseif($role->permissions->count() > 0)
-                                {{ $role->permissions->pluck('name')->implode(', ') }}
+                        <th width="5%">Seq</th>
+                        <th width="20%">{{ $t('roles.col_designation', 'Clearance Designation') }}</th>
+                        <th width="60%">{{ $t('roles.col_capabilities', 'Granted Capabilities') }}</th>
+                        <th width="15%">{{ $t('roles.col_established', 'Established') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($data as $role)
+                    @php
+                        $perms = $role->permissions->pluck('name')->implode(', ');
+                        $isGodMode = false;
+
+                        if ($role->name === 'Super Admin') {
+                            $perms = $t('roles.god_mode', 'ALL PROTOCOLS (GOD MODE)');
+                            $isGodMode = true;
+                        }
+
+                        if (empty($perms)) {
+                            $perms = $t('roles.no_access', 'No Access Permissions Granted');
+                        }
+                    @endphp
+                    <tr>
+                        <td style="color: #94a3b8; font-weight: bold;">
+                            {{ str_pad($loop->iteration, 4, '0', STR_PAD_LEFT) }}
+                        </td>
+                        <td class="designation-name">
+                            {{ $role->name }}
+                        </td>
+                        <td class="capabilities-text">
+                            @if($isGodMode)
+                                <span class="god-mode">{{ $perms }}</span>
                             @else
-                                <span class="no-access">No Access Explicitly Assigned</span>
+                                {{ $perms }}
                             @endif
                         </td>
-                        <td>{{ $role->created_at->format('Y-m-d') }}</td>
+                        <td style="color: #64748b; font-weight: bold;">
+                            {{ $role->created_at->format('Y-m-d') }}
+                        </td>
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
+                    @empty
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 30px; color: #94a3b8;">
+                            No role matrix records found for the selected criteria.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </main>
+
 </body>
 </html>

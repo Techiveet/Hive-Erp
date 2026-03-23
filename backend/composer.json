@@ -22,12 +22,14 @@
         "nwidart/laravel-modules": "^13.0",
         "pbmedia/laravel-ffmpeg": "^8.9",
         "pragmarx/google2fa-laravel": "^2.3",
+        "pusher/pusher-php-server": "^7.2",
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-medialibrary": "^11.21",
         "spatie/laravel-permission": "^7.2",
         "spiral/roadrunner-cli": "^2.7",
         "spiral/roadrunner-http": "^4.0",
         "stancl/tenancy": "^3.9",
+        "stevebauman/location": "^7.6",
         "venturecraft/revisionable": "^1.42"
     },
     "require-dev": {

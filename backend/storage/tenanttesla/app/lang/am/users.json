@@ -30,6 +30,7 @@
     "col_clearance": "የፈቃድ ደረጃ",
     "col_status": "ሁኔታ",
     "col_provisioned": "የቀረበበት ጊዜ",
+    "col_actions": "እርምጃዎች",
     "purge_operator": "ኦፕሬተሩን አጥፋ?",
     "purge_desc": "ይህ በቋሚነት ይሰርዛል",
     "purge_desc2": "ከዚህ ኖድ።",

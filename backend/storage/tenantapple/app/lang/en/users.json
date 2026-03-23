@@ -30,6 +30,7 @@
     "col_clearance": "Clearance Level",
     "col_status": "Status",
     "col_provisioned": "Provisioned",
+    "col_actions": "Actions",
     "purge_operator": "Purge Operator?",
     "purge_desc": "This will permanently delete",
     "purge_desc2": "from this node.",

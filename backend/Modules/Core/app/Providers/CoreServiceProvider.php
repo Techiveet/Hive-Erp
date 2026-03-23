@@ -4,6 +4,7 @@ namespace Modules\Core\Providers;
 
 use Nwidart\Modules\Support\ModuleServiceProvider;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Config; // 🚀 ADDED CONFIG FACADE
 
 // 🚀 Import the command classes
 use Modules\Core\Console\Commands\SyncLocalizationCommand;
@@ -33,16 +34,58 @@ class CoreServiceProvider extends ModuleServiceProvider
     ];
 
     /**
-     * 🚀 NEW: Hook into Laravel's boot lifecycle to register module schedules.
+     * 🚀 Hook into Laravel's boot lifecycle.
      */
     public function boot(): void
     {
         parent::boot();
 
+        // =========================================================================
+        // 🚀 DYNAMIC SESSION OVERRIDE
+        // Overwrite Laravel's .env session lifetime with our global database setting
+        // =========================================================================
+        if (!app()->runningInConsole()) {
+            try {
+                // Fetch the setting (Fallback to 120 if not set)
+                $timeout = (int) get_system_setting('session_timeout_minutes', 120);
+
+                // Force Laravel's native session engine to obey our database setting
+                Config::set('session.lifetime', $timeout);
+            } catch (\Exception $e) {
+                // 🛡️ Silently fail during early database setup/migrations
+                // If the 'settings' table doesn't exist yet, it won't crash the app
+            }
+        }
+
+        // =========================================================================
+        // 📡 REAL-TIME BROADCASTING (REVERB)
+        // Load the modular channels.php file for WebSocket authorization
+        // =========================================================================
+        $this->registerBroadcastChannels();
+
+        // =========================================================================
+        // ⏰ SCHEDULER & OBSERVERS
+        // =========================================================================
         $this->app->booted(function () {
             $schedule = $this->app->make(Schedule::class);
             $this->configureSchedules($schedule);
         });
+
+        // Register the Activity Observer for real-time dashboard updates
+        \Modules\Core\Models\Activity::observe(\Modules\Core\Observers\ActivityObserver::class);
+    }
+
+    /**
+     * 🚀 Load the broadcast channels securely for this module.
+     */
+    protected function registerBroadcastChannels(): void
+    {
+        // Dynamically resolve the path using the Nwidart module helper
+        $channelsPath = module_path($this->name, 'routes/channels.php');
+
+        if (file_exists($channelsPath)) {
+            require $channelsPath;
+        }
     }
 
     /**

@@ -7,8 +7,10 @@ use Modules\Identity\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PragmaRX\Google2FA\Google2FA;
+use Stevebauman\Location\Facades\Location;
 
 // Aliased to prevent naming conflicts
 use Illuminate\Support\Facades\Password as PasswordFacade;
@@ -30,6 +32,17 @@ class AuthController extends Controller
             'roles'              => $user->getRoleNames(),
             'permissions'        => $user->getAllPermissions()->pluck('name'),
             'two_factor_enabled' => !empty($user->two_factor_secret) && $user->two_factor_confirmed_at !== null,
+        ], 200);
+    }
+
+    /**
+     * Lightweight heartbeat endpoint to keep the session token alive.
+     */
+    public function ping(Request $request)
+    {
+        return response()->json([
+            'status' => 'alive',
+            'timestamp' => now()->toIso8601String()
         ], 200);
     }
 
@@ -76,14 +89,17 @@ class AuthController extends Controller
             return response()->json(['message' => 'This account has been deactivated.'], 403);
         }
 
-        // 🚀 THE FIX: Use null coalescing to ensure trim() always gets a string
-        $hasSecret = !empty(trim($user->two_factor_secret ?? ''));
+        // 🚀 1. CHECK GLOBAL AND PERSONAL 2FA STATUS
+        $global2faEnforced = get_system_setting('require_2fa', false);
+        $hasSecret = !empty($user->two_factor_secret);
+        $isConfirmed = $user->two_factor_confirmed_at !== null;
 
-        if ($hasSecret && $user->two_factor_confirmed_at) {
+        // 🚀 2. INTERCEPT IF 2FA IS REQUIRED
+        if ($global2faEnforced || ($hasSecret && $isConfirmed)) {
+
             $tempToken = Str::random(64);
-            Cache::put('2fa_auth_' . $tempToken, $user->id, now()->addMinutes(10));
+            Cache::put('2fa_auth_' . $tempToken, $user->id, now()->addMinutes(15));
 
-            // 🛡️ LOG: 2FA HANDSHAKE INITIATED
             activity('Security & Access')
                 ->causedBy($user)
                 ->tap(function($activity) use ($currentTenant) { $activity->tenant_id = $currentTenant; })
@@ -94,17 +110,42 @@ class AuthController extends Controller
                 ])
                 ->log('login_2fa_initiated');
 
-            return response()->json([
-                'message'          => 'Verification required.',
-                'requires_2fa'     => true,
-                'two_factor_token' => $tempToken,
-            ], 200);
+            $response = [
+                'message'             => 'Verification required.',
+                'requires_2fa'        => true,
+                'two_factor_token'    => $tempToken,
+                'global_2fa_enforced' => $global2faEnforced,
+            ];
+
+            // 🚀 3. FORCED SETUP LOGIC
+            if ($global2faEnforced && (!$hasSecret || !$isConfirmed)) {
+                $google2fa = new Google2FA();
+
+                if (!$hasSecret) {
+                    $rawSecret = $google2fa->generateSecretKey();
+                    $user->two_factor_secret = encrypt($rawSecret);
+                    $user->save();
+                } else {
+                    $rawSecret = decrypt($user->two_factor_secret);
+                }
+
+                $appName = get_system_setting('system_email_name', 'HIVE.OS');
+                $qrCodeUrl = $google2fa->getQRCodeUrl($appName, $user->email, $rawSecret);
+
+                $response['requires_2fa_setup'] = true;
+                $response['qr_code_url'] = $qrCodeUrl;
+                $response['secret'] = $rawSecret;
+            }
+
+            return response()->json($response, 200);
         }
 
-        // Normal Login (No 2FA)
+        // 🚀 4. NORMAL LOGIN (No 2FA Required)
         $token = $user->createToken('hive-access-token')->plainTextToken;
 
-        // 🛡️ LOG: SUCCESSFUL LOGIN
+        // TRACK GEOGRAPHIC LOCATION
+        $this->recordLoginHistory($user, $request, $currentTenant);
+
         activity('Security & Access')
             ->causedBy($user)
             ->tap(function($activity) use ($currentTenant) { $activity->tenant_id = $currentTenant; })
@@ -162,7 +203,6 @@ class AuthController extends Controller
             $google2fa = new Google2FA();
 
             if (!$google2fa->verifyKey($secret, $request->code)) {
-                // 🛡️ LOG: FAILED 2FA CODE
                 activity('Security & Access')
                     ->causedBy($user)
                     ->tap(function($activity) use ($currentTenant) { $activity->tenant_id = $currentTenant; })
@@ -175,14 +215,22 @@ class AuthController extends Controller
 
                 return response()->json(['message' => 'Invalid authentication code.'], 401);
             }
+
+            if (is_null($user->two_factor_confirmed_at)) {
+                $user->two_factor_confirmed_at = now();
+                $user->save();
+            }
+
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Failed to decrypt 2FA payload.'], 500);
+            return response()->json(['message' => 'Failed to process 2FA.'], 500);
         }
 
         Cache::forget('2fa_auth_' . $request->two_factor_token);
         $token = $user->createToken('hive-access-token')->plainTextToken;
 
-        // 🛡️ LOG: SUCCESSFUL 2FA LOGIN
+        // TRACK GEOGRAPHIC LOCATION
+        $this->recordLoginHistory($user, $request, $currentTenant);
+
         activity('Security & Access')
             ->causedBy($user)
             ->tap(function($activity) use ($currentTenant) { $activity->tenant_id = $currentTenant; })
@@ -219,7 +267,6 @@ class AuthController extends Controller
         $user = $request->user();
         $currentTenant = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
 
-        // 🛡️ LOG: LOGOUT
         if ($user) {
             activity('Security & Access')
                 ->causedBy($user)
@@ -270,7 +317,6 @@ class AuthController extends Controller
         );
 
         if ($status === PasswordFacade::PASSWORD_RESET) {
-            // 🛡️ LOG: PASSWORD RESET
             $user = User::where('email', $request->email)->first();
             if ($user) {
                 activity('Security & Access')
@@ -287,5 +333,35 @@ class AuthController extends Controller
         }
 
         return response()->json(['message' => 'Invalid or expired security token.'], 400);
+    }
+
+    /**
+     * 🚀 Helper: Extract and log the Geographic location of a successful login
+     */
+    private function recordLoginHistory($user, Request $request, $currentTenant)
+    {
+        $ip = $request->ip();
+
+        // 🚀 UNCOMMENT THIS LINE FOR LOCAL TESTING TO GET AN ADDIS ABABA IP
+        // $ip = '72.229.28.185';
+
+        $cityName = 'Unknown Server';
+        $countryCode = null;
+
+        // Try to locate the IP via MaxMind/IP-API
+        if ($position = Location::get($ip)) {
+            $cityName = $position->cityName ?: 'Unknown Server';
+            $countryCode = $position->countryCode;
+        }
+
+        DB::table('login_histories')->insert([
+            'user_id' => $user->id,
+            'tenant_id' => $currentTenant === 'central' ? null : $currentTenant,
+            'ip_address' => $ip,
+            'city' => $cityName,
+            'country_code' => $countryCode,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }

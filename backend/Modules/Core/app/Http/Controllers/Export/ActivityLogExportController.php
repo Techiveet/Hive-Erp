@@ -6,8 +6,9 @@ use Modules\Core\Models\Activity;
 use Modules\Core\Models\ActivityArchive;
 use Modules\Identity\Models\User;
 use Modules\Core\Models\Language;
-use Modules\Core\Models\Translation; // 🚀 Added to bypass Octane cache
-use Modules\Core\Exports\ActivityLogExport; // 🚀 FIX: Updated to the new modular namespace!
+use Modules\Core\Models\Translation;
+use Modules\Core\Models\Setting;
+use Modules\Core\Exports\ActivityLogExport;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
@@ -91,6 +92,62 @@ class ActivityLogExportController extends Controller
         return $query->orderBy($sortCol, $sortDir);
     }
 
+    /**
+     * 🚀 Resolves the physical path for PDF or Base64 for Frontend
+     */
+    protected function getResolvedLogo($asBase64 = false): string
+    {
+        $tenantPrefix = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
+        // Updated cache key to bust old paths
+        $cacheKey = "export_logo_final_v3_{$tenantPrefix}_" . ($asBase64 ? 'b64' : 'path');
+
+        return Cache::remember($cacheKey, now()->addHour(), function() use ($asBase64) {
+            $logoPath = Setting::where('key', 'logo_dark')->value('value');
+            $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
+
+            if (empty($logoPath)) {
+                return $fallback;
+            }
+
+            // 🚀 Handle External URLs (S3, Cloudinary, etc.)
+            if (filter_var($logoPath, FILTER_VALIDATE_URL)) {
+                if ($asBase64) {
+                    try {
+                        $data = file_get_contents($logoPath);
+                        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($data) ?: 'image/png';
+                        return 'data:' . $mime . ';base64,' . base64_encode($data);
+                    } catch (\Exception $e) {
+                        return $logoPath;
+                    }
+                }
+                return $logoPath;
+            }
+
+            // 🚀 Handle Local Storage Paths
+            $cleanPath = ltrim($logoPath, '/');
+
+            if (!str_starts_with($cleanPath, 'storage/')) {
+                $cleanPath = 'storage/' . $cleanPath;
+            }
+
+            $fullPath = public_path($cleanPath);
+            $realPath = realpath($fullPath);
+
+            if ($realPath && file_exists($realPath)) {
+                if ($asBase64) {
+                    $mime = mime_content_type($realPath);
+                    $data = file_get_contents($realPath);
+                    return 'data:' . $mime . ';base64,' . base64_encode($data);
+                }
+
+                // Force file protocol for DOMPDF to bypass local network issues
+                return 'file://' . $realPath;
+            }
+
+            return $fallback;
+        });
+    }
+
     public function handleExport(Request $request)
     {
         $this->authorizeViewLogs();
@@ -98,39 +155,23 @@ class ActivityLogExportController extends Controller
         try {
             $type = strtolower($request->input('type', $request->input('format', 'xlsx')));
             $mode = $request->input('mode', 'active');
-
-            // 🚀 THE OCTANE BYPASS: Safely fetch the dictionary directly
             $locale = $request->input('locale', 'en');
             $cachePrefix = function_exists('tenant') && tenant('id') ? 'tenant_' . tenant('id') : 'central';
 
             $dictionary = Cache::rememberForever("{$cachePrefix}_translations_{$locale}", function () use ($locale) {
                 $language = Language::where('code', $locale)->where('is_active', true)->first();
-
-                // Directly query the Translation model using the language ID
-                if ($language) {
-                    return Translation::where('language_id', $language->id)->pluck('value', 'key')->toArray();
-                }
-
-                return [];
+                return $language ? Translation::where('language_id', $language->id)->pluck('value', 'key')->toArray() : [];
             });
 
             $t = function($key, $default) use ($dictionary) {
                 return $dictionary[$key] ?? $default;
             };
 
-            $filenamePrefix = $mode === 'archived' ? 'vaulted_audit_ledger_' : 'activity_log_export_';
-            $filename = $filenamePrefix . now()->format('Ymd_His');
+            $filename = ($mode === 'archived' ? 'vaulted_audit_ledger_' : 'activity_log_export_') . now()->format('Ymd_His');
 
-            if (auth()->check()) {
-                activity('System Audit')->event('exported')->causedBy(auth()->user())
-                    ->withProperties(['format' => $type, 'mode' => $mode, 'ip' => $request->ip()])
-                    ->log("Extracted system logs in {$type} format");
-            }
-
-            // --- COPY & PRINT (Translate Both Keys AND Values) ---
+            // --- COPY & PRINT (React Frontend gets Base64) ---
             if (in_array($type, ['print', 'copy'])) {
-                $logs = $this->getFilteredQuery($request)->limit(1500)->get()->map(function($log, $index) use ($t) {
-
+                $logs = $this->getFilteredQuery($request)->limit(1500)->get()->map(function($log) use ($t) {
                     $rawEvent = strtolower($log->event ?? 'sys');
                     $translatedEvent = in_array($rawEvent, ['created', 'updated', 'deleted', 'viewed', 'exported', 'copied', 'printed'])
                         ? $t("global.{$rawEvent}", $rawEvent) : $rawEvent;
@@ -144,25 +185,31 @@ class ActivityLogExportController extends Controller
                         $t('audit.col_time', 'Timestamp')            => $log->created_at ? $log->created_at->format('Y-m-d H:i:s') : 'N/A',
                     ];
                 });
-                return response()->json(['data' => $logs]);
+
+                return response()->json([
+                    'logo_url' => $this->getResolvedLogo(true),
+                    'data' => $logs
+                ]);
             }
 
-            // --- PDF ---
+            // --- PDF (DOMPDF gets forced Base64 for ultimate reliability) ---
             if ($type === 'pdf') {
                 $logs = $this->getFilteredQuery($request)->limit(1500)->get();
                 $pdf = Pdf::loadView('core::exports.activity-log-export', [
-                    'title' => $t('audit.title', 'Hive.OS WORM Audit Ledger'),
-                    'data'  => $logs,
-                ])->setPaper('a4', 'landscape')->setWarnings(false);
+                    'title'   => $t('audit.title', 'Hive.OS WORM Audit Ledger'),
+                    'data'    => $logs,
+                    'logoUrl' => $this->getResolvedLogo(true), // Forced Base64 string
+                ])
+                ->setPaper('a4', 'landscape')
+                ->setWarnings(false)
+                ->setOptions(['isRemoteEnabled' => true, 'isHtml5ParserEnabled' => true]);
 
                 return $pdf->download("{$filename}.pdf");
             }
 
             // --- EXCEL & CSV ---
             $format = ($type === 'csv') ? \Maatwebsite\Excel\Excel::CSV : \Maatwebsite\Excel\Excel::XLSX;
-            $extension = ($type === 'csv') ? 'csv' : 'xlsx';
-
-            return Excel::download(new ActivityLogExport($this->getFilteredQuery($request), $dictionary), "{$filename}.{$extension}", $format);
+            return Excel::download(new ActivityLogExport($this->getFilteredQuery($request), $dictionary), "{$filename}." . ($type === 'csv' ? 'csv' : 'xlsx'), $format);
 
         } catch (\Exception $e) {
             Log::error("Audit Export Failed: " . $e->getMessage());

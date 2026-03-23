@@ -4,138 +4,253 @@
     <meta charset="utf-8">
     <title>{{ $title }}</title>
     <style>
-        @page { margin: 80px 25px 50px 25px; }
-        body {
-            /* Clean fallback to standard English PDF fonts */
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            font-size: 10px;
-            color: #334155;
+        /* ----------------------------------------------------
+           GLOBAL SETUP & TYPOGRAPHY
+        ---------------------------------------------------- */
+        @page {
+            margin: 110px 30px 60px 30px; /* Top margin accommodates the fixed header */
         }
 
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 9px;
+            color: #334155;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ----------------------------------------------------
+           HEADER (Fixed to top of every page)
+        ---------------------------------------------------- */
         header {
             position: fixed;
-            top: -60px;
-            left: 0px;
-            right: 0px;
-            height: 40px;
-            border-bottom: 2px solid #6366f1;
-        }
-        .brand {
-            font-size: 16px;
-            font-weight: 900;
-            color: #1e1b4b;
-            letter-spacing: 1.5px;
-            margin: 0;
-            text-transform: uppercase;
-        }
-        .report-meta {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 8px;
-            color: #64748b;
-            margin-top: 4px;
-            text-transform: uppercase;
+            top: -80px;
+            left: 0;
+            right: 0;
+            height: 60px;
+            border-bottom: 2px solid #1e293b; /* Deep slate corporate line */
+            padding-bottom: 10px;
         }
 
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .logo-td {
+            width: 160px;
+            vertical-align: middle;
+        }
+
+        .logo-img {
+            max-height: 40px;
+            width: auto;
+            display: block;
+        }
+
+        .title-td {
+            vertical-align: middle;
+            text-align: left;
+        }
+
+        .report-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0 0 3px 0;
+        }
+
+        .report-subtitle {
+            font-size: 9px;
+            color: #64748b;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .meta-td {
+            text-align: right;
+            vertical-align: middle;
+            font-size: 8px;
+            color: #475569;
+            line-height: 1.4;
+        }
+
+        .meta-label {
+            font-weight: bold;
+            color: #1e293b;
+        }
+
+        /* ----------------------------------------------------
+           FOOTER (Fixed to bottom of every page)
+        ---------------------------------------------------- */
         footer {
             position: fixed;
-            bottom: -35px;
-            left: 0px;
-            right: 0px;
+            bottom: -30px;
+            left: 0;
+            right: 0;
             height: 20px;
             border-top: 1px solid #e2e8f0;
             padding-top: 8px;
         }
-        .footer-table { width: 100%; border: none; margin: 0; }
-        .footer-table td { border: none; padding: 0; font-size: 8px; color: #94a3b8; }
-        .text-right { text-align: right; }
-        .text-left { text-align: left; }
+
+        .footer-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8px;
+            color: #94a3b8;
+        }
+
+        .page-number:after {
+            content: counter(page);
+        }
+
+        /* ----------------------------------------------------
+           DATA TABLE
+        ---------------------------------------------------- */
+        .table-container {
+            margin-top: 10px;
+        }
 
         .data-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            background-color: #ffffff;
         }
-        .data-table th {
-            background-color: #f8fafc;
-            color: #475569;
-            text-align: left;
-            padding: 8px;
-            border-bottom: 2px solid #cbd5e1;
-            text-transform: uppercase;
-            font-size: 8px;
-            letter-spacing: 0.5px;
-        }
-        .data-table td {
-            padding: 8px;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle;
-        }
-        .data-table tr:nth-child(even) { background-color: #fdfdfd; }
 
-        .badge {
+        .data-table th {
+            background-color: #1e293b; /* Deep corporate blue/slate */
+            color: #ffffff;
+            font-size: 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 10px 8px;
+            text-align: left;
+            border: 1px solid #1e293b;
+        }
+
+        .data-table td {
+            padding: 8px 8px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        /* Subtle zebra striping for readability */
+        .data-table tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        /* ----------------------------------------------------
+           UI ELEMENTS
+        ---------------------------------------------------- */
+        .operator-name {
+            font-weight: bold;
+            color: #0f172a;
+        }
+
+        .status-active {
+            color: #059669;
             font-weight: bold;
             font-size: 8px;
             text-transform: uppercase;
         }
-        .status-active { color: #059669; font-weight: bold; text-transform: uppercase; }
-        .status-inactive { color: #dc2626; font-weight: bold; text-transform: uppercase; }
-        .font-bold { font-weight: bold; color: #0f172a; }
+
+        .status-inactive {
+            color: #dc2626;
+            font-weight: bold;
+            font-size: 8px;
+            text-transform: uppercase;
+        }
+
+        .email-text {
+            color: #475569;
+        }
     </style>
 </head>
 <body>
+
     <header>
-        <h1 class="brand">HIVE.OS :: {{ $title }}</h1>
-        <div class="report-meta">REPORT_TYPE: USER_REGISTRY | GENERATED: {{ now()->format('Y-m-d H:i:s T') }}</div>
+        <table class="header-table">
+            <tr>
+                <td class="logo-td">
+                    @if(!empty($logoUrl))
+                        <img src="{{ $logoUrl }}" class="logo-img">
+                    @endif
+                </td>
+                <td class="title-td">
+                    <h1 class="report-title">{{ $title }}</h1>
+                    <p class="report-subtitle">User Registry & Authorization Matrix</p>
+                </td>
+                <td class="meta-td">
+                    <span class="meta-label">Date Generated:</span> {{ now()->format('M d, Y - H:i:s T') }}<br>
+                    <span class="meta-label">Total Users:</span> {{ count($data) }}<br>
+                    <span class="meta-label">Generated By:</span> {{ auth()->user()->name ?? 'System WORM Engine' }}
+                </td>
+            </tr>
+        </table>
     </header>
 
     <footer>
         <table class="footer-table">
             <tr>
-                <td class="text-left">Generated from HIVE.OS — Created by Techive Technology Solutions</td>
-                <td class="text-right">
-                    <script type="text/php">
-                        if (isset($pdf)) {
-                            $x = $pdf->get_width() - 85;
-                            $y = $pdf->get_height() - 25;
-                            $text = "PAGE {PAGE_NUM} OF {PAGE_COUNT}";
-                            $font = $fontMetrics->get_font("Helvetica", "normal");
-                            $size = 7;
-                            $color = array(0.58, 0.63, 0.72);
-                            $pdf->page_text($x, $y, $text, $font, $size, $color);
-                        }
-                    </script>
-                </td>
+                <td style="text-align: left; width: 33%;">HIVE.OS Enterprise Management</td>
+                <td style="text-align: center; width: 34%;">Strictly Confidential</td>
+                <td style="text-align: right; width: 33%;">Page <span class="page-number"></span></td>
             </tr>
         </table>
     </footer>
 
     <main>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th width="5%">#</th>
-                    <th width="25%">{{ $t('users.col_operator', 'Operator Name') }}</th>
-                    <th width="30%">{{ $t('users.email_address', 'System Email') }}</th>
-                    <th width="15%">{{ $t('users.col_clearance', 'Role') }}</th>
-                    <th width="10%">{{ $t('users.col_status', 'Status') }}</th>
-                    <th width="15%">{{ $t('users.col_provisioned', 'Provisioned') }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($data as $index => $user)
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td>{{ $index + 1 }}</td>
-                        <td class="font-bold">{{ $user->name }}</td>
-                        <td>{{ $user->email }}</td>
-                        <td>{{ $user->roles->first()?->name ?? 'Member' }}</td>
+                        <th width="6%">Seq</th>
+                        <th width="24%">{{ $t('users.col_operator', 'Operator Name') }}</th>
+                        <th width="28%">{{ $t('users.email_address', 'System Email') }}</th>
+                        <th width="16%">{{ $t('users.col_clearance', 'Role / Clearance') }}</th>
+                        <th width="12%">{{ $t('users.col_status', 'Status') }}</th>
+                        <th width="14%">{{ $t('users.col_provisioned', 'Provisioned') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($data as $user)
+                    <tr>
+                        <td style="color: #94a3b8; font-weight: bold;">
+                            {{ str_pad($loop->iteration, 4, '0', STR_PAD_LEFT) }}
+                        </td>
+                        <td class="operator-name">
+                            {{ $user->name }}
+                        </td>
+                        <td class="email-text">
+                            {{ $user->email }}
+                        </td>
+                        <td>
+                            {{ $user->roles->first()?->name ?? 'Member' }}
+                        </td>
                         <td class="{{ $user->is_active ? 'status-active' : 'status-inactive' }}">
                             {{ $user->is_active ? $t('global.active', 'ACTIVE') : $t('global.locked', 'LOCKED') }}
                         </td>
-                        <td>{{ $user->created_at->format('Y-m-d') }}</td>
+                        <td style="color: #64748b;">
+                            {{ $user->created_at->format('Y-m-d') }}
+                        </td>
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
+                    @empty
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 30px; color: #94a3b8;">
+                            No user records found for the selected criteria.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </main>
+
 </body>
 </html>

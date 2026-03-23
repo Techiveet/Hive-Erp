@@ -2,7 +2,9 @@ FROM php:8.4-cli-alpine3.20
 
 # 1. Install system dependencies
 # Includes libraries for Postgres, ZIP, GD (Images), FFmpeg (Video), and build tools for PECL
+# Includes libraries for Postgres, ZIP, GD (Images), FFmpeg (Video), and build tools for PECL
 RUN apk add --no-cache \
+    postgresql-client \
     postgresql-dev \
     libzip-dev \
     unzip \
