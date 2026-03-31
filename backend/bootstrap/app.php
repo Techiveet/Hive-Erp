@@ -19,6 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'active_status' => \App\Http\Middleware\EnsureActiveStatus::class,
+            'dynamic_timeout' => \Modules\Core\Http\Middleware\EnforceDynamicSessionTimeout::class,
         ]);
 
         // 2. Bypass CSRF for API requests
@@ -26,11 +28,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*',
         ]);
 
-        // 🚀 3. THE NEW EJECTION & TIMEOUT CHECKPOINTS
-        // Apply to all API routes so it intercepts every request instantly
-        $middleware->api(append: [
-            \App\Http\Middleware\EnsureActiveStatus::class,
-            \Modules\Core\Http\Middleware\EnforceDynamicSessionTimeout::class, // 🚀 ADDED HERE
+        // Initialize tenant context for every API request before auth runs.
+        // The middleware safely no-ops on central domains.
+        $middleware->api(prepend: [
+            \App\Http\Middleware\InitializeTenantContext::class,
         ]);
 
     })

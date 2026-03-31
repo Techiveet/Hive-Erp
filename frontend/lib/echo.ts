@@ -19,6 +19,8 @@ export const initEcho = (token: string) => {
       const currentHost = window.location.hostname;
       const apiPort = 8085; // Your backend port
       const authEndpoint = `http://${currentHost}:${apiPort}/api/v1/broadcasting/auth`;
+      const isTenant = currentHost !== 'localhost' && currentHost !== '127.0.0.1';
+      const tenantId = isTenant ? currentHost.split('.')[0] : null;
 
       window.Echo = new Echo({
         broadcaster: 'reverb',
@@ -36,6 +38,7 @@ export const initEcho = (token: string) => {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: 'application/json',
+            ...(tenantId ? { 'X-Tenant': tenantId } : {}),
           },
         },
       });

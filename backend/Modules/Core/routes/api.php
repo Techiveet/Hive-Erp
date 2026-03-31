@@ -2,8 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Broadcast;
-use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
-use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+use App\Http\Middleware\InitializeTenantContext;
 
 use Modules\Core\Http\Controllers\ActivityLogController;
 use Modules\Core\Http\Controllers\Settings\LocalizationController;
@@ -39,9 +38,10 @@ foreach ($centralDomains as $domain) {
         // 🚀 LARGE FILE DOWNLOAD ROUTE (Token Auth to avoid browser memory crash)
         Route::get('/system/backups/{id}/download', [SystemOperationsController::class, 'downloadBackup']);
 
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
             Broadcast::routes();
             Route::post('/central/users/{id}/impersonate', [UserController::class, 'impersonate']);
+            Route::get('/dashboard', [DashboardController::class, 'index']);
             Route::get('/central/dashboard', [DashboardController::class, 'index']);
             Route::get('/search', [GlobalSearchController::class, 'search']);
 
@@ -118,12 +118,18 @@ foreach ($centralDomains as $domain) {
     });
 }
 
+// Docker-safe central aliases.
+// These are not bound to a specific central domain, so central API calls still
+// work when the app is reached through a container hostname or reverse proxy.
+Route::prefix('v1')->middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
+    Route::get('/central/dashboard', [DashboardController::class, 'index']);
+});
+
 // =========================================================================
 // 2. TENANT NODE (Core)
 // =========================================================================
 Route::middleware([
-    InitializeTenancyByDomain::class,
-    PreventAccessFromCentralDomains::class
+    InitializeTenantContext::class,
 ])->prefix('v1')->group(function () {
 
     Route::get('/translations/{locale}', [LocalizationController::class, 'fetchTranslations']);
@@ -141,10 +147,11 @@ Route::middleware([
     // 🚀 LARGE FILE DOWNLOAD ROUTE (Tenant)
     Route::get('/system/backups/{id}/download', [SystemOperationsController::class, 'downloadBackup']);
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
         Broadcast::routes();
         Route::post('/users/{id}/impersonate', [UserController::class, 'impersonate']);
         Route::get('/dashboard', [DashboardController::class, 'index']);
+        Route::get('/tenant/dashboard', [DashboardController::class, 'index']);
         Route::get('/search', [GlobalSearchController::class, 'search']);
 
         Route::prefix('system')->group(function () {

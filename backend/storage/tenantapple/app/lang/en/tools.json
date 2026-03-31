@@ -66,5 +66,10 @@
     "discard_pdf": "Discard PDF",
     "toast_saving_cloud": "Saving to File Manager...",
     "toast_saved_cloud": "PDF securely saved to File Manager!",
-    "toast_save_failed": "Failed to save PDF to the cloud."
+    "toast_save_failed": "Failed to save PDF to the cloud.",
+    "format_code": "Format Code",
+    "copy_code": "Copy",
+    "new_file": "New File...",
+    "filename_req": "Filename is required.",
+    "file_exists": "File already exists."
 }

@@ -18,6 +18,7 @@ import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { logFrontendAction } from "@/lib/api"; // 🚀 Added Telemetry
 import { cn } from "@/lib/utils";
+import { isTenantHost } from "@/lib/runtime-context";
 
 function ResetPasswordForm({ isTenant }: { isTenant: boolean }) {
   const router = useRouter();
@@ -50,8 +51,15 @@ function ResetPasswordForm({ isTenant }: { isTenant: boolean }) {
 
       try {
         const host = window.location.hostname;
-        const endpoint = isTenant ? "/api/v1/tenant/password-policy" : "/api/v1/password-policy";
-        const res = await fetch(`http://${host}:8085${endpoint}`, { signal: controller.signal, headers: { "Accept": "application/json" } });
+        const tenantId = isTenantHost(host) ? host.split(".")[0] : null;
+        const endpoint = tenantId ? "/api/v1/tenant/password-policy" : "/api/v1/password-policy";
+        const res = await fetch(`http://${host}:8085${endpoint}`, {
+          signal: controller.signal,
+          headers: {
+            "Accept": "application/json",
+            ...(tenantId ? { "X-Tenant": tenantId } : {}),
+          },
+        });
         
         if (res.ok) setPolicy(await res.json());
         else setPolicy(fallbackPolicy);
@@ -93,12 +101,17 @@ function ResetPasswordForm({ isTenant }: { isTenant: boolean }) {
 
     setLoading(true);
     const host = window.location.hostname;
-    const endpoint = isTenant ? "/api/v1/tenant/reset-password" : "/api/v1/reset-password";
+    const tenantId = isTenantHost(host) ? host.split(".")[0] : null;
+    const endpoint = tenantId ? "/api/v1/tenant/reset-password" : "/api/v1/reset-password";
 
     try {
       const res = await fetch(`http://${host}:8085${endpoint}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...(tenantId ? { "X-Tenant": tenantId } : {}),
+        },
         body: JSON.stringify({ email, token, password, password_confirmation: passwordConfirmation }),
       });
 

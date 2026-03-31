@@ -24,7 +24,17 @@ class EnsureActiveStatus
         }
 
         // 2. Check if the Tenant Node is suspended
-        if (function_exists('tenant') && tenant() && !tenant('is_active')) {
+        if (function_exists('tenant') && tenant()) {
+            $tenantStatus = tenant()->getAttribute('is_active');
+
+            // Treat missing/null status as active.
+            // Only eject operators when the node is explicitly marked false.
+            $tenantIsSuspended = filter_var($tenantStatus, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === false;
+
+            if (!$tenantIsSuspended) {
+                return $next($request);
+            }
+
             // Revoke the token immediately
             if ($request->user()) {
                 $request->user()->currentAccessToken()->delete();

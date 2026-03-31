@@ -48,11 +48,10 @@ export const useLocalization = create<LocalizationState>((set, get) => ({
       const res = await fetch(getApiUrl('/localization/languages'), { headers: getHeaders() });
       if (!res.ok) throw new Error("Failed to fetch languages");
       const data = await res.json();
-      set({ languages: data });
+      const normalizedLanguages = Array.isArray(data) ? data : (data.data || []);
+      set({ languages: normalizedLanguages });
       
-      const source = Array.isArray(data) 
-        ? (data.find((l: Language) => l.is_default) || data[0])
-        : (data.data?.find((l: Language) => l.is_default) || data.data?.[0]);
+      const source = normalizedLanguages.find((l: Language) => l.is_default) || normalizedLanguages[0];
         
       if (source) await get().fetchBaseTranslations(source.code);
     } catch (err: any) { 
@@ -66,12 +65,15 @@ export const useLocalization = create<LocalizationState>((set, get) => ({
     try {
       // Use the internal endpoint for the editor matrix
       const res = await fetch(getApiUrl(`/localization/languages/${sourceCode}/translations`), { headers: getHeaders() });
-      if (!res.ok) throw new Error("Failed to fetch base dictionary");
+      if (!res.ok) {
+        set({ baseTranslations: {} });
+        return;
+      }
       const data = await res.json();
       // 🚀 THE FIX: Removed .messages
       set({ baseTranslations: data.data || data || {} });
     } catch (err: any) { 
-      console.error(err); 
+      set({ baseTranslations: {} });
     }
   },
 

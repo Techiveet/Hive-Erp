@@ -1,8 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
-use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+use App\Http\Middleware\InitializeTenantContext;
 
 use Modules\Tenancy\Http\Controllers\TenantController;
 use Modules\Tenancy\Http\Controllers\Export\TenantExportController;
@@ -22,7 +21,7 @@ foreach ($centralDomains as $domain) {
         });
 
         // Protected
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
 
             // 🚀 REMOVED the hardcoded /central/dashboard closure from here!
             // It is now safely handled by the Core module's DashboardController.
@@ -42,11 +41,10 @@ foreach ($centralDomains as $domain) {
 // 2. TENANT NODE (Tenancy)
 // =========================================================================
 Route::middleware([
-    InitializeTenancyByDomain::class,
-    PreventAccessFromCentralDomains::class
+    InitializeTenantContext::class,
 ])->prefix('v1')->group(function () {
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
 
         // 🚀 REMOVED the hardcoded /dashboard closure from here!
         // It is now safely handled by the Core module's DashboardController.

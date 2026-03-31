@@ -5,16 +5,20 @@ import { useQuery } from "@tanstack/react-query";
 import { ShieldAlert } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { SystemOffline } from "@/components/auth/system-offline";
+import { clearHiveSession } from "@/lib/auth-sync";
+import { getTenantId } from "@/lib/runtime-context";
 
 // 🚀 Helper to get the correct API URL
 const getApiUrl = () => {
     if (typeof window === "undefined") return "http://localhost:8085/api/v1";
     const host = window.location.hostname;
     const protocol = window.location.protocol;
-    if (host !== "localhost" && host !== "127.0.0.1" && host.includes(".")) {
-        return `${protocol}//${host}:8085/api/v1/tenant`; 
-    }
     return `${protocol}//${host}:8085/api/v1`;
+};
+
+const getTenantHeaders = () => {
+    const tenantId = getTenantId();
+    return tenantId ? { "X-Tenant": tenantId } : {};
 };
 
 // 🚀 Interfaces
@@ -76,9 +80,37 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         queryKey: ["globalSystemSettings"],
         queryFn: async () => {
             const token = localStorage.getItem("hive_token");
+
+            if (!token) {
+                return { data: null };
+            }
+
             const res = await fetch(`${getApiUrl()}/settings/general`, {
-                headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' },
+                headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...getTenantHeaders() },
             });
+
+            if (res.status === 401) {
+                clearHiveSession();
+                if (!pathname.includes("/sign-in")) {
+                    router.replace("/sign-in");
+                }
+                return { data: null };
+            }
+
+            if (res.status === 403) {
+                let message = "";
+                try {
+                    const payload = await res.json();
+                    message = String(payload?.message || "");
+                } catch {}
+
+                clearHiveSession(message.startsWith("CRITICAL: ") ? message.replace("CRITICAL: ", "") : undefined);
+                if (!pathname.includes("/sign-in")) {
+                    router.replace("/sign-in");
+                }
+                return { data: null };
+            }
+
             if (!res.ok) throw new Error("Failed to fetch settings");
             return res.json();
         },

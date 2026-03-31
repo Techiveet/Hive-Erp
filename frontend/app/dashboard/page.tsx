@@ -24,6 +24,7 @@ import { useTour } from "@/components/providers/tour-provider";
 import { useTranslation } from "@/store/use-translation"; 
 import { cn } from '@/lib/utils';
 import { initEcho } from '@/lib/echo';
+import { getTenantId, isTenantSession } from '@/lib/runtime-context';
 
 interface DashboardData {
     company: string;
@@ -85,8 +86,10 @@ export default function DashboardHome() {
 
     useEffect(() => {
         const host = window.location.hostname;
-        if (host !== 'localhost' && host !== '127.0.0.1') {
-            setTenantName(host.split('.')[0].toUpperCase());
+        const tenantId = getTenantId();
+
+        if (tenantId) {
+            setTenantName(tenantId.toUpperCase());
         } else {
             setTenantName('CENTRAL');
         }
@@ -112,10 +115,18 @@ export default function DashboardHome() {
         queryFn: async () => {
             const token = localStorage.getItem('hive_token');
             const host = window.location.hostname;
-            const isTenant = host !== 'localhost' && host !== '127.0.0.1';
-            const endpoint = isTenant ? `http://${host}:8085/api/v1/dashboard` : `http://${host}:8085/api/v1/central/dashboard`;
+            const tenantId = getTenantId();
+            const endpoint = isTenantSession()
+                ? `http://${host}:8085/api/v1/tenant/dashboard`
+                : `http://${host}:8085/api/v1/dashboard`;
             
-            const res = await fetch(endpoint, { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` } });
+            const res = await fetch(endpoint, {
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    ...(tenantId ? { 'X-Tenant': tenantId } : {}),
+                }
+            });
             if (!res.ok) throw new Error(`Node Connection Failed: ${res.status}`);
             return res.json();
         },

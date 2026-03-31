@@ -1,8 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
-use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+use App\Http\Middleware\InitializeTenantContext;
 
 use Modules\Identity\Http\Controllers\AuthController;
 use Modules\Identity\Http\Controllers\TwoFactorController;
@@ -37,7 +36,7 @@ foreach ($centralDomains as $domain) {
         Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
         // Protected Auth
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
             // Heartbeat Endpoint
             Route::post('/ping', [AuthController::class, 'ping']);
 
@@ -72,8 +71,7 @@ foreach ($centralDomains as $domain) {
 // 2. TENANT NODE (Identity & Public System)
 // =========================================================================
 Route::middleware([
-    InitializeTenancyByDomain::class,
-    PreventAccessFromCentralDomains::class
+    InitializeTenantContext::class,
 ])->prefix('v1')->group(function () {
 
     // 🚀 NEW: PUBLIC SYSTEM ROUTES FOR TENANTS (For Maintenance Mode Ticker)
@@ -87,19 +85,28 @@ Route::middleware([
 
     // Public Auth
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/tenant/login', [AuthController::class, 'login']);
     Route::post('/verify-2fa', [AuthController::class, 'verify2FA']);
+    Route::post('/tenant/verify-2fa', [AuthController::class, 'verify2FA']);
     Route::get('/password-policy', [AuthController::class, 'passwordPolicy']);
+    Route::get('/tenant/password-policy', [AuthController::class, 'passwordPolicy']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+    Route::post('/tenant/reset-password', [AuthController::class, 'resetPassword']);
 
     // Protected Auth
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
         // Heartbeat Endpoint
         Route::post('/ping', [AuthController::class, 'ping']);
+        Route::post('/tenant/ping', [AuthController::class, 'ping']);
 
         Route::get('/user', [AuthController::class, 'user']);
+        Route::get('/tenant/user', [AuthController::class, 'user']);
         Route::post('/logout', [AuthController::class, 'logout']);
+        Route::post('/tenant/logout', [AuthController::class, 'logout']);
         Route::post('/profile/update', [ProfileController::class, 'updateProfile']);
+        Route::post('/tenant/profile/update', [ProfileController::class, 'updateProfile']);
         Route::get('/profile/avatar', [ProfileController::class, 'getAvatar']);
+        Route::get('/tenant/profile/avatar', [ProfileController::class, 'getAvatar']);
 
         Route::prefix('2fa')->group(function () {
             Route::post('/enable', [TwoFactorController::class, 'enable']);

@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { logFrontendAction } from "@/lib/api"; 
+import { clearHiveSession } from "@/lib/auth-sync";
+import { isTenantHost } from "@/lib/runtime-context";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -40,7 +42,7 @@ export default function LoginPage() {
     }
 
     const host = window.location.hostname;
-    if (host !== "localhost" && host !== "127.0.0.1") {
+    if (isTenantHost(host)) {
       const tenantId = host.split(".")[0].toUpperCase();
       setPortalName(`${tenantId} NODE`);
       setIsTenant(true);
@@ -53,12 +55,18 @@ export default function LoginPage() {
     setError("");
 
     const host = window.location.hostname;
-    const apiUrl = `http://${host}:8085/api/v1/login`;
+    const tenantId = isTenantHost(host) ? host.split(".")[0] : null;
+    const endpoint = tenantId ? "/api/v1/tenant/login" : "/api/v1/login";
+    const apiUrl = `http://${host}:8085${endpoint}`;
 
     try {
       const res = await fetch(apiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...(tenantId ? { "X-Tenant": tenantId } : {}),
+        },
         body: JSON.stringify({ email, password }),
       });
 
@@ -86,12 +94,15 @@ export default function LoginPage() {
       }
 
       // Standard Login (If no 2FA is required globally or personally)
+      clearHiveSession();
+      localStorage.removeItem("hive_original_token");
       localStorage.setItem("hive_token", data.data.token);
       localStorage.setItem("hive_user", JSON.stringify(data.data.user));
       localStorage.setItem("hive_context", data.data.context);
+      sessionStorage.removeItem("hive_eject_reason");
 
       await logFrontendAction({ module: 'UI Telemetry', action: 'session_initialized', description: `Operator ${email} authenticated.` }).catch(()=>{});
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
       
     } catch (err: any) {
       logFrontendAction({ module: 'Auth', action: 'login_failed', description: `Failed: ${err.message}` }).catch(()=>{});

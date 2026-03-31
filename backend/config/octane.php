@@ -22,6 +22,7 @@ use Laravel\Octane\Listeners\FlushUploadedFiles;
 use Laravel\Octane\Listeners\ReportException;
 use Laravel\Octane\Listeners\StopWorkerIfNecessary;
 use Laravel\Octane\Octane;
+use App\Listeners\FlushTenantContext;
 
 return [
 
@@ -73,6 +74,7 @@ return [
         RequestReceived::class => [
             ...Octane::prepareApplicationForNextOperation(),
             ...Octane::prepareApplicationForNextRequest(),
+            FlushTenantContext::class,
             //
         ],
 
@@ -81,6 +83,7 @@ return [
         ],
 
         RequestTerminated::class => [
+            FlushTenantContext::class,
             // FlushUploadedFiles::class,
         ],
 
@@ -103,10 +106,11 @@ return [
         ],
 
         OperationTerminated::class => [
+            FlushTenantContext::class,
             FlushOnce::class,
             FlushTemporaryContainerInstances::class,
-            // DisconnectFromDatabases::class,
-            // CollectGarbage::class,
+            DisconnectFromDatabases::class,
+            CollectGarbage::class,
         ],
 
         WorkerErrorOccurred::class => [

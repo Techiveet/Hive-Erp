@@ -13,7 +13,7 @@ export function StatusTicker() {
       // Handle tenant vs central routing if needed, or stick to central for system status
       const isTenant = host !== "localhost" && host !== "127.0.0.1" && host.includes(".");
       const url = isTenant 
-        ? `${protocol}//${host}:8085/api/v1/tenant/system/status-ticker` // Adjust if you scoped the route differently
+        ? `${protocol}//${host}:8085/api/v1/system/status-ticker`
         : `${protocol}//${host}:8085/api/v1/system/status-ticker`;
 
       const res = await fetch(url);

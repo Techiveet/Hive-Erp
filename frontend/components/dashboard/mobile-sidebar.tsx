@@ -16,12 +16,16 @@ import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { cn } from "@/lib/utils";
+import { getTenantId, isTenantSession } from "@/lib/runtime-context";
 
 const getApiUrl = () => {
   if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-  return window.location.hostname.endsWith(".localhost") 
-    ? `http://${window.location.hostname}:8085/api/v1/tenant` 
-    : "http://localhost:8085/api/v1";
+  return `http://${window.location.hostname}:8085/api/v1`;
+};
+
+const getTenantHeaders = () => {
+  const tenantId = getTenantId();
+  return tenantId ? { "X-Tenant": tenantId } : {};
 };
 
 // 🚀 SECURE BRAND LOGO FOR MOBILE SIDEBAR
@@ -77,8 +81,7 @@ export function MobileSidebar() {
   // 🚀 PREVENT HYDRATION ERRORS
   useEffect(() => {
       setIsMounted(true);
-      const host = window.location.hostname;
-      setIsTenantNode(host !== 'localhost' && host !== '127.0.0.1');
+      setIsTenantNode(isTenantSession());
   }, []);
 
   const { data: brandData } = useQuery({
@@ -86,7 +89,7 @@ export function MobileSidebar() {
     queryFn: async () => {
         const token = localStorage.getItem('hive_token');
         const res = await fetch(`${getApiUrl()}/settings/brand`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }
         });
         return res.json();
     },

@@ -46,7 +46,7 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
       const host = window.location.hostname;
       const protocol = window.location.protocol;
       const isTenant = host !== "localhost" && host !== "127.0.0.1" && host.includes(".");
-      const endpoint = isTenant ? "/api/v1/tenant/logout" : "/api/v1/logout";
+      const endpoint = "/api/v1/logout";
       
       await fetch(`${protocol}//${host}:8085${endpoint}`, {
         method: "POST",
@@ -81,7 +81,7 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
       const host = window.location.hostname;
       const protocol = window.location.protocol;
       const isTenant = host !== "localhost" && host !== "127.0.0.1" && host.includes(".");
-      const url = isTenant ? `${protocol}//${host}:8085/api/v1/tenant/ping` : `${protocol}//${host}:8085/api/v1/ping`;
+      const url = `${protocol}//${host}:8085/api/v1/ping`;
 
       await fetch(url, {
         method: 'POST',

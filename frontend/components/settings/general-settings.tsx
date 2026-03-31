@@ -24,7 +24,7 @@ const getApiUrl = () => {
     const protocol = window.location.protocol;
     
     if (host !== "localhost" && host !== "127.0.0.1" && host.includes(".")) {
-        return `${protocol}//${host}:8085/api/v1/tenant`; 
+        return `${protocol}//${host}:8085/api/v1`; 
     }
     return `${protocol}//${host}:8085/api/v1`;
 };

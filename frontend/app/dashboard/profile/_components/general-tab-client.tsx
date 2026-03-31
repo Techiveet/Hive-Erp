@@ -18,7 +18,7 @@ const getApiUrl = () => {
   if (typeof window === "undefined") return "http://localhost:8085/api/v1";
   const host = window.location.hostname;
   if (host !== "localhost" && host.endsWith(".localhost")) {
-    return `http://${host}:8085/api/v1/tenant`; 
+    return `http://${host}:8085/api/v1`; 
   }
   return "http://localhost:8085/api/v1";
 };
@@ -52,7 +52,7 @@ const SecureBlobAvatar = ({ user, previewUrl, lastSaved, className }: any) => {
             try {
                 const token = localStorage.getItem('hive_token');
                 const host = window.location.hostname.endsWith(".localhost") 
-                    ? `http://${window.location.hostname}:8085/api/v1/tenant` 
+                    ? `http://${window.location.hostname}:8085/api/v1` 
                     : `http://${window.location.hostname}:8085/api/v1`;
 
                 const res = await fetch(`${host}/profile/avatar?cb=${lastSaved}`, {

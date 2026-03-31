@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getTenantId } from './runtime-context';
 
 const api = axios.create({
   headers: {
@@ -11,9 +12,15 @@ api.interceptors.request.use((config) => {
     const token = localStorage.getItem('hive_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
     
-    // Domain-based routing: Let the host naturally direct traffic
+    // Keep tenant requests on the standard API namespace and pass the tenant
+    // explicitly. Most tenant routes are mounted at /api/v1 and selected by
+    // host/header, not by a /tenant path segment.
     const host = window.location.hostname;
+    const tenantId = getTenantId();
     config.baseURL = `http://${host}:8085/api/v1`;
+    if (tenantId) {
+      config.headers['X-Tenant'] = tenantId;
+    }
   }
   return config;
 });
@@ -25,12 +32,14 @@ api.interceptors.response.use(
     if (typeof window !== 'undefined') {
       const status = error.response?.status;
       const msg = error.response?.data?.message || '';
+      const requestUrl = String(error.config?.url || '');
 
       // Check for standard 401 OR our custom 403 CRITICAL ejection
       const isUnauthorized = status === 401;
       const isEjected = status === 403 && msg.includes('CRITICAL:');
+      const isTelemetryRequest = requestUrl.includes('/logs/client-action');
 
-      if (isUnauthorized || isEjected) {
+      if ((isUnauthorized && !isTelemetryRequest) || isEjected) {
         // 1. Purge all sensitive session data
         localStorage.removeItem('hive_token');
         localStorage.removeItem('hive_user');

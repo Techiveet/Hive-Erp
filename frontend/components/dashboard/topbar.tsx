@@ -14,17 +14,25 @@ import { Button } from "@/components/ui/button";
 import { MobileSidebar } from "./mobile-sidebar"; 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useTour } from "@/components/providers/tour-provider"; 
-import { useLocalization } from "@/store/use-localization"; 
 import { useTranslation } from "@/store/use-translation";
 import { GlobalSearch } from "./global-search";
+import { getTenantId, isTenantSession } from "@/lib/runtime-context";
 
 const getApiUrl = () => {
   if (typeof window === "undefined") return "http://localhost:8085/api/v1";
   const host = window.location.hostname;
-  if (host !== "localhost" && host.endsWith(".localhost")) {
-    return `http://${host}:8085/api/v1/tenant`; 
-  }
-  return "http://localhost:8085/api/v1";
+  return `http://${host}:8085/api/v1`;
+};
+
+const getTenantHeaders = () => {
+  const tenantId = getTenantId();
+  return tenantId ? { "X-Tenant": tenantId } : {};
+};
+
+const getTenantAwareEndpoint = (path: string) => {
+  if (typeof window === "undefined") return `http://localhost:8085/api/v1${path}`;
+  const base = getApiUrl();
+  return isTenantSession() ? `${base}/tenant${path}` : `${base}${path}`;
 };
 
 // 🚀 SECURE TOPBAR AVATAR
@@ -44,8 +52,8 @@ const SecureTopbarAvatar = ({ user, fallbackInitials }: { user: any, fallbackIni
             setIsFetching(true);
             try {
                 const token = localStorage.getItem('hive_token');
-                const res = await fetch(`${getApiUrl()}/profile/avatar?cb=${Date.now()}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const res = await fetch(`${getTenantAwareEndpoint('/profile/avatar')}?cb=${Date.now()}`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }
                 });
 
                 if (!res.ok) throw new Error("No avatar found");
@@ -86,18 +94,13 @@ export function DashboardTopbar() {
   
   const { startTour } = useTour(); 
   const { t } = useTranslation();
-  const { languages, fetchLanguages } = useLocalization();
-
-  // 🚀 THE FIX: Cast languages to 'any' before checking properties to satisfy TypeScript
-  const safeLanguages = Array.isArray(languages) ? languages : ((languages as any)?.data || []);
-
   const { data: serverUser } = useQuery({
       queryKey: ['authUserProfile'],
       queryFn: async () => {
           const token = localStorage.getItem('hive_token');
           if (!token) throw new Error("No token");
-          const res = await fetch(`${getApiUrl()}/user`, {
-              headers: { 'Authorization': `Bearer ${token}` }
+          const res = await fetch(getTenantAwareEndpoint('/user'), {
+              headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }
           });
           if (!res.ok) throw new Error("Failed to fetch user data");
           return res.json();
@@ -114,12 +117,10 @@ export function DashboardTopbar() {
     const storedLocale = localStorage.getItem("hive_locale") || 'en';
     setCurrentLocale(storedLocale);
 
-    fetchLanguages();
-
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, [fetchLanguages]);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("hive_token");
@@ -215,7 +216,10 @@ export function DashboardTopbar() {
                     {t('topbar.select_language', 'Select Language')}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {safeLanguages.map((lang: any) => (
+                  {[
+                    { code: "en", name: "English" },
+                    { code: "am", name: "Amharic" },
+                  ].map((lang) => (
                     <DropdownMenuItem 
                       key={lang.code} 
                       onClick={() => handleLanguageChange(lang.code)}

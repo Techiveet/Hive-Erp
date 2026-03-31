@@ -27,7 +27,7 @@ const getApiUrl = () => {
   if (typeof window === "undefined") return "http://localhost:8085/api/v1";
   const host = window.location.hostname;
   if (host.endsWith(".localhost")) {
-    return `http://${host}:8085/api/v1/tenant`; 
+    return `http://${host}:8085/api/v1`; 
   }
   return "http://localhost:8085/api/v1";
 };

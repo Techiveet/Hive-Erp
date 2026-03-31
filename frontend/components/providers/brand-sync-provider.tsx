@@ -7,10 +7,16 @@ import { useQuery } from "@tanstack/react-query";
 const getApiUrl = () => {
   if (typeof window === "undefined") return "http://localhost:8085/api/v1";
   const host = window.location.hostname;
-  if (host !== "localhost" && host.endsWith(".localhost")) {
-    return `http://${host}:8085/api/v1/tenant`; 
+  return `http://${host}:8085/api/v1`;
+};
+
+const getTenantHeaders = () => {
+  if (typeof window === "undefined") return {};
+  const host = window.location.hostname;
+  if (host !== "localhost" && host !== "127.0.0.1" && host.includes(".")) {
+    return { "X-Tenant": host.split(".")[0] };
   }
-  return "http://localhost:8085/api/v1";
+  return {};
 };
 
 const getStorageUrl = (url: string | null | undefined): string | null => {
@@ -31,7 +37,8 @@ export function BrandSyncProvider() {
           const res = await fetch(`${getApiUrl()}/settings/brand`, {
               headers: { 
                   'Authorization': `Bearer ${token}`,
-                  'Accept': 'application/json'
+                  'Accept': 'application/json',
+                  ...getTenantHeaders(),
               }
           });
           

@@ -66,5 +66,10 @@
     "discard_pdf": "ፒዲኤፉን አስወግድ",
     "toast_saving_cloud": "ወደ ፋይል አስተዳዳሪ በማስቀመጥ ላይ...",
     "toast_saved_cloud": "ፒዲኤፍ ደህንነቱ በተጠበቀ ሁኔታ ተቀምጧል!",
-    "toast_save_failed": "ወደ ማከማቻ ማስቀመጥ አልተሳካም።"
+    "toast_save_failed": "ወደ ማከማቻ ማስቀመጥ አልተሳካም።",
+    "format_code": "ቅርጸት ያስተካክሉ",
+    "copy_code": "ቅዳ",
+    "new_file": "አዲስ ፋይል...",
+    "filename_req": "የፋይል ስም ያስፈልጋል።",
+    "file_exists": "ፋይሉ አስቀድሞ አለ።"
 }

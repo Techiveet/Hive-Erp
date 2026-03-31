@@ -10,8 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { logFrontendAction } from "@/lib/api"; 
+import { clearHiveSession } from "@/lib/auth-sync";
 import { cn } from "@/lib/utils";
 import { QRCodeSVG } from "qrcode.react"; // 🚀 Used for forced setup
+import { isTenantHost } from "@/lib/runtime-context";
 
 export default function TwoFactorPage() {
   const router = useRouter();
@@ -45,7 +47,7 @@ export default function TwoFactorPage() {
     }
 
     const host = window.location.hostname;
-    if (host !== "localhost" && host !== "127.0.0.1") {
+    if (isTenantHost(host)) {
       setPortalName(`${host.split(".")[0].toUpperCase()} NODE`);
       setIsTenant(true);
     }
@@ -64,9 +66,10 @@ export default function TwoFactorPage() {
 
     const email = sessionStorage.getItem("hive_pending_email");
     const host = window.location.hostname;
+    const tenantId = isTenantHost(host) ? host.split(".")[0] : null;
     
     // If they are setting it up for the first time, hit the confirm endpoint. Otherwise, hit verify.
-  const endpoint = "verify-2fa";
+    const endpoint = tenantId ? "tenant/verify-2fa" : "verify-2fa";
     const apiUrl = `http://${host}:8085/api/v1/${endpoint}`;
 
     try {
@@ -74,7 +77,11 @@ export default function TwoFactorPage() {
 
       const res = await fetch(apiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...(tenantId ? { "X-Tenant": tenantId } : {}),
+        },
         body: JSON.stringify(payload),
       });
 
@@ -86,12 +93,15 @@ export default function TwoFactorPage() {
       sessionStorage.removeItem("hive_2fa_setup_qr");
       sessionStorage.removeItem("hive_2fa_setup_secret");
       
+      clearHiveSession();
+      localStorage.removeItem("hive_original_token");
       localStorage.setItem("hive_token", data.data.token);
       localStorage.setItem("hive_user", JSON.stringify(data.data.user));
       localStorage.setItem("hive_context", data.data.context);
+      sessionStorage.removeItem("hive_eject_reason");
 
       await logFrontendAction({ module: 'Auth - 2FA', action: 'login_success', description: `2FA verification passed.` }).catch(()=>{});
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } catch (err: any) {
       logFrontendAction({ module: 'Auth - 2FA', action: 'login_failed', description: `2FA verification failed: ${err.message}` }).catch(()=>{});
       setError(err.message);
