@@ -1,18 +1,17 @@
-// frontend/components/providers.tsx
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
 import { useState } from "react";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  // ⚡ Create the client once per session to avoid resetting data on re-renders
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        // With SSR, we usually want to set some default staleTime
-        // above 0 to avoid refetching immediately on the client
         staleTime: 60 * 1000,
+        // 🚀 THE FIX: Disable automatic refetching when the window regains focus.
+        // This stops the "phantom reload" when switching between Central and Tenant tabs.
+        refetchOnWindowFocus: false, 
+        retry: false, 
       },
     },
   }));

@@ -5,7 +5,8 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { 
     Loader2, Palette, Shield, Settings, Globe, Bell, Headset, 
     Globe2, Sliders, AlertTriangle, Clock, HardDrive, HelpCircle, 
-    Image as ImageIcon, Upload, CheckCircle2, X, Activity, Mail, UserPlus, ShieldCheck
+    Image as ImageIcon, Upload, CheckCircle2, X, Activity, Mail, UserPlus, ShieldCheck,
+    Database
 } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 // Modules
 import { LocalizationManager } from '@/components/settings/localization-manager';
 import { FileManagerClient } from "@/components/dashboard/file-manager-client"; 
+import { BackupSettings } from '@/components/settings/backup-settings'; 
 
 // ==========================================
 // 🚀 1. UTILITIES & FETCH HELPERS
@@ -99,7 +101,6 @@ const SecureBrandAsset = ({ path, previewUrl, lastSaved, fallbackText, className
                 const blob = await res.blob();
                 if (isMounted) setBlobUrl(URL.createObjectURL(blob));
             } catch (err) {
-                // Fallback to static URL if CORS rejects the Bearer token for static files
                 if (isMounted) setBlobUrl(`${resolvedUrl}?cb=${lastSaved}`);
             } finally {
                 if (isMounted) setIsFetching(false);
@@ -116,6 +117,7 @@ const SecureBrandAsset = ({ path, previewUrl, lastSaved, fallbackText, className
 };
 
 function BrandAssetPickerModal({ isOpen, onClose, onSelect }: { isOpen: boolean, onClose: () => void, onSelect: (url: string) => void }) {
+    const { t } = useTranslation();
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-6xl w-[95vw] h-[85vh] p-0 overflow-hidden rounded-[2.5rem] bg-background border-border/50 shadow-2xl flex flex-col gap-0 z-[1000]">
@@ -124,8 +126,8 @@ function BrandAssetPickerModal({ isOpen, onClose, onSelect }: { isOpen: boolean,
                     <div className="flex items-center gap-4">
                         <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0"><ImageIcon className="h-5 w-5 text-primary" /></div>
                         <div>
-                            <h2 className="text-lg font-black tracking-tight text-foreground">Brand Asset Picker</h2>
-                            <p className="text-xs text-muted-foreground mt-0.5">Select or upload an image to update your identity matrix.</p>
+                            <h2 className="text-lg font-black tracking-tight text-foreground">{t('settings.brand_asset_picker', 'Brand Asset Picker')}</h2>
+                            <p className="text-xs text-muted-foreground mt-0.5">{t('settings.brand_asset_picker_desc', 'Select or upload an image to update your identity matrix.')}</p>
                         </div>
                     </div>
                     <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full"><X className="h-4 w-4" /></Button>
@@ -159,6 +161,8 @@ function BrandSettings() {
 
     const [previews, setPreviews] = useState<Record<string, string>>({});
     const [isPickerOpen, setIsPickerOpen] = useState(false);
+    
+    // 🚀 THE FIX: Strongly type activeTarget so TS knows it maps to formData keys
     const [activeTarget, setActiveTarget] = useState<keyof typeof formData | null>(null);
     const [lastSaved, setLastSaved] = useState(Date.now());
 
@@ -195,7 +199,8 @@ function BrandSettings() {
         toast.success(t('settings.asset_attached', "Asset attached! Click 'Commit Identity Changes'."));
     };
 
-    const BrandImageSelector = ({ label, targetKey, fallback, wide = false }: any) => (
+    // 🚀 THE FIX: Strongly typed the targetKey prop to match formData keys
+    const BrandImageSelector = ({ label, targetKey, fallback, wide = false }: { label: string, targetKey: keyof typeof formData, fallback: string, wide?: boolean }) => (
         <div className={cn("flex flex-col gap-2", wide ? "col-span-1 sm:col-span-2 md:col-span-3" : "col-span-1")}>
             <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">{label}</Label>
             <div className="relative group p-1 rounded-2xl bg-card border-2 border-dashed border-border/50 hover:border-primary transition-all duration-300">
@@ -216,12 +221,12 @@ function BrandSettings() {
 
     return (
         <div className="pb-24 space-y-6">
-            <div className="p-8 border border-border/50 rounded-[2.5rem] bg-card/40 backdrop-blur-md shadow-sm">
+            <div id="tour-settings-brand-visuals" className="p-8 border border-border/50 rounded-[2.5rem] bg-card/40 backdrop-blur-md shadow-sm transition-all animate-in fade-in slide-in-from-bottom-2">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-                    <BrandImageSelector label="Logo Light" targetKey="logo_light" fallback="NO LOGO" />
-                    <BrandImageSelector label="Logo Dark" targetKey="logo_dark" fallback="NO LOGO" />
-                    <BrandImageSelector label="Favicon" targetKey="favicon" fallback="NO FAVICON" />
-                    <BrandImageSelector label="Sidebar" targetKey="sidebar_icon" fallback="H" />
+                    <BrandImageSelector label={t('settings.logo_light', 'Logo Light')} targetKey="logo_light" fallback="NO LOGO" />
+                    <BrandImageSelector label={t('settings.logo_dark', 'Logo Dark')} targetKey="logo_dark" fallback="NO LOGO" />
+                    <BrandImageSelector label={t('settings.favicon', 'Favicon')} targetKey="favicon" fallback="NO FAVICON" />
+                    <BrandImageSelector label={t('settings.sidebar_icon', 'Sidebar')} targetKey="sidebar_icon" fallback="H" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-border/50">
                     <div className="space-y-2"><Label className="text-[10px] font-bold uppercase text-muted-foreground">{t('settings.app_title', 'App Title')}</Label><Input value={formData.app_title} onChange={e => setFormData(p => ({...p, app_title: e.target.value}))} className="bg-muted/30 h-12 rounded-xl" /></div>
@@ -230,19 +235,19 @@ function BrandSettings() {
                 </div>
             </div>
 
-            <div className="p-8 border border-border/50 rounded-[2rem] bg-card/40 backdrop-blur-md shadow-sm">
+            <div id="tour-settings-brand-auth" className="p-8 border border-border/50 rounded-[2rem] bg-card/40 backdrop-blur-md shadow-sm transition-all animate-in fade-in slide-in-from-bottom-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                    <BrandImageSelector label="Auth Background" targetKey="auth_background_image" fallback="NO BG" wide />
+                    <BrandImageSelector label={t('settings.login_bg', 'Auth Background')} targetKey="auth_background_image" fallback="NO BG" wide />
                     <div className="col-span-1 space-y-2">
-                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">Auth Message</Label>
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">{t('settings.welcome_msg', 'Auth Message')}</Label>
                         <textarea value={formData.auth_welcome_message} onChange={e => setFormData(p => ({...p, auth_welcome_message: e.target.value}))} className="w-full bg-muted/30 h-48 rounded-xl p-3 text-sm border border-input focus:ring-1 focus:ring-primary" />
                     </div>
                 </div>
             </div>
 
-            <div className="fixed bottom-6 right-6 left-6 md:left-[320px] flex justify-end p-4 rounded-[2rem] bg-card/80 backdrop-blur-xl border border-border/50 shadow-2xl z-50">
+            <div id="tour-settings-save" className="fixed bottom-6 right-6 left-6 md:left-[320px] flex justify-end p-4 rounded-[2rem] bg-card/80 backdrop-blur-xl border border-border/50 shadow-2xl z-50">
                 <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="rounded-xl px-12 font-bold bg-primary text-primary-foreground h-12 hover:scale-105 transition-all">
-                    {saveMut.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Commit Identity Changes"}
+                    {saveMut.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : t('settings.commit_changes', 'Commit Identity Changes')}
                 </Button>
             </div>
 
@@ -292,7 +297,7 @@ function GeneralSettings() {
     const handleToggle = (key: keyof typeof formData) => { setFormData(prev => ({ ...prev, [key]: !prev[key as keyof typeof formData] })); };
 
     return (
-        <div className="pb-24 space-y-6">
+        <div className="pb-24 space-y-6 transition-all animate-in fade-in slide-in-from-bottom-2">
             
             {/* 🎧 COMMUNICATION & SUPPORT */}
             <div className="p-8 border border-border/50 rounded-[2rem] bg-card/40 backdrop-blur-md shadow-sm">
@@ -304,12 +309,12 @@ function GeneralSettings() {
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 pb-6 border-b border-border/50">
-                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground"><Mail className="inline h-3 w-3 mr-1"/> System Sender Name</Label><Input value={formData.system_email_name} onChange={e => setFormData(p => ({...p, system_email_name: e.target.value}))} className="bg-muted/30 h-12 rounded-xl" /></div>
-                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground">System Sender Address</Label><Input value={formData.system_email_address} onChange={e => setFormData(p => ({...p, system_email_address: e.target.value}))} className="bg-muted/30 h-12 rounded-xl" /></div>
+                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground"><Mail className="inline h-3 w-3 mr-1"/> {t('settings.sys_sender_name', 'System Sender Name')}</Label><Input value={formData.system_email_name} onChange={e => setFormData(p => ({...p, system_email_name: e.target.value}))} className="bg-muted/30 h-12 rounded-xl" /></div>
+                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground">{t('settings.sys_sender_address', 'System Sender Address')}</Label><Input value={formData.system_email_address} onChange={e => setFormData(p => ({...p, system_email_address: e.target.value}))} className="bg-muted/30 h-12 rounded-xl" /></div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground">Public Support Email</Label><Input value={formData.support_email} onChange={e => setFormData(p => ({...p, support_email: e.target.value}))} className="bg-muted/30 h-12 rounded-xl" /></div>
-                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground">Public Support Phone</Label><Input value={formData.support_phone} onChange={e => setFormData(p => ({...p, support_phone: e.target.value}))} className="bg-muted/30 h-12 rounded-xl font-mono" /></div>
+                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground">{t('settings.pub_support_email', 'Public Support Email')}</Label><Input value={formData.support_email} onChange={e => setFormData(p => ({...p, support_email: e.target.value}))} className="bg-muted/30 h-12 rounded-xl" /></div>
+                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground">{t('settings.pub_support_phone', 'Public Support Phone')}</Label><Input value={formData.support_phone} onChange={e => setFormData(p => ({...p, support_phone: e.target.value}))} className="bg-muted/30 h-12 rounded-xl font-mono" /></div>
                 </div>
             </div>
 
@@ -317,17 +322,17 @@ function GeneralSettings() {
             <div className="p-8 border border-border/50 rounded-[2rem] bg-card/40 backdrop-blur-md shadow-sm">
                 <div className="mb-8 flex items-center gap-3">
                     <div className="h-10 w-10 bg-purple-500/10 rounded-xl flex items-center justify-center text-purple-500"><ShieldCheck className="h-5 w-5" /></div>
-                    <div><h2 className="text-2xl font-space font-black tracking-tight text-foreground">Global Access Control</h2></div>
+                    <div><h2 className="text-2xl font-space font-black tracking-tight text-foreground">{t('settings.global_access', 'Global Access Control')}</h2></div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div onClick={() => handleToggle('enable_registration')} className={cn("flex items-center gap-4 p-4 rounded-xl border cursor-pointer", formData.enable_registration ? "bg-purple-500/10 border-purple-500/30" : "bg-muted/30")}>
                         <div className="h-10 w-10 bg-background rounded-lg flex items-center justify-center shrink-0 border"><UserPlus className={cn("h-5 w-5", formData.enable_registration ? "text-purple-500" : "text-muted-foreground")} /></div>
-                        <div className="flex-1"><Label className="text-sm font-bold cursor-pointer">Allow Public Registration</Label></div>
+                        <div className="flex-1"><Label className="text-sm font-bold cursor-pointer">{t('settings.allow_registration', 'Allow Public Registration')}</Label></div>
                         <Switch checked={formData.enable_registration} className="data-[state=checked]:bg-purple-500 pointer-events-none" />
                     </div>
                     <div onClick={() => handleToggle('require_2fa')} className={cn("flex items-center gap-4 p-4 rounded-xl border cursor-pointer", formData.require_2fa ? "bg-amber-500/10 border-amber-500/30" : "bg-muted/30")}>
                         <div className="h-10 w-10 bg-background rounded-lg flex items-center justify-center shrink-0 border"><ShieldCheck className={cn("h-5 w-5", formData.require_2fa ? "text-amber-500" : "text-muted-foreground")} /></div>
-                        <div className="flex-1"><Label className="text-sm font-bold cursor-pointer">Enforce Global 2FA</Label></div>
+                        <div className="flex-1"><Label className="text-sm font-bold cursor-pointer">{t('settings.enforce_2fa', 'Enforce Global 2FA')}</Label></div>
                         <Switch checked={formData.require_2fa} className="data-[state=checked]:bg-amber-500 pointer-events-none" />
                     </div>
                 </div>
@@ -338,17 +343,17 @@ function GeneralSettings() {
                 <div className="mb-8 flex flex-col md:flex-row justify-between gap-6">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500"><Sliders className="h-5 w-5" /></div>
-                        <div><h2 className="text-2xl font-space font-black tracking-tight text-foreground">Operational Limits</h2></div>
+                        <div><h2 className="text-2xl font-space font-black tracking-tight text-foreground">{t('settings.op_limits', 'Operational Limits')}</h2></div>
                     </div>
                     <div onClick={() => handleToggle('maintenance_mode')} className={cn("flex items-center gap-3 p-3 pl-4 rounded-xl border cursor-pointer", formData.maintenance_mode ? "bg-destructive/10 border-destructive/30" : "bg-muted/50")}>
-                        <div className="pr-2"><Label className="text-xs font-bold cursor-pointer flex items-center gap-2">{formData.maintenance_mode && <AlertTriangle className="h-3 w-3 text-destructive animate-pulse" />}Maintenance Mode</Label></div>
+                        <div className="pr-2"><Label className="text-xs font-bold cursor-pointer flex items-center gap-2">{formData.maintenance_mode && <AlertTriangle className="h-3 w-3 text-destructive animate-pulse" />}{t('settings.maintenance_mode', 'Maintenance Mode')}</Label></div>
                         <Switch checked={formData.maintenance_mode} className="data-[state=checked]:bg-destructive pointer-events-none" />
                     </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2"><HardDrive className="h-3 w-3"/> Max Upload Size</Label>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2"><HardDrive className="h-3 w-3"/> {t('settings.max_upload', 'Max Upload Size')}</Label>
                         <div className="flex items-center gap-2">
                             <Input type="number" min="1" value={formData.max_upload_size} onChange={e => setFormData(p => ({...p, max_upload_size: parseInt(e.target.value)||10}))} className="bg-muted/30 h-12 rounded-xl flex-1 font-mono" />
                             <Select value={formData.max_upload_unit} onValueChange={(v) => setFormData(p => ({...p, max_upload_unit: v}))}>
@@ -358,19 +363,19 @@ function GeneralSettings() {
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2"><Clock className="h-3 w-3"/> Session Timeout (Minutes)</Label>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2"><Clock className="h-3 w-3"/> {t('settings.session_timeout', 'Session Timeout (Minutes)')}</Label>
                         <Input type="number" min="1" max="1440" value={formData.session_timeout_minutes} onChange={e => setFormData(p => ({...p, session_timeout_minutes: parseInt(e.target.value)||120}))} className="bg-muted/30 h-12 rounded-xl font-mono" />
                     </div>
 
                     {formData.maintenance_mode && (
                         <div className="space-y-2 md:col-span-2 mt-4 pt-6 border-t border-border/50 animate-in fade-in slide-in-from-top-4 duration-500">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-destructive pl-1 flex items-center gap-2">
-                                <Activity className="h-3 w-3 animate-pulse" /> Live Status Ticker Message
+                                <Activity className="h-3 w-3 animate-pulse" /> {t('settings.live_ticker', 'Live Status Ticker Message')}
                             </Label>
                             <Input 
                                 value={formData.maintenance_message} 
                                 onChange={(e) => setFormData(p => ({...p, maintenance_message: e.target.value}))} 
-                                placeholder="E.g. Database migration in progress... 45% complete." 
+                                placeholder={t('settings.live_ticker_ph', 'E.g. Database migration in progress... 45% complete.')} 
                                 className="bg-destructive/5 h-12 rounded-xl border-destructive/30 focus-visible:ring-destructive font-mono text-xs placeholder:text-destructive/40 text-destructive" 
                             />
                         </div>
@@ -380,7 +385,7 @@ function GeneralSettings() {
 
             <div className="fixed bottom-6 right-6 left-6 md:left-[320px] flex justify-end p-4 rounded-[2rem] bg-card/80 backdrop-blur-xl border border-border/50 shadow-2xl z-50">
                 <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="rounded-xl px-12 font-bold bg-primary text-primary-foreground h-12 hover:scale-105 transition-all">
-                    {saveMut.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Commit Configurations"}
+                    {saveMut.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : t('settings.commit_configs', 'Commit Configurations')}
                 </Button>
             </div>
         </div>
@@ -424,11 +429,12 @@ function SettingsTabs() {
         { id: 'brand', label: t('nav.settings_brand', 'Brand Settings'), icon: Palette },
         { id: 'general', label: t('nav.settings_general', 'General'), icon: Settings },
         { id: 'localization', label: t('nav.settings_loc', 'Localization'), icon: Globe },
+        { id: 'backup', label: t('nav.settings_backup', 'System Backups'), icon: Database },
     ];
 
     return (
         <div className="flex flex-col xl:flex-row gap-6 pt-2">
-            <Card className="w-full xl:w-64 shrink-0 p-3 rounded-[2rem] border-border/50 bg-card/40 h-fit">
+            <Card id="tour-settings-tabs" className="w-full xl:w-64 shrink-0 p-3 rounded-[2rem] border-border/50 bg-card/40 h-fit transition-all animate-in fade-in slide-in-from-left-4">
                 <nav className="flex flex-col space-y-1">
                     {TABS.map((tab) => (
                         <button key={tab.id} onClick={() => handleTabChange(tab.id)}
@@ -448,8 +454,13 @@ function SettingsTabs() {
                 {activeTab === 'brand' && <BrandSettings />}
                 {activeTab === 'general' && <GeneralSettings />}
                 {activeTab === 'localization' && (
-                    <div className="p-6 border border-border/50 rounded-[2rem] bg-card/40 backdrop-blur-sm shadow-sm transition-all animate-in fade-in">
+                    <div className="p-6 border border-border/50 rounded-[2rem] bg-card/40 backdrop-blur-sm shadow-sm transition-all animate-in fade-in slide-in-from-bottom-2">
                         <LocalizationManager />
+                    </div>
+                )}
+                {activeTab === 'backup' && (
+                    <div id="tour-settings-backup" className="transition-all animate-in fade-in slide-in-from-bottom-2">
+                        <BackupSettings />
                     </div>
                 )}
             </div>
@@ -461,12 +472,11 @@ export default function SettingsClient() {
     const { t } = useTranslation();
     return (
         <div className="space-y-4 mt-6">
-            <div className="flex flex-col sm:flex-row justify-between items-center bg-card/40 p-6 rounded-[2rem] border border-border/50 backdrop-blur-md shadow-sm gap-4 mt-2">
+            <div id="tour-settings-header" className="flex flex-col sm:flex-row justify-between items-center bg-card/40 p-6 rounded-[2rem] border border-border/50 backdrop-blur-md shadow-sm gap-4 mt-2">
                 <h2 className="text-2xl font-black font-space flex items-center gap-2 tracking-tight">
                     <Settings className="h-6 w-6 text-primary" /> {t('nav.settings', 'System Preferences')}
                 </h2>
             </div>
-            {/* Suspense is required for Next.js when using useSearchParams */}
             <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
                 <SettingsTabs />
             </Suspense>

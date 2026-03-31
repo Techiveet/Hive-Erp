@@ -87,6 +87,7 @@ services:
       - "8085:8000"
     volumes:
       - ./backend:/var/www/html
+      - ./backend/storage:/var/www/html/storage
     environment:
       APP_ENV: local
       APP_DEBUG: "true"
@@ -166,7 +167,6 @@ services:
       - hive-network
 
   # 8. THE FACE (Next.js 16)
- # 8. THE FACE (Next.js 16)
   frontend:
     build:
       context: ./frontend
@@ -182,7 +182,7 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:8085/api
       INTERNAL_API_URL: http://backend:8000/api
       WATCHPACK_POLLING: "true"
-      # 🚀 ADD THESE TWO LINES: Forces Next.js to broadcast outside the container
+      # 🚀Forces Next.js to broadcast outside the container
       HOSTNAME: "0.0.0.0"
       PORT: 3000
     depends_on:
@@ -206,7 +206,7 @@ services:
     networks:
       - hive-network
 
-  # 🚀 10. WEBSOCKET ENGINE (Reverb) - NEW!
+  # 🚀 10. WEBSOCKET ENGINE (Reverb)
   reverb:
     build:
       context: ./backend
@@ -232,6 +232,16 @@ services:
       db:
         condition: service_healthy
     command: php artisan reverb:start --host=0.0.0.0 --port=9000
+    networks:
+      - hive-network
+
+  # 🚀 11. PDF & DOC CONVERTER (Gotenberg)
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: hive-gotenberg
+    restart: unless-stopped
+    ports:
+      - "3030:3000" # Mapped to 3030 on the host machine to prevent port collision with Next.js
     networks:
       - hive-network
 

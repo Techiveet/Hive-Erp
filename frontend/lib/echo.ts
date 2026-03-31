@@ -1,10 +1,11 @@
+//lib/echo.ts
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
 declare global {
   interface Window {
     Pusher: any;
-    Echo: Echo;
+    Echo: Echo<any>;
   }
 }
 
@@ -23,14 +24,14 @@ export const initEcho = (token: string) => {
         broadcaster: 'reverb',
         key: process.env.NEXT_PUBLIC_REVERB_APP_KEY,
         wsHost: process.env.NEXT_PUBLIC_REVERB_HOST || 'localhost',
-        wsPort: process.env.NEXT_PUBLIC_REVERB_PORT || 9000, // Make sure this matches your Reverb port (9000)
-        wssPort: process.env.NEXT_PUBLIC_REVERB_PORT || 9000,
+        
+        // 🚀 THE FIX: Cast the string environment variables safely to numbers
+        wsPort: Number(process.env.NEXT_PUBLIC_REVERB_PORT ?? 9000),
+        wssPort: Number(process.env.NEXT_PUBLIC_REVERB_PORT ?? 9000),
+        
         forceTLS: process.env.NEXT_PUBLIC_REVERB_SCHEME === 'https',
         enabledTransports: ['ws', 'wss'],
-        
-        // 🚀 THE FIX: Dynamically targets the correct v1 endpoint we just created
         authEndpoint: authEndpoint, 
-        
         auth: {
           headers: {
             Authorization: `Bearer ${token}`,

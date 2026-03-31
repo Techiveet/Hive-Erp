@@ -94,9 +94,13 @@ const SimpleMenu = ({ children, trigger }: { children: React.ReactNode, trigger:
 
     return (
         <>
-            <div ref={triggerRef} onClick={toggleMenu} className="relative inline-block cursor-pointer z-50 overflow-visible">
-                {React.cloneElement(trigger, {
-                    className: cn(trigger.props.className, open && "opacity-100 bg-background/80 ring-2 ring-emerald-500/50")
+           <div ref={triggerRef} onClick={toggleMenu} className="relative inline-block cursor-pointer z-50 overflow-visible">
+                {/* 🚀 THE PERMANENT FIX: Cast 'trigger' to any inside the clone to unlock 'props' access */}
+                {React.cloneElement(trigger as React.ReactElement<any>, {
+                    className: cn(
+                        (trigger as any).props?.className, 
+                        open && "opacity-100 bg-background/80 ring-2 ring-emerald-500/50"
+                    )
                 })}
             </div>
             {mounted && open && createPortal(

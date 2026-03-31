@@ -1,7 +1,7 @@
-FROM php:8.4-cli-alpine3.20
+# 🚀 CRITICAL FIX: Bumped to alpine3.21 to ensure PostgreSQL 17 client tools (pg_dump) are installed
+FROM php:8.4-cli-alpine3.21
 
 # 1. Install system dependencies
-# Includes libraries for Postgres, ZIP, GD (Images), FFmpeg (Video), and build tools for PECL
 # Includes libraries for Postgres, ZIP, GD (Images), FFmpeg (Video), and build tools for PECL
 RUN apk add --no-cache \
     postgresql-client \

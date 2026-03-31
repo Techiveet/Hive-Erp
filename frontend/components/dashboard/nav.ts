@@ -2,8 +2,8 @@
 import { LayoutDashboard, Users, FileText, Settings, Shield, HardDrive, Network } from "lucide-react";
 
 export interface NavItem {
-  translationKey: string; // 🚀 Replaces static label
-  fallbackLabel: string;  // 🚀 Safety net if key is missing
+  translationKey: string; 
+  fallbackLabel: string;  
   href: string;
   icon: any;
   permissions?: string[]; 

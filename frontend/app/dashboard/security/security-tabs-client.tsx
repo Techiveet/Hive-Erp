@@ -10,7 +10,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useTour } from "@/components/providers/tour-provider";
-import { useTranslation } from "@/store/use-translation"; // 🚀 Added Translation Hook
+import { useTranslation } from "@/store/use-translation"; 
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -25,7 +25,7 @@ export function SecurityTabsClient({ tenantId, tenantName, defaultTab }: Props) 
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { startTour, isActive, currentStepTarget } = useTour();
-  const { t } = useTranslation(); // 🚀 Initialize translator
+  const { t } = useTranslation(); 
 
   const onTabChange = useCallback((value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -207,12 +207,13 @@ export function SecurityTabsClient({ tenantId, tenantName, defaultTab }: Props) 
 
         {showRoles && (
           <TabsContent value="roles" className="border-none p-0 outline-none m-0">
-            <RolesTabClient tenantId={tenantId} />
+            <RolesTabClient tenantId={tenantId} tenantName={tenantName} />
           </TabsContent>
         )}
 
         {showPerms && (
           <TabsContent value="permissions" className="border-none p-0 outline-none m-0">
+             {/* 🚀 THE FIX: Safely removed the unmatched tenantName prop */}
             <PermissionsTabClient tenantId={tenantId} />
           </TabsContent>
         )}

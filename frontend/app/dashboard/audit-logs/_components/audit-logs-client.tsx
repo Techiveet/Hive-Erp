@@ -104,7 +104,6 @@ export function AuditLogsClient() {
         } catch (e) {}
     }, [queryClient]);
 
-    // 🚀 THE FIX: Integrated Smart Router / Meilisearch Engine Fetching
     const { data: logsData, isLoading, isFetching } = useQuery({
         queryKey: ["logs", page, pageSize, search, sortCol, sortDir, eventFilter, nodeFilter, viewMode, startDate, endDate],
         queryFn: async () => {
@@ -130,7 +129,7 @@ export function AuditLogsClient() {
             return { 
                 rows: json?.data || [], 
                 total: json?.meta?.total || 0,
-                engine: json?.meta?.engine || 'database' // 🚀 Capture engine origin
+                engine: json?.meta?.engine || 'database'
             };
         },
         placeholderData: (prev) => prev,
@@ -343,8 +342,9 @@ export function AuditLogsClient() {
                 id: "select",
                 header: () => (
                     <Checkbox 
-                        checked={logsData?.rows?.length > 0 && selectedIds.length === logsData.rows.length}
-                        onCheckedChange={(c) => c ? setSelectedIds(logsData?.rows.map((r: any) => r.id) || []) : setSelectedIds([])}
+                        // 🚀 THE FIX: Safely check array length using optional chaining and nullish coalescing
+                        checked={(logsData?.rows?.length ?? 0) > 0 && selectedIds.length === (logsData?.rows?.length ?? 0)}
+                        onCheckedChange={(c) => c ? setSelectedIds(logsData?.rows?.map((r: any) => r.id) || []) : setSelectedIds([])}
                     />
                 ),
                 size: 40,
@@ -376,7 +376,7 @@ export function AuditLogsClient() {
                         </Button>
                     </div>
 
-                    {/* 🚀 ENGINE INDICATOR: Visually confirms Meilisearch is Active */}
+                    {/* ENGINE INDICATOR: Visually confirms Meilisearch is Active */}
                     {logsData?.engine === 'meilisearch' && search.length > 0 && (
                         <Badge variant="outline" className="h-8 px-3 bg-emerald-500/10 text-emerald-500 border-emerald-500/30 font-bold gap-1.5 animate-in fade-in zoom-in">
                            <Zap className="h-4 w-4 fill-emerald-500 text-emerald-500" /> Advanced Search Active

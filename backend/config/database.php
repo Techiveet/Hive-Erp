@@ -96,6 +96,12 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+
+            'dump' => [
+               'dump_binary_path' => '/usr/bin/', // Note: Just the directory, not the full file path
+               'use_single_transaction',
+               'timeout' => 60 * 10, // 10 minute timeout for large backups
+            ],
         ],
 
         // It forces Laravel to always look at your master database in your .env file.

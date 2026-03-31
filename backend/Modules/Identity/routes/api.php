@@ -30,8 +30,6 @@ foreach ($centralDomains as $domain) {
             });
         });
 
-
-
         // Public Auth
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/verify-2fa', [AuthController::class, 'verify2FA']);

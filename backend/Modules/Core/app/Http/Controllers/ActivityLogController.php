@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Carbon;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
-use App\Jobs\ProcessClientAuditLog;
-use App\Jobs\ArchiveActivityLogs;
+use Modules\Core\Jobs\ProcessClientAuditLog; // 🚀 FIXED: Correct Namespace
+use Modules\Core\Jobs\ArchiveActivityLogs;   // 🚀 FIXED: Correct Namespace
 
 class ActivityLogController extends Controller implements HasMiddleware
 {
@@ -73,21 +73,16 @@ class ActivityLogController extends Controller implements HasMiddleware
         $canUseMeilisearch = $isTenant || $nodeFilter === 'central';
 
         if ($canUseMeilisearch && !empty($search)) {
-            // 🚀 ROUTE 1: MEILISEARCH ENGINE
             $indexName = $isTenant ? "tenant_{$tenantId}_{$tableName}" : "central_{$tableName}";
-
             $scout = $modelClass::search($search)->within($indexName);
 
             $scout->query(function ($query) use ($request, $isTenant, $tenantId) {
                 $this->applyDatabaseFilters($query, $request, $isTenant, $tenantId);
             });
 
-            // 🚀 THE FIX: Let Meilisearch sort by relevance (Best Match) automatically!
             $logs = $scout->paginate($request->input('pageSize', 15));
-
             $engine = 'meilisearch';
         } else {
-            // 🚀 ROUTE 2: DATABASE ENGINE
             $query = $modelClass::query();
             $this->applyDatabaseFilters($query, $request, $isTenant, $tenantId);
 
@@ -106,7 +101,6 @@ class ActivityLogController extends Controller implements HasMiddleware
             $sortDir = $request->input('sort_direction', 'desc');
 
             $logs = $query->orderBy($sortCol, $sortDir)->paginate($request->input('pageSize', 15));
-
             $engine = 'database';
         }
 
@@ -130,9 +124,6 @@ class ActivityLogController extends Controller implements HasMiddleware
         ], 200);
     }
 
-    /**
-     * Shared filter application for dates, node isolation, and event types
-     */
     private function applyDatabaseFilters($query, Request $request, $isTenant, $tenantId)
     {
         if ($isTenant) {

@@ -274,10 +274,11 @@ export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, o
       setAiLoadingText("Downloading AI Model...");
       
       try {
-          const config = {
+         const config = {
               publicPath: "https://static.imgly.com/@imgly/background-removal/1.4.3/dist/",
               debug: false,
-              output: { format: 'image/png', quality: 1.0 }
+              // 🚀 THE FIX: Added 'as const' to satisfy the strict union type
+              output: { format: 'image/png' as const, quality: 1.0 }
           };
 
           setAiLoadingText("Isolating Subject...");

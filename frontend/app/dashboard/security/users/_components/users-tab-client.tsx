@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import {
   Calendar, Eye, EyeOff, Loader2, Mail, Pencil, PlusCircle, 
   RefreshCw, Shield, Trash2, UserCog, Upload, ImageIcon, Filter, X, AlertCircle, Zap, VenetianMask
-} from "lucide-react"; // 🚀 ADDED: VenetianMask icon for impersonation
+} from "lucide-react"; 
 
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
@@ -30,7 +30,6 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTranslation } from "@/store/use-translation";
 
-// 🚀 IMPORT FILE MANAGER
 import { FileManagerClient } from "@/components/dashboard/file-manager-client";
 
 export type UserForClient = {
@@ -243,7 +242,6 @@ export function UsersTabClient(props: Props) {
     if (!formRoleId && assignableRoles.length > 0 && !isEdit) setFormRoleId(assignableRoles[0].id);
   }, [assignableRoles, formRoleId, isEdit]);
 
-  // 🚀 IMPERSONATION MUTATION
   const impersonateMut = useMutation({
     mutationFn: async (userId: string) => {
       const token = localStorage.getItem('hive_token');
@@ -260,16 +258,13 @@ export function UsersTabClient(props: Props) {
     },
     onSuccess: (data) => {
       if (data.data?.token) {
-        // Save the current token so we can "leave" impersonation later
         const currentToken = localStorage.getItem('hive_token');
         if (currentToken && !localStorage.getItem('hive_original_token')) {
           localStorage.setItem('hive_original_token', currentToken);
         }
-        // Swap to the new token
         localStorage.setItem('hive_token', data.data.token);
         toast.success(t('users.impersonating', 'Impersonating user...'));
         
-        // Force a hard reload to reset all states/cache with the new user context
         window.location.href = '/dashboard';
       }
     },
@@ -307,7 +302,11 @@ export function UsersTabClient(props: Props) {
 
   const handleDeleteRows = React.useCallback(async (rows: UserForClient[]) => {
     const validRows = rows.filter(r => r.id !== '1');
-    if (validRows.length === 0) return toast.error(t('users.purge_protected_err', "Cannot purge protected accounts."));
+    // 🚀 THE FIX: Removed the 'return' so it returns void
+    if (validRows.length === 0) {
+        toast.error(t('users.purge_protected_err', "Cannot purge protected accounts."));
+        return; 
+    }
     await Promise.all(validRows.map((r) => deleteMut.mutateAsync(Number(r.id))));
     toast.success(`${validRows.length} ${t('users.accounts_purged', 'accounts purged.')}`);
   }, [deleteMut, t]);
@@ -324,7 +323,11 @@ export function UsersTabClient(props: Props) {
   }, [resetForm]);
 
   const openEdit = React.useCallback((u: UserForClient) => {
-    if (isProtectedUser(u)) return toast.error(t('users.protected_user', "This profile is protected and cannot be edited."));
+    // 🚀 THE FIX: Removed 'return' here as well
+    if (isProtectedUser(u)) {
+        toast.error(t('users.protected_user', "This profile is protected and cannot be edited."));
+        return;
+    }
     setEditingUser(u); setFormName(u.name || ""); setFormEmail(u.email);
     setPreviewUrl(u.avatarUrl || null);
     setFormAvatarPath(null);
@@ -357,7 +360,10 @@ export function UsersTabClient(props: Props) {
 
   const handleSubmit = React.useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (Object.values(fieldErrors).some(err => err !== "")) return toast.error("Please fix the validation errors before submitting.");
+    if (Object.values(fieldErrors).some(err => err !== "")) {
+        toast.error("Please fix the validation errors before submitting.");
+        return;
+    }
 
     const formData = new FormData();
     formData.append("name", formName.trim());
@@ -466,7 +472,6 @@ export function UsersTabClient(props: Props) {
         return (
           <div className="flex items-center justify-end gap-1">
 
-            {/* 🚀 ADDED: Impersonation Button for Central Admins */}
             {isCentralAdmin && u.id !== "1" && (
               <span className="tour-users-action-impersonate flex">
                 <Button 
@@ -525,7 +530,6 @@ export function UsersTabClient(props: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Rest of the component code remains the same... */}
       <div id="tour-users-header" className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-card/40 p-6 rounded-[2rem] border border-border/50 backdrop-blur-md shadow-sm gap-4">
         
         <div className="flex items-start gap-4">

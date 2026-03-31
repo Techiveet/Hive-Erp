@@ -1,6 +1,6 @@
 {
     "dashboard": "Dashboard",
-    "tenants": "Node Management",
+    "tenants": "Tenant Management",
     "security": "Identity & Access",
     "audit_logs": "System Audit Logs",
     "storage": "Storage",

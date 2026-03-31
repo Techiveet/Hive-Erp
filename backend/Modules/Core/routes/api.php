@@ -13,7 +13,11 @@ use Modules\Core\Http\Controllers\Settings\BrandSettingsController;
 use Modules\Core\Http\Controllers\Settings\GeneralSettingsController;
 use Modules\Core\Http\Controllers\Export\ActivityLogExportController;
 use Modules\Core\Http\Controllers\Dashboard\DashboardController;
-use Modules\Identity\Http\Controllers\UserController; // 🚀 ADDED: Import UserController
+use Modules\Core\Http\Controllers\Dashboard\SystemOperationsController;
+use Modules\Core\Http\Controllers\SystemAlertController;
+use Modules\Core\Http\Controllers\Tools\FileConverterController; // 🚀 ADDED: File Converter
+use Modules\Identity\Http\Controllers\UserController;
+use Modules\Core\Models\Setting;
 
 $centralDomains = ['localhost', '127.0.0.1', 'hive-os.com'];
 
@@ -23,22 +27,39 @@ $centralDomains = ['localhost', '127.0.0.1', 'hive-os.com'];
 foreach ($centralDomains as $domain) {
     Route::domain($domain)->prefix('v1')->group(function () {
 
-        // Public
         Route::get('/translations/{locale}', [LocalizationController::class, 'fetchTranslations']);
         Route::get('/settings/brand/public', [BrandSettingsController::class, 'getPublicBrandSettings']);
 
-        // Protected
+        Route::get('/system/status-ticker', function() {
+            $message = Setting::where('key', 'maintenance_message')->value('value')
+                       ?? 'HIVE.OS: System neural links are currently undergoing optimization.';
+            return response()->json(['message' => $message]);
+        });
+
+        // 🚀 LARGE FILE DOWNLOAD ROUTE (Token Auth to avoid browser memory crash)
+        Route::get('/system/backups/{id}/download', [SystemOperationsController::class, 'downloadBackup']);
+
         Route::middleware('auth:sanctum')->group(function () {
-
-            // 🚀 Register Broadcast Auth for the Central Domain
             Broadcast::routes();
-
-            // 🚀 USER IMPERSONATION (Central)
             Route::post('/central/users/{id}/impersonate', [UserController::class, 'impersonate']);
-
-            // 🚀 DASHBOARD
             Route::get('/central/dashboard', [DashboardController::class, 'index']);
             Route::get('/search', [GlobalSearchController::class, 'search']);
+
+            Route::prefix('system')->group(function () {
+                Route::post('/flush-cache', [SystemOperationsController::class, 'flushCache']);
+                Route::post('/trigger-backup', [SystemOperationsController::class, 'triggerBackup']);
+                Route::post('/backup/schedule', [SystemOperationsController::class, 'updateSchedule']);
+                Route::get('/backups', [SystemOperationsController::class, 'getBackups']);
+                Route::delete('/backups/{id}', [SystemOperationsController::class, 'deleteBackup']);
+                Route::get('/alerts', [SystemAlertController::class, 'index']);
+                Route::delete('/alerts/{id}', [SystemAlertController::class, 'destroy']);
+                Route::post('/alerts/clear-all', [SystemAlertController::class, 'clearAll']);
+            });
+
+            // 🔄 FILE CONVERTER ENGINE (Central)
+            Route::prefix('convert')->group(function () {
+                Route::post('/html-to-pdf', [FileConverterController::class, 'htmlToPdf']);
+            });
 
             Route::prefix('settings')->group(function () {
                 Route::get('/brand', [BrandSettingsController::class, 'getBrandSettings']);
@@ -47,7 +68,6 @@ foreach ($centralDomains as $domain) {
                 Route::post('/general', [GeneralSettingsController::class, 'store']);
             });
 
-            // 🌐 DYNAMIC LOCALIZATION MANAGEMENT
             Route::prefix('localization')->group(function () {
                 Route::get('/languages', [LocalizationController::class, 'getLanguages']);
                 Route::post('/languages', [LocalizationController::class, 'addLanguage']);
@@ -61,7 +81,6 @@ foreach ($centralDomains as $domain) {
                 Route::post('/publish', [LocalizationController::class, 'publishTranslations']);
             });
 
-            // 📂 FILE MANAGER
             Route::prefix('files')->group(function () {
                 Route::get('/', [FileManagerController::class, 'index']);
                 Route::post('/folder', [FileManagerController::class, 'createFolder']);
@@ -84,7 +103,6 @@ foreach ($centralDomains as $domain) {
                 Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])->whereIn('type', ['file', 'folder']);
             });
 
-            // 🛡️ AUDIT LOGS
             Route::prefix('logs')->group(function () {
                 Route::get('/export', [ActivityLogExportController::class, 'handleExport']);
                 Route::post('/client-action', [ActivityLogController::class, 'logClientAction']);
@@ -108,23 +126,42 @@ Route::middleware([
     PreventAccessFromCentralDomains::class
 ])->prefix('v1')->group(function () {
 
-    // Public
     Route::get('/translations/{locale}', [LocalizationController::class, 'fetchTranslations']);
     Route::get('/settings/brand/public', [BrandSettingsController::class, 'getPublicBrandSettings']);
     Route::get('/tenant/settings/brand/public', [BrandSettingsController::class, 'getPublicBrandSettings']);
 
-    // Protected
+    Route::prefix('system')->group(function () {
+        Route::get('/status-ticker', function() {
+            $message = Setting::where('key', 'maintenance_message')->value('value')
+                       ?? 'HIVE.OS: System neural links are currently undergoing optimization.';
+            return response()->json(['message' => $message]);
+        });
+    });
+
+    // 🚀 LARGE FILE DOWNLOAD ROUTE (Tenant)
+    Route::get('/system/backups/{id}/download', [SystemOperationsController::class, 'downloadBackup']);
+
     Route::middleware('auth:sanctum')->group(function () {
-
-        // 🚀 Register Broadcast Auth for the Tenant Domains
         Broadcast::routes();
-
-        // 🚀 USER IMPERSONATION (Tenant)
         Route::post('/users/{id}/impersonate', [UserController::class, 'impersonate']);
-
-        // 🚀 DASHBOARD
         Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/search', [GlobalSearchController::class, 'search']);
+
+        Route::prefix('system')->group(function () {
+            Route::post('/flush-cache', [SystemOperationsController::class, 'flushCache']);
+            Route::post('/trigger-backup', [SystemOperationsController::class, 'triggerBackup']);
+            Route::post('/backup/schedule', [SystemOperationsController::class, 'updateSchedule']);
+            Route::get('/backups', [SystemOperationsController::class, 'getBackups']);
+            Route::delete('/backups/{id}', [SystemOperationsController::class, 'deleteBackup']);
+            Route::get('/alerts', [SystemAlertController::class, 'index']);
+            Route::delete('/alerts/{id}', [SystemAlertController::class, 'destroy']);
+            Route::post('/alerts/clear-all', [SystemAlertController::class, 'clearAll']);
+        });
+
+        // 🔄 FILE CONVERTER ENGINE (Tenant)
+        Route::prefix('convert')->group(function () {
+            Route::post('/html-to-pdf', [FileConverterController::class, 'htmlToPdf']);
+        });
 
         Route::prefix('settings')->group(function () {
             Route::get('/brand', [BrandSettingsController::class, 'getBrandSettings']);
@@ -133,7 +170,6 @@ Route::middleware([
             Route::post('/general', [GeneralSettingsController::class, 'store']);
         });
 
-        // 🌐 DYNAMIC LOCALIZATION MANAGEMENT
         Route::prefix('localization')->group(function () {
             Route::get('/languages', [LocalizationController::class, 'getLanguages']);
             Route::post('/languages', [LocalizationController::class, 'addLanguage']);
@@ -147,7 +183,6 @@ Route::middleware([
             Route::post('/publish', [LocalizationController::class, 'publishTranslations']);
         });
 
-        // 📂 FILE MANAGER
         Route::prefix('files')->group(function () {
             Route::get('/', [FileManagerController::class, 'index']);
             Route::post('/folder', [FileManagerController::class, 'createFolder']);
@@ -170,7 +205,6 @@ Route::middleware([
             Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])->whereIn('type', ['file', 'folder']);
         });
 
-        // 🛡️ AUDIT LOGS
         Route::prefix('logs')->group(function () {
             Route::get('/export', [ActivityLogExportController::class, 'handleExport']);
             Route::post('/client-action', [ActivityLogController::class, 'logClientAction']);

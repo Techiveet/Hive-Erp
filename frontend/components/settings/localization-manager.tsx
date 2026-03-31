@@ -57,8 +57,8 @@ export function LocalizationManager() {
     fetchLanguages(); 
   }, [fetchLanguages]);
 
-  // 🚀 BULLETPROOF LANGUAGE EXTRACTION
-  const safeLanguages = Array.isArray(languages) ? languages : (languages?.data || []);
+  // 🚀 BULLETPROOF LANGUAGE EXTRACTION (Fixed strict TS checking)
+  const safeLanguages = Array.isArray(languages) ? languages : ((languages as any)?.data || []);
   const sourceLang = safeLanguages.find((l: any) => l.is_default) || safeLanguages[0];
 
   // 🚀 BULLETPROOF TRANSLATION PARSER

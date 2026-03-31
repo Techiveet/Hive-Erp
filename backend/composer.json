@@ -24,6 +24,7 @@
         "pragmarx/google2fa-laravel": "^2.3",
         "pusher/pusher-php-server": "^7.2",
         "spatie/laravel-activitylog": "^4.12",
+        "spatie/laravel-backup": "^10.2",
         "spatie/laravel-medialibrary": "^11.21",
         "spatie/laravel-permission": "^7.2",
         "spiral/roadrunner-cli": "^2.7",

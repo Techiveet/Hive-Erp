@@ -1,4 +1,4 @@
-//components/dashboard/topbar.tsx
+//compnents/dashboard/topbar.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -88,7 +88,8 @@ export function DashboardTopbar() {
   const { t } = useTranslation();
   const { languages, fetchLanguages } = useLocalization();
 
-  const safeLanguages = Array.isArray(languages) ? languages : (languages?.data || []);
+  // 🚀 THE FIX: Cast languages to 'any' before checking properties to satisfy TypeScript
+  const safeLanguages = Array.isArray(languages) ? languages : ((languages as any)?.data || []);
 
   const { data: serverUser } = useQuery({
       queryKey: ['authUserProfile'],
@@ -142,7 +143,6 @@ export function DashboardTopbar() {
     window.location.reload(); 
   };
 
-  // 🚀 THE FIX: Comprehensive Master Tour Array
   const triggerMasterTour = () => {
     const possibleSteps = [
         { target: '#tour-sidebar-brand', title: t('tour.sidebar_brand_title', 'HIVE.OS Control Hub'), content: t('tour.sidebar_brand_desc', 'This is your central command console.'), placement: 'right' as const },
@@ -160,7 +160,6 @@ export function DashboardTopbar() {
         { target: '#tour-topbar-profile', title: t('tour.topbar_profile_title', 'Operator Profile'), content: t('tour.topbar_profile_desc', 'Manage your settings and safely disconnect your node.'), placement: 'bottom-end' as const }
     ];
 
-    // Filter out steps if the user doesn't have permission to see that part of the DOM!
     const activeSteps = possibleSteps.filter(step => document.querySelector(step.target));
     
     startTour(activeSteps.map(step => ({ ...step, disableBeacon: true })));
@@ -182,7 +181,6 @@ export function DashboardTopbar() {
               <div className="lg:hidden shrink-0">
                 <MobileSidebar />
               </div>
-              {/* 🚀 Added the ID wrapper here for the tour search step */}
               <div id="tour-topbar-search" className="hidden lg:flex lg:items-center">
                 <GlobalSearch />
               </div>

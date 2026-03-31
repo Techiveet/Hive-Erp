@@ -1,3 +1,4 @@
+//components/dashboard/mobile-sidebar.tsx
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -32,19 +33,16 @@ const SecureMobileLogo = ({ path, fallbackTitle }: { path?: string, fallbackTitl
         
         let isMounted = true;
         const fullUrl = path.startsWith('http') 
-            ? path 
-            : `http://${window.location.hostname}:8085${path.startsWith('/') ? '' : '/'}${path}`;
+            ? path : `http://${window.location.hostname}:8085${path.startsWith('/') ? '' : '/'}${path}`;
 
         const fetchLogo = async () => {
             try {
                 const token = localStorage.getItem('hive_token');
                 const res = await fetch(fullUrl, { headers: { 'Authorization': `Bearer ${token}` } });
-                
                 if (!res.ok) throw new Error("Fetch blocked");
                 const blob = await res.blob();
                 if (isMounted) setBlobUrl(URL.createObjectURL(blob));
             } catch { 
-                // 🚀 CRITICAL FALLBACK
                 if (isMounted) setBlobUrl(fullUrl); 
             }
         };
@@ -71,7 +69,17 @@ export function MobileSidebar() {
   const { hasAnyPermission } = usePermissions();
   const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
+  
   const [searchQuery, setSearchQuery] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
+  const [isTenantNode, setIsTenantNode] = useState(false);
+
+  // 🚀 PREVENT HYDRATION ERRORS
+  useEffect(() => {
+      setIsMounted(true);
+      const host = window.location.hostname;
+      setIsTenantNode(host !== 'localhost' && host !== '127.0.0.1');
+  }, []);
 
   const { data: brandData } = useQuery({
     queryKey: ['brandSettings'],
@@ -81,12 +89,11 @@ export function MobileSidebar() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         return res.json();
-    }
+    },
+    enabled: isMounted
   });
 
   const brandSettings = brandData?.data;
-  
-  // 🚀 Switch between dark and light logos dynamically based on theme
   const logoPath = resolvedTheme === 'dark' ? brandSettings?.logo_dark : brandSettings?.logo_light;
 
   const handleLogout = () => {
@@ -97,21 +104,26 @@ export function MobileSidebar() {
   };
 
   const hasAccess = (item: NavItem) => {
+    // 🚀 THE FIX: Hide Tenant Management if the user is on a Tenant Node
+    if (isTenantNode && item.href === '/dashboard/tenants') return false;
+
     if (!item.permissions || item.permissions.length === 0) return true;
     return hasAnyPermission(item.permissions);
   };
 
   const filteredNav = useMemo(() => {
+    if (!isMounted) return [];
     return DASHBOARD_NAV.filter(item => 
       hasAccess(item) && t(item.translationKey, item.fallbackLabel).toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery, t, hasAnyPermission]);
+  }, [searchQuery, t, hasAnyPermission, isTenantNode, isMounted]);
 
   const filteredSecondary = useMemo(() => {
+    if (!isMounted) return [];
     return DASHBOARD_SECONDARY.filter(item => 
       hasAccess(item) && t(item.translationKey, item.fallbackLabel).toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery, t, hasAnyPermission]);
+  }, [searchQuery, t, hasAnyPermission, isTenantNode, isMounted]);
 
   return (
     <Sheet>
@@ -166,7 +178,7 @@ export function MobileSidebar() {
                 })}
               </nav>
 
-              {(filteredSecondary.length > 0 || !searchQuery) && (
+              {(filteredSecondary.length > 0 || !searchQuery) && isMounted && (
                 <div className="space-y-1">
                   <div className="px-4 text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-3">
                     {t('nav.settings', 'System Preferences')}

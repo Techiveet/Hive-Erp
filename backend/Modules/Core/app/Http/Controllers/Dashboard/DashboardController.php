@@ -12,6 +12,7 @@ use Modules\Identity\Models\Role;
 use Modules\Identity\Models\Permission;
 use Modules\Tenancy\Models\Tenant;
 use Modules\Core\Models\Activity;
+use Modules\Core\Models\SystemAlert;
 
 class DashboardController extends Controller
 {
@@ -21,7 +22,7 @@ class DashboardController extends Controller
         $tenantId = $isTenant ? tenant('id') : 'central';
         $guard = $isTenant ? 'tenant' : 'web';
 
-        // 1. Basic Stats (Cached for 5 mins for performance)
+        // 1. Basic Stats (Scoped automatically by Database Connection)
         $stats = Cache::remember("dashboard_stats_{$tenantId}", 300, function () use ($isTenant, $guard) {
             $data = [
                 'total_users'       => User::count(),
@@ -43,20 +44,20 @@ class DashboardController extends Controller
 
         if ($isTenant) {
             $activityQuery->where('tenant_id', $tenantId);
-        } else {
-            $activityQuery->where(function($q) {
-                $q->whereNull('tenant_id')->orWhere('tenant_id', 'central');
-            });
         }
 
         $recentActivity = $activityQuery->get()->map(function ($log) {
+            // 🚀 THE FIX: Read the 'causer_name' property FIRST to bypass the relationship mapping bug
+            $causerName = $log->properties['causer_name'] ?? optional($log->causer)->name ?? 'System';
+
             return [
                 'id'           => $log->id,
                 'event'        => $log->event,
                 'description'  => $log->description,
-                'causer'       => $log->causer ? $log->causer->name : ($log->properties['causer_name'] ?? 'SYSTEM'),
+                'causer'       => $causerName,
                 'time'         => $log->created_at->diffForHumans(),
                 'subject_type' => $log->subject_type,
+                'node'         => $log->tenant_id ?: 'Central',
             ];
         });
 
@@ -99,26 +100,26 @@ class DashboardController extends Controller
             'ws_connections' => rand(120, 180),
         ];
 
-        // 5. System Alerts (Checks for real failed background jobs)
-        $alerts = [];
-        if (Schema::hasTable('failed_jobs')) {
-            $failedJobs = DB::table('failed_jobs')->orderBy('failed_at', 'desc')->limit(2)->get();
-            $alerts = $failedJobs->map(function($job) {
-                return [
-                    'title' => 'Background Job Failed',
-                    'description' => substr($job->exception, 0, 85) . '...',
-                    'level' => 'critical'
-                ];
-            })->toArray();
+        // 5. REAL SYSTEM ALERTS
+        $alertQuery = SystemAlert::orderBy('created_at', 'desc');
+
+        if ($isTenant) {
+            $alertQuery->where('tenant_id', $tenantId);
         }
 
-        // =========================================================
-        // 🚀 6. REAL GEOGRAPHIC TRAFFIC AGGREGATION
-        // =========================================================
+        $alerts = $alertQuery->limit(5)->get()->map(function($alert) {
+            return [
+                'id'          => $alert->id,
+                'title'       => $alert->title,
+                'description' => $alert->description,
+                'level'       => $alert->level,
+                'time_ago'    => $alert->created_at->diffForHumans()
+            ];
+        });
+
+        // 6. REAL GEOGRAPHIC TRAFFIC AGGREGATION
         $trafficOrigins = [];
-
         if (Schema::hasTable('login_histories')) {
-
             $query = DB::table('login_histories')
                 ->select('city', 'country_code', DB::raw('count(*) as total'))
                 ->where('created_at', '>=', now()->subDays(30))
@@ -126,15 +127,13 @@ class DashboardController extends Controller
                 ->orderByDesc('total')
                 ->limit(4);
 
-            // If we are on a Tenant Node, only show their specific traffic!
             if ($isTenant) {
                 $query->where('tenant_id', $tenantId);
             }
 
             $locations = $query->get();
-            $totalLogins = $locations->sum('total') ?: 1; // Prevent division by zero
+            $totalLogins = $locations->sum('total') ?: 1;
 
-            // Helper to convert 'ET' to '🇪🇹'
             $getFlagEmoji = function ($countryCode) {
                 if (!$countryCode) return '🌐';
                 return implode('', array_map(function ($char) {
@@ -151,13 +150,12 @@ class DashboardController extends Controller
             })->toArray();
         }
 
-        // Determine company/node name
         $companyName = $isTenant ? (tenant('name') ?? ucfirst($tenantId)) : 'Central Command';
-        $plan = $isTenant ? (tenant('plan') ?? 'Standard') : 'God Mode';
+        $planValue = $isTenant ? (tenant('plan') ?? 'Standard') : 'God Mode';
 
         return response()->json([
             'company'         => $companyName,
-            'plan'            => strtoupper($plan),
+            'plan'            => strtoupper($planValue),
             'stats'           => $stats,
             'recent_activity' => $recentActivity,
             'business'        => $business,

@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { syncUserSession } from "@/lib/auth-sync";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useTranslation } from "@/store/use-translation"; // 🚀 Added Translation Hook
+import { useTranslation } from "@/store/use-translation"; 
 
 type Props = {
   tenantId: string | null;
@@ -37,7 +37,7 @@ type Props = {
 export function RolesTabClient({ tenantId, tenantName, companySettings, brandingSettings }: Props) {
   const isCentralAdmin = !tenantId;
   const queryClient = useQueryClient();
-  const { t, locale } = useTranslation(); // 🚀 Grab translator AND locale
+  const { t, locale } = useTranslation(); 
 
   const { hasAnyPermission } = usePermissions();
   const canCreate = hasAnyPermission(["manage_roles", "create_roles"]);
@@ -154,7 +154,12 @@ export function RolesTabClient({ tenantId, tenantName, companySettings, branding
 
   const handleDeleteRows = React.useCallback(async (rows: any[]) => {
     const validRows = rows.filter(r => !isProtectedRole(r.name));
-    if (validRows.length === 0) return toast.error(t('roles.purge_core_err', "Cannot purge core system roles."));
+    
+    // 🚀 THE FIX: Removed the `return` statement so it returns void instead of string/number
+    if (validRows.length === 0) {
+        toast.error(t('roles.purge_core_err', "Cannot purge core system roles."));
+        return; 
+    }
     
     await Promise.all(validRows.map((r) => deleteMut.mutateAsync(r.id)));
     toast.success(`${validRows.length} ${t('roles.levels_purged', 'clearance levels purged.')}`);
@@ -166,7 +171,11 @@ export function RolesTabClient({ tenantId, tenantName, companySettings, branding
   };
 
   const openEdit = (role: any) => {
-    if (role.name === 'Super Admin') return toast.error(t('roles.super_admin_err', "Super Admin cannot be modified."));
+    // 🚀 THE FIX: Removed `return` statements from toast calls here too just in case
+    if (role.name === 'Super Admin') {
+        toast.error(t('roles.super_admin_err', "Super Admin cannot be modified."));
+        return;
+    }
     if (role.name === 'Admin') toast.warning(t('roles.admin_warn', "Core Role: You can modify capabilities, but the designation cannot be changed."));
     
     setEditingRole(role); setRoleName(role.name);
@@ -199,7 +208,11 @@ export function RolesTabClient({ tenantId, tenantName, companySettings, branding
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roleName.trim()) return toast.error(t('roles.name_required', "Clearance level requires a designation."));
+    // 🚀 THE FIX: Removed `return` statement
+    if (!roleName.trim()) {
+        toast.error(t('roles.name_required', "Clearance level requires a designation."));
+        return;
+    }
     saveMut.mutate({ name: roleName.trim(), permissions: selectedPermissions });
   };
 
@@ -230,7 +243,7 @@ export function RolesTabClient({ tenantId, tenantName, companySettings, branding
     },
     {
       id: "permissions", 
-      accessorFn: (row) => row.name === "Super Admin" ? t('roles.god_mode', 'ALL PROTOCOLS (GOD MODE)') : (row.permissions?.length || 0) > 0 ? row.permissions.map((p:any) => p.name).join(', ') : t('roles.no_access', 'No Access'), // 🚀 Export translation enabled
+      accessorFn: (row) => row.name === "Super Admin" ? t('roles.god_mode', 'ALL PROTOCOLS (GOD MODE)') : (row.permissions?.length || 0) > 0 ? row.permissions.map((p:any) => p.name).join(', ') : t('roles.no_access', 'No Access'), 
       header: t('roles.col_capabilities', "Network Capabilities"), enableSorting: false,
       cell: ({ row }) => {
         const perms = row.original.permissions || [];
@@ -263,7 +276,7 @@ export function RolesTabClient({ tenantId, tenantName, companySettings, branding
       ),
     },
     {
-      id: "actions", header: t('roles.col_actions', "Actions"), size: 140, enableSorting: false, // 🚀 Translated Header
+      id: "actions", header: t('roles.col_actions', "Actions"), size: 140, enableSorting: false, 
       cell: ({ row }) => {
         const r = row.original;
         const isSuper = r.name === "Super Admin";
@@ -318,7 +331,6 @@ export function RolesTabClient({ tenantId, tenantName, companySettings, branding
     },
   ], [page, pageSize, deleteMut, isProtectedRole, formatDate, canEdit, canDelete, t]);
 
-  // 🚀 THE FIX: Appended locale to export URL
   const exportUrl = `${isCentralAdmin ? '' : '/tenant'}/roles/export?search=${search}&sortCol=${sortCol || ""}&sortDir=${sortDir || ""}&locale=${locale}`;
 
   return (
@@ -503,6 +515,7 @@ export function RolesTabClient({ tenantId, tenantName, companySettings, branding
         </DialogContent>
       </Dialog>
 
+      {/* VIEW DIALOG */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
           <div className="px-6 py-6 border-b border-border/40 bg-muted/20 flex items-center gap-4">

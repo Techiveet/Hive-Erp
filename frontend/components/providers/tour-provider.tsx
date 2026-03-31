@@ -5,7 +5,6 @@ import Joyride, { Step, CallBackProps, STATUS, EVENTS, TooltipRenderProps } from
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 
-// 🚀 ADDED: currentStepTarget and isActive to the Context so external components can track the tour's progress
 interface TourContextType {
     startTour: (steps: Step[]) => void;
     stopTour: () => void;
@@ -21,16 +20,14 @@ export const useTour = () => {
     return context;
 };
 
-// 🚀 FIX: Removed 'transform-gpu' and 'will-change-transform' that caused the shaking conflict.
 const CustomTooltip = React.forwardRef<HTMLDivElement, TooltipRenderProps>(
     ({ index, step, backProps, closeProps, primaryProps, skipProps, tooltipProps, isLastStep }, ref) => {
         return (
             <div 
-                ref={ref} 
                 {...tooltipProps} 
+                ref={ref} 
                 className="w-[340px] p-6 border border-amber-500/20 dark:border-amber-500/30 bg-white dark:bg-[#0a0a0b] shadow-[0_0_40px_-10px_rgba(245,158,11,0.15)] rounded-[1.5rem] flex flex-col relative overflow-hidden z-[100001]"
             >
-                {/* Tech accent line */}
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50" />
 
                 <Button 
@@ -120,7 +117,6 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
             setRun(false);
             setStepIndex(0);
             
-            // 🚀 ADDED: Security check for the new tab orchestrator
             if (window.location.pathname.includes('/tenants')) {
                 localStorage.setItem('hive_tour_tenants_completed', 'true');
             } else if (window.location.pathname.includes('/security')) {
@@ -131,7 +127,6 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
-    // 🚀 EXPOSE THE CURRENT TARGET
     const currentStepTarget = steps[stepIndex]?.target as string | null;
 
     return (
@@ -148,14 +143,15 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
                     disableOverlayClose={true}
                     showSkipButton={true}
                     showProgress={false}
-                    scrollOffset={150} // 🚀 Auto-scrolls the page a bit higher so the tooltip always has room at the top!
+                    scrollOffset={150} 
                     tooltipComponent={CustomTooltip} 
+                    // 🚀 THE FIX: Cast the entire object to 'any'
                     floaterProps={{ 
-                        disableTransform: true, // 🚀 Locks it into place to absolutely prevent shaking
+                        disableTransform: true, 
                         hideArrow: true,
                         offset: 15,
                         styles: { popper: { zIndex: 100000 } }
-                    }}
+                    } as any}
                     styles={{
                         options: { overlayColor: 'rgba(0, 0, 0, 0.75)', zIndex: 100000 },
                         spotlight: { borderRadius: '1.2rem' }
