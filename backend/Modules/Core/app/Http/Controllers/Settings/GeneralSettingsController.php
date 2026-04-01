@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Modules\Core\Models\Setting;
-use Illuminate\Support\Facades\Cache;
 
 class GeneralSettingsController extends Controller
 {
@@ -15,6 +14,7 @@ class GeneralSettingsController extends Controller
      */
     public function index(): JsonResponse
     {
+        $isTenantContext = $this->isTenantContext();
         $keys = [
             'support_email',
             'support_phone',
@@ -65,6 +65,13 @@ class GeneralSettingsController extends Controller
         $response['enable_registration'] = filter_var($response['enable_registration'], FILTER_VALIDATE_BOOLEAN);
         $response['require_2fa'] = filter_var($response['require_2fa'], FILTER_VALIDATE_BOOLEAN);
 
+        // Maintenance mode is a central-node control. Tenant dashboards should
+        // never expose or honor a tenant-local maintenance toggle.
+        if ($isTenantContext) {
+            $response['maintenance_mode'] = false;
+            $response['maintenance_message'] = $defaults['maintenance_message'];
+        }
+
         return response()->json([
             'data' => $response
         ]);
@@ -75,8 +82,10 @@ class GeneralSettingsController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $isTenantContext = $this->isTenantContext();
+
         // 1. Strict Validation
-        $validated = $request->validate([
+        $rules = [
             'support_email' => 'nullable|email|max:255',
             'support_phone' => 'nullable|string|max:50',
             'system_email_name' => 'required|string|max:255',
@@ -88,14 +97,26 @@ class GeneralSettingsController extends Controller
             'max_upload_size' => 'required|integer|min:1',
             'max_upload_unit' => 'required|in:KB,MB,GB,TB',
             'session_timeout_minutes' => 'required|integer|min:1|max:1440',
-            'maintenance_mode' => 'required|boolean',
-            'maintenance_message' => 'nullable|string|max:255', // 🚀 NEW: Allows you to save the ticker text
             'enable_registration' => 'required|boolean',
             'require_2fa' => 'required|boolean',
-        ]);
+        ];
+
+        if (!$isTenantContext) {
+            $rules['maintenance_mode'] = 'required|boolean';
+            $rules['maintenance_message'] = 'nullable|string|max:255';
+        }
+
+        $validated = $request->validate($rules);
+        $settingsToPersist = $validated;
+
+        if ($isTenantContext) {
+            unset($settingsToPersist['maintenance_mode'], $settingsToPersist['maintenance_message']);
+            $validated['maintenance_mode'] = false;
+            $validated['maintenance_message'] = 'HIVE.OS: System neural links are currently undergoing optimization.';
+        }
 
         // 2. Save/Update each key in the database
-        foreach ($validated as $key => $value) {
+        foreach ($settingsToPersist as $key => $value) {
             // Convert booleans to strings for DB storage
             if (is_bool($value)) {
                 $value = $value ? 'true' : 'false';
@@ -108,11 +129,16 @@ class GeneralSettingsController extends Controller
         }
 
         // 🚀 3. CRITICAL: Clear the settings cache!
-        Cache::forget('global_system_settings');
+        clear_system_settings_cache();
 
         return response()->json([
             'message' => 'System configuration updated successfully.',
             'data' => $validated
         ]);
+    }
+
+    private function isTenantContext(): bool
+    {
+        return function_exists('tenant') && (bool) tenant('id');
     }
 }

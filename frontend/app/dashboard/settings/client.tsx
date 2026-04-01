@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTranslation } from '@/store/use-translation';
 import { cn } from "@/lib/utils";
+import { isTenantSession } from "@/lib/runtime-context";
 
 // Modules
 import { LocalizationManager } from '@/components/settings/localization-manager';
@@ -262,6 +263,7 @@ function BrandSettings() {
 function GeneralSettings() {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
+    const [isTenantNode, setIsTenantNode] = useState<boolean | null>(null);
 
     const [formData, setFormData] = useState({
         support_email: '', support_phone: '', system_email_name: '', system_email_address: '',
@@ -283,8 +285,17 @@ function GeneralSettings() {
         }
     }, [settingsData]);
 
+    useEffect(() => {
+        setIsTenantNode(isTenantSession());
+    }, []);
+
     const saveMut = useMutation({
-        mutationFn: () => apiFetch('/settings/general', { method: 'POST', body: JSON.stringify(formData) }),
+        mutationFn: () => {
+            const { maintenance_mode, maintenance_message, ...tenantPayload } = formData;
+            const payload = isTenantNode === true ? tenantPayload : formData;
+
+            return apiFetch('/settings/general', { method: 'POST', body: JSON.stringify(payload) });
+        },
         onSuccess: () => {
             toast.success(t('settings.general_updated', "System Configuration Updated Successfully!"));
             queryClient.invalidateQueries({ queryKey: ['globalSystemSettings'] });
@@ -345,10 +356,12 @@ function GeneralSettings() {
                         <div className="h-10 w-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500"><Sliders className="h-5 w-5" /></div>
                         <div><h2 className="text-2xl font-space font-black tracking-tight text-foreground">{t('settings.op_limits', 'Operational Limits')}</h2></div>
                     </div>
-                    <div onClick={() => handleToggle('maintenance_mode')} className={cn("flex items-center gap-3 p-3 pl-4 rounded-xl border cursor-pointer", formData.maintenance_mode ? "bg-destructive/10 border-destructive/30" : "bg-muted/50")}>
-                        <div className="pr-2"><Label className="text-xs font-bold cursor-pointer flex items-center gap-2">{formData.maintenance_mode && <AlertTriangle className="h-3 w-3 text-destructive animate-pulse" />}{t('settings.maintenance_mode', 'Maintenance Mode')}</Label></div>
-                        <Switch checked={formData.maintenance_mode} className="data-[state=checked]:bg-destructive pointer-events-none" />
-                    </div>
+                    {isTenantNode === false && (
+                        <div onClick={() => handleToggle('maintenance_mode')} className={cn("flex items-center gap-3 p-3 pl-4 rounded-xl border cursor-pointer", formData.maintenance_mode ? "bg-destructive/10 border-destructive/30" : "bg-muted/50")}>
+                            <div className="pr-2"><Label className="text-xs font-bold cursor-pointer flex items-center gap-2">{formData.maintenance_mode && <AlertTriangle className="h-3 w-3 text-destructive animate-pulse" />}{t('settings.maintenance_mode', 'Maintenance Mode')}</Label></div>
+                            <Switch checked={formData.maintenance_mode} className="data-[state=checked]:bg-destructive pointer-events-none" />
+                        </div>
+                    )}
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -367,7 +380,7 @@ function GeneralSettings() {
                         <Input type="number" min="1" max="1440" value={formData.session_timeout_minutes} onChange={e => setFormData(p => ({...p, session_timeout_minutes: parseInt(e.target.value)||120}))} className="bg-muted/30 h-12 rounded-xl font-mono" />
                     </div>
 
-                    {formData.maintenance_mode && (
+                    {isTenantNode === false && formData.maintenance_mode && (
                         <div className="space-y-2 md:col-span-2 mt-4 pt-6 border-t border-border/50 animate-in fade-in slide-in-from-top-4 duration-500">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-destructive pl-1 flex items-center gap-2">
                                 <Activity className="h-3 w-3 animate-pulse" /> {t('settings.live_ticker', 'Live Status Ticker Message')}

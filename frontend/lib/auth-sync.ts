@@ -1,4 +1,5 @@
 import { getTenantId, isTenantSession } from "./runtime-context";
+import { clearSessionActivity } from "./session-activity";
 
 export const clearHiveSession = (ejectReason?: string) => {
   if (typeof window === "undefined") return;
@@ -6,6 +7,7 @@ export const clearHiveSession = (ejectReason?: string) => {
   localStorage.removeItem("hive_token");
   localStorage.removeItem("hive_user");
   localStorage.removeItem("hive_context");
+  clearSessionActivity();
 
   if (ejectReason) {
     sessionStorage.setItem("hive_eject_reason", ejectReason);

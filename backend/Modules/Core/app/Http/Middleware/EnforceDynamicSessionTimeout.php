@@ -26,7 +26,7 @@ class EnforceDynamicSessionTimeout
             $timeoutMinutes = (int) get_system_setting('session_timeout_minutes', 120);
 
             // 🚀 2. Check if the token has been idle longer than the allowed time
-            if ($token->last_used_at && now()->diffInMinutes($token->last_used_at) > $timeoutMinutes) {
+            if ($token->last_used_at && now()->diffInSeconds($token->last_used_at) >= ($timeoutMinutes * 60)) {
 
                 // 🛡️ Log the auto-logout to your WORM audit ledger
                 $currentTenant = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';

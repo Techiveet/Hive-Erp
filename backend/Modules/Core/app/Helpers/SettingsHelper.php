@@ -3,6 +3,35 @@
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Models\Setting;
 
+if (!function_exists('get_system_settings_cache_key')) {
+    /**
+     * Build a settings cache key that is isolated per central/tenant context.
+     */
+    function get_system_settings_cache_key(): string {
+        $context = 'central';
+
+        if (function_exists('tenant')) {
+            $tenant = tenant();
+
+            if ($tenant && tenant('id')) {
+                $context = 'tenant:' . tenant('id');
+            }
+        }
+
+        return 'global_system_settings:' . $context;
+    }
+}
+
+if (!function_exists('clear_system_settings_cache')) {
+    /**
+     * Clear the current context settings cache plus the legacy shared key.
+     */
+    function clear_system_settings_cache(): void {
+        Cache::forget(get_system_settings_cache_key());
+        Cache::forget('global_system_settings');
+    }
+}
+
 if (!function_exists('get_system_setting')) {
     /**
      * Retrieve a setting by key, cached forever until updated.
@@ -12,8 +41,9 @@ if (!function_exists('get_system_setting')) {
      * @return mixed
      */
     function get_system_setting($key, $default = null) {
-        // Cache the settings array to prevent database hits on every request
-        $settings = Cache::rememberForever('global_system_settings', function () {
+        // Cache the settings array to prevent database hits on every request,
+        // but keep each tenant and the central node isolated from one another.
+        $settings = Cache::rememberForever(get_system_settings_cache_key(), function () {
             return Setting::pluck('value', 'key')->toArray();
         });
 

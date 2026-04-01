@@ -15,6 +15,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { logFrontendAction } from "@/lib/api"; 
 import { clearHiveSession } from "@/lib/auth-sync";
 import { isTenantHost } from "@/lib/runtime-context";
+import { initializeSessionActivity } from "@/lib/session-activity";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -99,6 +100,7 @@ export default function LoginPage() {
       localStorage.setItem("hive_token", data.data.token);
       localStorage.setItem("hive_user", JSON.stringify(data.data.user));
       localStorage.setItem("hive_context", data.data.context);
+      initializeSessionActivity();
       sessionStorage.removeItem("hive_eject_reason");
 
       await logFrontendAction({ module: 'UI Telemetry', action: 'session_initialized', description: `Operator ${email} authenticated.` }).catch(()=>{});

@@ -14,6 +14,7 @@ import { clearHiveSession } from "@/lib/auth-sync";
 import { cn } from "@/lib/utils";
 import { QRCodeSVG } from "qrcode.react"; // 🚀 Used for forced setup
 import { isTenantHost } from "@/lib/runtime-context";
+import { initializeSessionActivity } from "@/lib/session-activity";
 
 export default function TwoFactorPage() {
   const router = useRouter();
@@ -98,6 +99,7 @@ export default function TwoFactorPage() {
       localStorage.setItem("hive_token", data.data.token);
       localStorage.setItem("hive_user", JSON.stringify(data.data.user));
       localStorage.setItem("hive_context", data.data.context);
+      initializeSessionActivity();
       sessionStorage.removeItem("hive_eject_reason");
 
       await logFrontendAction({ module: 'Auth - 2FA', action: 'login_success', description: `2FA verification passed.` }).catch(()=>{});

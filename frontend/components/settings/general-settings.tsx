@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTranslation } from '@/store/use-translation';
 import { cn } from "@/lib/utils";
+import { isTenantSession } from "@/lib/runtime-context";
 
 // ==========================================
 // 🚀 BULLETPROOF API ROUTING & FETCH WRAPPER
@@ -55,6 +56,7 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
 export function GeneralSettings() {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
+    const [isTenantNode, setIsTenantNode] = useState<boolean | null>(null);
 
     const [formData, setFormData] = useState({
         support_email: '',
@@ -87,8 +89,17 @@ export function GeneralSettings() {
         }
     }, [settingsData]);
 
+    useEffect(() => {
+        setIsTenantNode(isTenantSession());
+    }, []);
+
     const saveSettingsMut = useMutation({
-        mutationFn: () => apiFetch('/settings/general', { method: 'POST', body: JSON.stringify(formData) }),
+        mutationFn: () => {
+            const { maintenance_mode, maintenance_message, ...tenantPayload } = formData;
+            const payload = isTenantNode === true ? tenantPayload : formData;
+
+            return apiFetch('/settings/general', { method: 'POST', body: JSON.stringify(payload) });
+        },
         onSuccess: () => {
             toast.success(t('settings.general_updated', "System Configuration Updated Successfully!"));
             queryClient.invalidateQueries({ queryKey: ['globalSystemSettings'] });
@@ -241,16 +252,18 @@ export function GeneralSettings() {
                         </div>
                     </div>
 
-                    <div onClick={() => handleToggle('maintenance_mode')} className={cn("flex items-center gap-3 p-3 pl-4 rounded-xl border transition-colors duration-300 cursor-pointer select-none", formData.maintenance_mode ? "bg-destructive/10 border-destructive/30 hover:bg-destructive/20" : "bg-muted/50 border-border/50 hover:bg-muted/80")}>
-                        <div className="space-y-0.5 pr-2">
-                            <Label className="text-xs font-bold cursor-pointer flex items-center gap-2">
-                                {formData.maintenance_mode && <AlertTriangle className="h-3 w-3 text-destructive animate-pulse" />}
-                                {t('settings.maintenance_mode', 'Maintenance Mode')}
-                            </Label>
-                            <p className="text-[10px] text-muted-foreground">{t('settings.maintenance_desc', 'Lock out non-admin operators')}</p>
+                    {isTenantNode === false && (
+                        <div onClick={() => handleToggle('maintenance_mode')} className={cn("flex items-center gap-3 p-3 pl-4 rounded-xl border transition-colors duration-300 cursor-pointer select-none", formData.maintenance_mode ? "bg-destructive/10 border-destructive/30 hover:bg-destructive/20" : "bg-muted/50 border-border/50 hover:bg-muted/80")}>
+                            <div className="space-y-0.5 pr-2">
+                                <Label className="text-xs font-bold cursor-pointer flex items-center gap-2">
+                                    {formData.maintenance_mode && <AlertTriangle className="h-3 w-3 text-destructive animate-pulse" />}
+                                    {t('settings.maintenance_mode', 'Maintenance Mode')}
+                                </Label>
+                                <p className="text-[10px] text-muted-foreground">{t('settings.maintenance_desc', 'Lock out non-admin operators')}</p>
+                            </div>
+                            <Switch checked={formData.maintenance_mode} className="data-[state=checked]:bg-destructive pointer-events-none" />
                         </div>
-                        <Switch checked={formData.maintenance_mode} className="data-[state=checked]:bg-destructive pointer-events-none" />
-                    </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -282,7 +295,7 @@ export function GeneralSettings() {
                     </div>
 
                     {/* 🚀 CONDITIONAL: LIVE STATUS TICKER INPUT (Only shows when Maintenance Mode is ON) */}
-                    {formData.maintenance_mode && (
+                    {isTenantNode === false && formData.maintenance_mode && (
                         <div className="space-y-2 md:col-span-2 mt-4 pt-6 border-t border-border/50 animate-in fade-in slide-in-from-top-4 duration-500">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-destructive pl-1 flex items-center gap-2">
                                 <Activity className="h-3 w-3 animate-pulse" /> {t('settings.maintenance_message', 'Live Status Ticker Message')}
