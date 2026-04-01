@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Loader2, User, Network, FileText, ArrowRight, Shield } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useTranslation } from "@/store/use-translation";
 import { useDebounce } from "@/hooks/use-debounce";
+import { usePermissions } from "@/hooks/use-permissions";
+import { canAccessDashboardRoute } from "@/lib/route-permissions";
 
 interface SearchResultItem {
   id: string | number;
@@ -24,15 +26,16 @@ interface SearchCategory {
 export function GlobalSearch() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { hasAnyPermission, hasPermission } = usePermissions();
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<SearchCategory[]>([]);
   const [modifierKey, setModifierKey] = useState("Ctrl");
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  
+
   // Prevent spamming the API: wait 300ms after the user stops typing
   const debouncedQuery = useDebounce(query, 300);
 
@@ -79,36 +82,36 @@ export function GlobalSearch() {
       setIsLoading(true);
       try {
         const token = localStorage.getItem('hive_token');
-        
+
         // 🚀 BULLETPROOF URL PARSER
-        // Grabs your env variable, or defaults to localhost. 
+        // Grabs your env variable, or defaults to localhost.
         let apiUrl = process.env.NEXT_PUBLIC_API_URL || `http://${window.location.hostname}:8085/api`;
-        
+
         // Strip any accidental trailing slashes
         if (apiUrl.endsWith('/')) {
             apiUrl = apiUrl.slice(0, -1);
         }
-        
+
         // Ensure we are hitting the /v1 route group
         if (apiUrl.endsWith('/api')) {
             apiUrl = `${apiUrl}/v1`;
         } else if (!apiUrl.includes('/v1')) {
             apiUrl = `${apiUrl}/api/v1`;
         }
-        
+
         const res = await fetch(`${apiUrl}/search?q=${encodeURIComponent(debouncedQuery)}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
           }
         });
-        
+
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
           console.error(`🚨 API Error (${res.status}):`, errorData);
           throw new Error(errorData.message || `API failed with status ${res.status}`);
         }
-        
+
         const json = await res.json();
         setResults(json.data || []);
       } catch (error) {
@@ -121,7 +124,20 @@ export function GlobalSearch() {
     fetchResults();
   }, [debouncedQuery]);
 
+  const filteredResults = useMemo(() => {
+    return results
+      .map((category) => ({
+        ...category,
+        items: category.items.filter((item) => canAccessDashboardRoute(item.url, { hasPermission, hasAnyPermission })),
+      }))
+      .filter((category) => category.items.length > 0);
+  }, [hasAnyPermission, hasPermission, results]);
+
   const handleSelect = (url: string) => {
+    if (!canAccessDashboardRoute(url, { hasPermission, hasAnyPermission })) {
+      return;
+    }
+
     setIsOpen(false);
     setQuery("");
     router.push(url);
@@ -142,8 +158,8 @@ export function GlobalSearch() {
     <div id="tour-topbar-search" ref={containerRef} className="relative ml-2 w-full max-w-[340px]">
       <div className="relative group">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-        
-        <Input 
+
+        <Input
           ref={inputRef}
           value={query}
           onChange={(e) => {
@@ -151,10 +167,10 @@ export function GlobalSearch() {
             setIsOpen(true);
           }}
           onFocus={() => { if (query) setIsOpen(true); }}
-          placeholder={t('topbar.search', 'Search system...')} 
-          className="h-10 rounded-xl pl-9 pr-14 bg-background/40 border-border/50 font-medium transition-all focus:ring-2 focus:ring-primary/20" 
+          placeholder={t('topbar.search', 'Search system...')}
+          className="h-10 rounded-xl pl-9 pr-14 bg-background/40 border-border/50 font-medium transition-all focus:ring-2 focus:ring-primary/20"
         />
-        
+
         {isLoading ? (
           <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
         ) : (
@@ -168,13 +184,13 @@ export function GlobalSearch() {
       {isOpen && query.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-card border border-border/50 shadow-2xl rounded-2xl overflow-hidden z-[1000] animate-in fade-in zoom-in-95 duration-200">
           <div className="max-h-[400px] overflow-y-auto overscroll-contain p-2 space-y-4">
-            
-            {results.length === 0 && !isLoading ? (
+
+            {filteredResults.length === 0 && !isLoading ? (
               <div className="p-6 text-center text-sm text-muted-foreground">
                 No results found for "<span className="font-bold text-foreground">{query}</span>"
               </div>
             ) : (
-              results.map((category) => (
+              filteredResults.map((category) => (
                 <div key={category.category}>
                   <div className="px-2 pb-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                     {category.label}
@@ -208,7 +224,7 @@ export function GlobalSearch() {
               ))
             )}
           </div>
-          
+
           <div className="bg-muted/30 border-t border-border/50 p-2 text-center">
             <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-center gap-1">
               Powered by <span className="text-primary">HIVE</span>

@@ -62,9 +62,9 @@ foreach ($centralDomains as $domain) {
             });
 
             Route::prefix('settings')->group(function () {
-                Route::get('/brand', [BrandSettingsController::class, 'getBrandSettings']);
+                Route::get('/brand', [BrandSettingsController::class, 'getBrandSettings'])->middleware('permission:manage_brand_settings,sanctum');
                 Route::post('/brand', [BrandSettingsController::class, 'updateBrandSettings'])->middleware('permission:manage_brand_settings,sanctum');
-                Route::get('/general', [GeneralSettingsController::class, 'index']);
+                Route::get('/general', [GeneralSettingsController::class, 'index'])->middleware('permission:manage_general_settings,sanctum');
                 Route::post('/general', [GeneralSettingsController::class, 'store'])->middleware('permission:manage_general_settings,sanctum');
             });
 
@@ -82,25 +82,25 @@ foreach ($centralDomains as $domain) {
             });
 
             Route::prefix('files')->group(function () {
-                Route::get('/', [FileManagerController::class, 'index']);
-                Route::post('/folder', [FileManagerController::class, 'createFolder']);
-                Route::post('/upload', [FileManagerController::class, 'uploadFile']);
-                Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage']);
-                Route::post('/remove-background', [FileManagerController::class, 'removeBackground']);
-                Route::post('/remove-logo-background', [FileManagerController::class, 'removeLogoBackground']);
-                Route::post('/trash/empty', [FileManagerController::class, 'emptyTrash']);
-                Route::post('/trash/restore', [FileManagerController::class, 'restoreItems']);
-                Route::post('/trash/force-delete', [FileManagerController::class, 'forceDeleteItems']);
-                Route::post('/rename', [FileManagerController::class, 'renameItem']);
-                Route::post('/move', [FileManagerController::class, 'moveItems']);
-                Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle']);
-                Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle']);
-                Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle']);
-                Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
-                Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia']);
-                Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])->whereIn('type', ['file', 'folder']);
-                Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])->whereIn('type', ['file', 'folder']);
-                Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])->whereIn('type', ['file', 'folder']);
+                Route::get('/', [FileManagerController::class, 'index'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+                Route::post('/folder', [FileManagerController::class, 'createFolder'])->middleware('permission:manage_storage,sanctum');
+                Route::post('/upload', [FileManagerController::class, 'uploadFile'])->middleware('permission:manage_storage,sanctum');
+                Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage'])->middleware('permission:manage_storage,sanctum');
+                Route::post('/remove-background', [FileManagerController::class, 'removeBackground'])->middleware('permission:manage_storage,sanctum');
+                Route::post('/remove-logo-background', [FileManagerController::class, 'removeLogoBackground'])->middleware('permission:manage_storage,sanctum');
+                Route::post('/trash/empty', [FileManagerController::class, 'emptyTrash'])->middleware('permission:manage_storage,sanctum');
+                Route::post('/trash/restore', [FileManagerController::class, 'restoreItems'])->middleware('permission:manage_storage,sanctum');
+                Route::post('/trash/force-delete', [FileManagerController::class, 'forceDeleteItems'])->middleware('permission:manage_storage,sanctum');
+                Route::post('/rename', [FileManagerController::class, 'renameItem'])->middleware('permission:manage_storage,sanctum');
+                Route::post('/move', [FileManagerController::class, 'moveItems'])->middleware('permission:manage_storage,sanctum');
+                Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle'])->middleware('permission:manage_storage,sanctum');
+                Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+                Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle'])->middleware('permission:manage_storage,sanctum');
+                Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+                Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+                Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
+                Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
+                Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
             });
 
             Route::prefix('logs')->group(function () {
@@ -172,9 +172,9 @@ Route::middleware([
         });
 
         Route::prefix('settings')->group(function () {
-            Route::get('/brand', [BrandSettingsController::class, 'getBrandSettings']);
+            Route::get('/brand', [BrandSettingsController::class, 'getBrandSettings'])->middleware('permission:manage_brand_settings,sanctum');
             Route::post('/brand', [BrandSettingsController::class, 'updateBrandSettings'])->middleware('permission:manage_brand_settings,sanctum');
-            Route::get('/general', [GeneralSettingsController::class, 'index']);
+            Route::get('/general', [GeneralSettingsController::class, 'index'])->middleware('permission:manage_general_settings,sanctum');
             Route::post('/general', [GeneralSettingsController::class, 'store'])->middleware('permission:manage_general_settings,sanctum');
         });
 
@@ -192,25 +192,25 @@ Route::middleware([
         });
 
         Route::prefix('files')->group(function () {
-            Route::get('/', [FileManagerController::class, 'index']);
-            Route::post('/folder', [FileManagerController::class, 'createFolder']);
-            Route::post('/upload', [FileManagerController::class, 'uploadFile']);
-            Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage']);
-            Route::post('/remove-background', [FileManagerController::class, 'removeBackground']);
-            Route::post('/remove-logo-background', [FileManagerController::class, 'removeLogoBackground']);
-            Route::post('/trash/empty', [FileManagerController::class, 'emptyTrash']);
-            Route::post('/trash/restore', [FileManagerController::class, 'restoreItems']);
-            Route::post('/trash/force-delete', [FileManagerController::class, 'forceDeleteItems']);
-            Route::post('/rename', [FileManagerController::class, 'renameItem']);
-            Route::post('/move', [FileManagerController::class, 'moveItems']);
-            Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle']);
-            Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle']);
-            Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle']);
-            Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream']);
-            Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia']);
-            Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])->whereIn('type', ['file', 'folder']);
-            Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])->whereIn('type', ['file', 'folder']);
-            Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])->whereIn('type', ['file', 'folder']);
+            Route::get('/', [FileManagerController::class, 'index'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+            Route::post('/folder', [FileManagerController::class, 'createFolder'])->middleware('permission:manage_storage,sanctum');
+            Route::post('/upload', [FileManagerController::class, 'uploadFile'])->middleware('permission:manage_storage,sanctum');
+            Route::post('/save-edited', [FileManagerController::class, 'saveEditedImage'])->middleware('permission:manage_storage,sanctum');
+            Route::post('/remove-background', [FileManagerController::class, 'removeBackground'])->middleware('permission:manage_storage,sanctum');
+            Route::post('/remove-logo-background', [FileManagerController::class, 'removeLogoBackground'])->middleware('permission:manage_storage,sanctum');
+            Route::post('/trash/empty', [FileManagerController::class, 'emptyTrash'])->middleware('permission:manage_storage,sanctum');
+            Route::post('/trash/restore', [FileManagerController::class, 'restoreItems'])->middleware('permission:manage_storage,sanctum');
+            Route::post('/trash/force-delete', [FileManagerController::class, 'forceDeleteItems'])->middleware('permission:manage_storage,sanctum');
+            Route::post('/rename', [FileManagerController::class, 'renameItem'])->middleware('permission:manage_storage,sanctum');
+            Route::post('/move', [FileManagerController::class, 'moveItems'])->middleware('permission:manage_storage,sanctum');
+            Route::post('/upload-subtitle/{id}', [FileManagerController::class, 'uploadSubtitle'])->middleware('permission:manage_storage,sanctum');
+            Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+            Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle'])->middleware('permission:manage_storage,sanctum');
+            Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+            Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+            Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
+            Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
+            Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
         });
 
         Route::prefix('logs')->group(function () {

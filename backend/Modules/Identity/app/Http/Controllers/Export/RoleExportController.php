@@ -2,7 +2,7 @@
 
 namespace Modules\Identity\Http\Controllers\Export;
 
-use App\Support\ResolvesExportBranding;
+use Modules\Core\Support\ResolvesExportBranding;
 use Modules\Identity\Models\Role;
 use Modules\Core\Models\Language;
 use Modules\Identity\Exports\RolesExport;
@@ -114,3 +114,4 @@ class RoleExportController extends Controller
         }
     }
 }
+

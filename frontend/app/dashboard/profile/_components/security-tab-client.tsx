@@ -1,7 +1,7 @@
 //app/dashboard/profile/_components/security-tab-client.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { ShieldCheck, ShieldAlert, Loader2, KeyRound, Copy, Check } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
-import { logFrontendAction } from "@/lib/api"; 
+import { logFrontendAction } from "@/lib/api";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,10 @@ import {
 } from "@/components/ui/dialog";
 
 export function SecurityTabClient() {
+  const { hasAnyPermission, hasPermission } = usePermissions();
+  const canViewProfile = hasAnyPermission(["view_profile", "edit_profile"]);
+  const canEditProfile = hasPermission("edit_profile");
+
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [isSettingUp2FA, setIsSettingUp2FA] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -45,12 +50,16 @@ export function SecurityTabClient() {
   };
 
   const getHeaders = () => ({
-    "Authorization": `Bearer ${localStorage.getItem("hive_token")}`,
-    "Accept": "application/json",
-    "Content-Type": "application/json"
+    Authorization: `Bearer ${localStorage.getItem("hive_token")}`,
+    Accept: "application/json",
+    "Content-Type": "application/json",
   });
 
   useEffect(() => {
+    if (!canViewProfile) {
+      return;
+    }
+
     const fetchProfile = async () => {
       try {
         const res = await fetch(`${getApiUrl()}/user`, { headers: getHeaders() });
@@ -58,14 +67,20 @@ export function SecurityTabClient() {
         if (data.two_factor_enabled) {
           setIs2FAEnabled(true);
         }
-      } catch (error) {
+      } catch {
         console.error("Failed to load profile data.");
       }
     };
+
     fetchProfile();
-  }, []);
+  }, [canViewProfile]);
 
   const handleToggleClick = () => {
+    if (!canEditProfile) {
+      toast.error("Your role can view 2FA status, but changing it requires the edit_profile permission.");
+      return;
+    }
+
     setPendingAction(is2FAEnabled ? "disable" : "enable");
     setPasswordInput("");
     setIsPasswordModalOpen(true);
@@ -73,6 +88,12 @@ export function SecurityTabClient() {
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canEditProfile) {
+      toast.error("Your role cannot change 2FA settings.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -80,34 +101,33 @@ export function SecurityTabClient() {
         const res = await fetch(`${getApiUrl()}/2fa/enable`, {
           method: "POST",
           headers: getHeaders(),
-          body: JSON.stringify({ password: passwordInput })
+          body: JSON.stringify({ password: passwordInput }),
         });
-        
+
         const data = await res.json();
-        
+
         if (!res.ok) throw new Error(data.message || "Failed to generate 2FA");
 
         setQrCodeUrl(data.qr_code_url);
         setSecretKey(data.secret);
         setIsSettingUp2FA(true);
-        
-        logFrontendAction({ module: 'Profile Settings', action: 'updated', description: 'Operator initiated 2FA setup sequence and generated QR code.' }).catch(()=>{});
-        toast.success("Protocol Initiated: Scan the QR code to continue.");
 
+        logFrontendAction({ module: "Profile Settings", action: "updated", description: "Operator initiated 2FA setup sequence and generated QR code." }).catch(() => {});
+        toast.success("Protocol Initiated: Scan the QR code to continue.");
       } else if (pendingAction === "disable") {
         const res = await fetch(`${getApiUrl()}/2fa/disable`, {
           method: "POST",
           headers: getHeaders(),
-          body: JSON.stringify({ password: passwordInput })
+          body: JSON.stringify({ password: passwordInput }),
         });
-        
+
         if (!res.ok) throw new Error("Failed to disable 2FA");
 
         setIs2FAEnabled(false);
         setIsSettingUp2FA(false);
         setRecoveryCodes([]);
-        
-        logFrontendAction({ module: 'Profile Settings', action: 'updated', description: 'Operator completely disabled Two-Factor Authentication.' }).catch(()=>{});
+
+        logFrontendAction({ module: "Profile Settings", action: "updated", description: "Operator completely disabled Two-Factor Authentication." }).catch(() => {});
         toast.warning("Security Downgraded: Two-Factor Authentication has been disabled.");
       }
     } catch (error: any) {
@@ -120,13 +140,19 @@ export function SecurityTabClient() {
 
   const handleConfirm2FA = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canEditProfile) {
+      toast.error("Your role cannot activate 2FA.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const res = await fetch(`${getApiUrl()}/2fa/confirm`, {
         method: "POST",
         headers: getHeaders(),
-        body: JSON.stringify({ code: verificationCode })
+        body: JSON.stringify({ code: verificationCode }),
       });
 
       const data = await res.json();
@@ -138,9 +164,8 @@ export function SecurityTabClient() {
       setIs2FAEnabled(true);
       setVerificationCode("");
 
-      logFrontendAction({ module: 'Profile Settings', action: 'updated', description: 'Operator successfully activated and locked Two-Factor Authentication.' }).catch(()=>{});
+      logFrontendAction({ module: "Profile Settings", action: "updated", description: "Operator successfully activated and locked Two-Factor Authentication." }).catch(() => {});
       toast.success("Security Upgraded! Two-Factor Authentication is now active.");
-
     } catch (error: any) {
       toast.error(error.message || "Verification Failed");
     } finally {
@@ -151,14 +176,13 @@ export function SecurityTabClient() {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(recoveryCodes.join("\n"));
     setHasCopied(true);
-    logFrontendAction({ module: 'Profile Settings', action: 'copied', description: 'Operator copied 2FA recovery codes to system clipboard.' }).catch(()=>{});
+    logFrontendAction({ module: "Profile Settings", action: "copied", description: "Operator copied 2FA recovery codes to system clipboard." }).catch(() => {});
     toast.success("Recovery codes saved to your clipboard.");
     setTimeout(() => setHasCopied(false), 3000);
   };
 
   return (
     <div className="space-y-6">
-      
       <Dialog open={isPasswordModalOpen} onOpenChange={setIsPasswordModalOpen}>
         <DialogContent className="sm:max-w-md rounded-[2rem] bg-card/95 backdrop-blur-xl border-border/50">
           <DialogHeader>
@@ -172,18 +196,21 @@ export function SecurityTabClient() {
           </DialogHeader>
           <form onSubmit={handlePasswordSubmit} className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Input 
-                type="password" 
-                placeholder="Enter current password" 
+              <Input
+                type="password"
+                placeholder="Enter current password"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
                 required
+                disabled={!canEditProfile || isLoading}
                 className="bg-muted/30 h-11 transition-all focus-visible:ring-primary"
               />
             </div>
             <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" className="rounded-xl" onClick={() => setIsPasswordModalOpen(false)}>Cancel</Button>
-              <Button type="submit" className="rounded-xl px-8 shadow-lg font-bold" disabled={isLoading || !passwordInput}>
+              <Button type="button" variant="outline" className="rounded-xl" onClick={() => setIsPasswordModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="rounded-xl px-8 shadow-lg font-bold" disabled={!canEditProfile || isLoading || !passwordInput}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Authorize
               </Button>
@@ -192,7 +219,6 @@ export function SecurityTabClient() {
         </DialogContent>
       </Dialog>
 
-      {/* 🚀 TARGET: 2FA CARD */}
       <Card id="tour-profile-2fa" className="bg-card/40 backdrop-blur-md border-border/50">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div className="space-y-1">
@@ -201,15 +227,20 @@ export function SecurityTabClient() {
               {is2FAEnabled ? <ShieldCheck className="h-5 w-5 text-emerald-500" /> : <ShieldAlert className="h-5 w-5 text-destructive" />}
             </CardTitle>
             <CardDescription>Add an extra layer of security to your node connection.</CardDescription>
+            {!canEditProfile && (
+              <p className="max-w-xl text-xs text-muted-foreground">
+                Your current role can review 2FA status, but changing it requires the <strong className="text-foreground">edit_profile</strong> permission.
+              </p>
+            )}
           </div>
-          <Switch checked={is2FAEnabled || isSettingUp2FA} onCheckedChange={handleToggleClick} />
+          <Switch checked={is2FAEnabled || isSettingUp2FA} onCheckedChange={handleToggleClick} disabled={!canEditProfile} />
         </CardHeader>
-        
+
         <CardContent>
           {!is2FAEnabled && !isSettingUp2FA && recoveryCodes.length === 0 && (
-             <div className="text-sm text-muted-foreground mt-2 bg-muted/50 p-4 rounded-xl border border-border/50">
-               When 2FA is enabled, you will be prompted for a secure, random 6-digit code during authentication.
-             </div>
+            <div className="text-sm text-muted-foreground mt-2 bg-muted/50 p-4 rounded-xl border border-border/50">
+              When 2FA is enabled, you will be prompted for a secure, random 6-digit code during authentication.
+            </div>
           )}
 
           {isSettingUp2FA && (
@@ -222,7 +253,7 @@ export function SecurityTabClient() {
                   {secretKey || "GENERATING..."}
                 </span>
               </div>
-              
+
               <div className="flex-1 space-y-4 w-full">
                 <div>
                   <h4 className="font-semibold text-sm">1. Scan the QR Code</h4>
@@ -233,16 +264,17 @@ export function SecurityTabClient() {
                 <form onSubmit={handleConfirm2FA} className="space-y-3 pt-2">
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">2. Enter 6-Digit Code</Label>
-                    <Input 
-                      placeholder="000 000" 
-                      maxLength={6} 
+                    <Input
+                      placeholder="000 000"
+                      maxLength={6}
                       value={verificationCode}
                       onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ""))}
-                      className="font-mono text-center tracking-[0.5em] text-xl h-12 bg-background" 
-                      required 
+                      className="font-mono text-center tracking-[0.5em] text-xl h-12 bg-background"
+                      disabled={!canEditProfile || isLoading}
+                      required
                     />
                   </div>
-                  <Button type="submit" className="w-full rounded-xl" disabled={verificationCode.length !== 6 || isLoading}>
+                  <Button type="submit" className="w-full rounded-xl" disabled={!canEditProfile || verificationCode.length !== 6 || isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Verify & Activate Security
                   </Button>
@@ -258,10 +290,10 @@ export function SecurityTabClient() {
                 <h4 className="text-emerald-500 font-bold text-lg">2FA Activated Successfully!</h4>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Please copy these recovery codes and store them in a secure location. 
+                Please copy these recovery codes and store them in a secure location.
                 <strong className="text-foreground ml-1">This is the ONLY time they will be shown.</strong>
               </p>
-              
+
               <div className="grid grid-cols-2 gap-3 font-mono text-sm mb-5">
                 {recoveryCodes.map((code, idx) => (
                   <div key={idx} className="bg-background/80 py-2 text-center rounded-lg border border-border/50 font-bold tracking-widest shadow-sm">

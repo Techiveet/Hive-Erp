@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\ApiDocumentationController;
+use Modules\Core\Http\Controllers\ApiDocumentationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -35,3 +35,4 @@ Route::get('/test-broadcast', function () {
         'payload' => $payload
     ]);
 });
+

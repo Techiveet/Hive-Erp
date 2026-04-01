@@ -3,7 +3,7 @@
 namespace Modules\Identity\Http\Controllers\Export;
 
 use App\Http\Controllers\Controller;
-use App\Support\ResolvesExportBranding;
+use Modules\Core\Support\ResolvesExportBranding;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -135,3 +135,4 @@ class UserExportController extends Controller
         }
     }
 }
+

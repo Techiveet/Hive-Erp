@@ -11,13 +11,15 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MobileSidebar } from "./mobile-sidebar"; 
+import { MobileSidebar } from "./mobile-sidebar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { useTour } from "@/components/providers/tour-provider"; 
+import { useTour } from "@/components/providers/tour-provider";
 import { useTranslation } from "@/store/use-translation";
 import { GlobalSearch } from "./global-search";
 import { getTenantId, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
+import { usePermissions } from "@/hooks/use-permissions";
+import { PROFILE_ROUTE_PERMISSIONS } from "@/lib/route-permissions";
 
 const getApiUrl = () => {
   if (typeof window === "undefined") return "http://localhost:8085/api/v1";
@@ -37,11 +39,17 @@ const getTenantAwareEndpoint = (path: string) => {
 };
 
 // 🚀 SECURE TOPBAR AVATAR
-const SecureTopbarAvatar = ({ user, fallbackInitials }: { user: any, fallbackInitials: string }) => {
+const SecureTopbarAvatar = ({ user, fallbackInitials, canViewProfile }: { user: any, fallbackInitials: string, canViewProfile: boolean }) => {
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
     const [isFetching, setIsFetching] = useState(true);
 
     useEffect(() => {
+        if (!canViewProfile) {
+            setBlobUrl(null);
+            setIsFetching(false);
+            return;
+        }
+
         if (user && !user.avatar_path && !user.avatar_url) {
             setBlobUrl(null);
             setIsFetching(false);
@@ -62,7 +70,7 @@ const SecureTopbarAvatar = ({ user, fallbackInitials }: { user: any, fallbackIni
                 }
 
                 if (!res.ok) throw new Error("No avatar found");
-                
+
                 const contentType = res.headers.get('content-type');
                 if (!contentType?.startsWith('image/')) throw new Error("Not an image");
 
@@ -77,7 +85,7 @@ const SecureTopbarAvatar = ({ user, fallbackInitials }: { user: any, fallbackIni
 
         fetchSecureAvatar();
         return () => { isMounted = false; };
-    }, [user?.avatar_path, user?.avatar_url]);
+    }, [canViewProfile, user?.avatar_path, user?.avatar_url]);
 
     if (isFetching && !blobUrl) {
         return <Loader2 className="h-4 w-4 animate-spin text-primary-foreground/50 m-auto" />;
@@ -96,9 +104,12 @@ export function DashboardTopbar() {
   const [localUser, setLocalUser] = useState<{ name: string, email: string } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentLocale, setCurrentLocale] = useState('en');
-  
-  const { startTour } = useTour(); 
+
+  const { startTour } = useTour();
   const { t } = useTranslation();
+  const { hasAnyPermission, hasPermission } = usePermissions();
+  const canViewProfile = hasAnyPermission([...PROFILE_ROUTE_PERMISSIONS]);
+  const canViewAlerts = hasPermission("view_alerts");
   const { data: serverUser } = useQuery({
       queryKey: ['authUserProfile'],
       queryFn: async () => {
@@ -113,7 +124,8 @@ export function DashboardTopbar() {
           if (!res.ok) throw new Error("Failed to fetch user data");
           return res.json();
       },
-      staleTime: 300000, 
+      staleTime: 300000,
+      enabled: canViewProfile,
   });
 
   const activeUser = serverUser || localUser;
@@ -132,7 +144,7 @@ export function DashboardTopbar() {
 
   const handleLogout = () => {
     clearHiveSession();
-    queryClient.clear(); 
+    queryClient.clear();
     router.push("/sign-in");
   };
 
@@ -147,7 +159,7 @@ export function DashboardTopbar() {
   const handleLanguageChange = (code: string) => {
     localStorage.setItem("hive_locale", code);
     setCurrentLocale(code);
-    window.location.reload(); 
+    window.location.reload();
   };
 
   const triggerMasterTour = () => {
@@ -168,19 +180,19 @@ export function DashboardTopbar() {
     ];
 
     const activeSteps = possibleSteps.filter(step => document.querySelector(step.target));
-    
+
     startTour(activeSteps.map(step => ({ ...step, disableBeacon: true })));
   };
 
-  const userInitials = activeUser?.name 
-      ? activeUser.name.substring(0, 2).toUpperCase() 
+  const userInitials = activeUser?.name
+      ? activeUser.name.substring(0, 2).toUpperCase()
       : "OP";
 
   return (
     <header className="sticky top-0 z-40 mb-4">
       <div className="relative rounded-[2rem]">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/70 via-background/35 to-transparent rounded-[2rem]" />
-        
+
         <div className="glass-panel rounded-[2rem] px-4 py-3 backdrop-blur-2xl border border-border/50 bg-card/40 md:px-5 relative z-10">
           <div className="flex items-center justify-between gap-3">
 
@@ -194,10 +206,10 @@ export function DashboardTopbar() {
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              
-              <Button 
+
+              <Button
                 id="tour-topbar-help"
-                variant="ghost" 
+                variant="ghost"
                 className="h-10 px-3 rounded-xl shrink-0 text-primary bg-primary/10 hover:bg-primary/20 font-bold hidden sm:flex items-center gap-2 transition-all"
                 onClick={triggerMasterTour}
               >
@@ -206,9 +218,9 @@ export function DashboardTopbar() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
+                  <Button
                     id="tour-topbar-language"
-                    variant="ghost" 
+                    variant="ghost"
                     className="h-10 w-10 rounded-xl p-0 shrink-0 text-muted-foreground hover:text-foreground hidden sm:flex items-center justify-center relative"
                   >
                     <Globe className="h-5 w-5" />
@@ -226,8 +238,8 @@ export function DashboardTopbar() {
                     { code: "en", name: "English" },
                     { code: "am", name: "Amharic" },
                   ].map((lang) => (
-                    <DropdownMenuItem 
-                      key={lang.code} 
+                    <DropdownMenuItem
+                      key={lang.code}
                       onClick={() => handleLanguageChange(lang.code)}
                       className={`cursor-pointer font-medium rounded-xl py-2 mb-1 flex items-center justify-between transition-colors ${currentLocale === lang.code ? 'bg-primary/10 text-primary' : ''}`}
                     >
@@ -244,28 +256,31 @@ export function DashboardTopbar() {
                 <ThemeToggle />
               </div>
 
-              <Button 
+              <Button
                 id="tour-topbar-fullscreen"
-                variant="ghost" 
+                variant="ghost"
                 className="h-10 w-10 rounded-xl p-0 shrink-0 text-muted-foreground hover:text-foreground hidden sm:flex items-center justify-center"
                 onClick={toggleFullscreen}
               >
                 {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
               </Button>
 
-              <Button 
-                id="tour-topbar-notifications"
-                variant="ghost" 
-                className="h-10 w-10 rounded-xl p-0 shrink-0 text-muted-foreground hover:text-foreground"
-              >
-                <Bell className="h-5 w-5" />
-              </Button>
+              {canViewAlerts && (
+                <Button
+                  id="tour-topbar-notifications"
+                  variant="ghost"
+                  className="h-10 w-10 rounded-xl p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => router.push("/dashboard/alerts")}
+                >
+                  <Bell className="h-5 w-5" />
+                </Button>
+              )}
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button id="tour-topbar-profile" variant="ghost" className="h-10 rounded-xl px-2 hover:bg-muted/50 transition-colors">
                     <Avatar className="h-8 w-8 border border-border/50 shrink-0 shadow-sm bg-muted flex items-center justify-center overflow-hidden ring-2 ring-transparent transition-all group-hover:ring-primary/20">
-                      <SecureTopbarAvatar user={activeUser} fallbackInitials={userInitials} />
+                      <SecureTopbarAvatar user={activeUser} fallbackInitials={userInitials} canViewProfile={canViewProfile} />
                     </Avatar>
                     <div className="ml-2 hidden text-left sm:block">
                       <div className="text-xs font-bold leading-4 truncate max-w-[120px]">{activeUser?.name || "Operator"}</div>
@@ -278,10 +293,14 @@ export function DashboardTopbar() {
                 <DropdownMenuContent align="end" className="w-56 z-[100] rounded-2xl border-border/60 shadow-xl p-2 mt-2">
                   <DropdownMenuLabel className="font-space font-bold">{t('topbar.my_account', 'My Account')}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/profile")} className="cursor-pointer font-medium rounded-xl mb-1">
-                    {t('topbar.profile_settings', 'Profile Settings')}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                  {canViewProfile && (
+                    <>
+                      <DropdownMenuItem onClick={() => router.push("/dashboard/profile")} className="cursor-pointer font-medium rounded-xl mb-1">
+                        {t('topbar.profile_settings', 'Profile Settings')}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem onClick={handleLogout} className="text-destructive font-bold cursor-pointer rounded-xl focus:text-destructive focus:bg-destructive/10 mt-1">
                     <LogOut className="mr-2 h-4 w-4" /> {t('nav.disconnect', 'Disconnect Node')}
                   </DropdownMenuItem>

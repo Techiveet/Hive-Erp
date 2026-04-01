@@ -16,7 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { cn } from "@/lib/utils";
-import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, isTenantSession } from "@/lib/runtime-context";
+import { getBackendApiRoot, getBackendStorageUrl, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 
 // 🚀 SECURE BRAND LOGO FOR MOBILE SIDEBAR
@@ -84,10 +84,13 @@ export function MobileSidebar() {
   const { data: brandData } = useQuery({
     queryKey: ['brandSettings'],
     queryFn: async () => {
-        const res = await fetch(`${getBackendApiRoot()}/settings/brand`, {
-            headers: getAuthHeaders(),
+        const res = await fetch(`${getBackendApiRoot()}/settings/brand/public`, {
+            headers: {
+                Accept: "application/json",
+                ...getTenantHeaders(),
+            },
         });
-        if (await handleAuthFailureResponse(res)) {
+        if (!res.ok) {
             return null;
         }
         return res.json();
@@ -214,3 +217,4 @@ export function MobileSidebar() {
     </Sheet>
   );
 }
+

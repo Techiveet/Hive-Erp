@@ -24,6 +24,7 @@ class TenantRolesSeeder extends Seeder
             'view_logs', 'export_logs', 'manage_log_settings', 'archive_logs', 'delete_archived_logs',
             'view_alerts', 'manage_alerts', 'view_backups', 'manage_backups',
             'manage_system_settings',
+            'view_storage',
             'manage_storage',
             'manage_brand_settings', 'manage_general_settings', 'manage_localization', 'view_api_docs',
             'view_invoices', 'manage_invoices',
@@ -37,7 +38,7 @@ class TenantRolesSeeder extends Seeder
 
         $roles = [
             'Super Admin' => $perms, // 🚀 FIX: Name changed to 'Super Admin' to align with UI creations
-            'HR Manager' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_users', 'create_users', 'edit_users', 'view_roles'],
+            'HR Manager' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_users', 'create_users', 'edit_users', 'view_roles', 'view_storage'],
             'Finance Controller' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_invoices', 'manage_invoices', 'view_logs', 'export_logs'],
             'Logistics Coordinator' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_inventory', 'manage_inventory', 'manage_fleet'],
             'Employee' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_users'],

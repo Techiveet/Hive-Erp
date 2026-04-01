@@ -2,8 +2,8 @@
 
 namespace Modules\Core\Http\Controllers\Export;
 
-use App\Support\AuditLogQuery;
-use App\Support\ResolvesExportBranding;
+use Modules\Core\Support\AuditLogQuery;
+use Modules\Core\Support\ResolvesExportBranding;
 use Modules\Core\Models\Language;
 use Modules\Core\Models\Translation;
 use Modules\Core\Exports\ActivityLogExport;
@@ -111,3 +111,5 @@ class ActivityLogExportController extends Controller
         }
     }
 }
+
+

@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\ApiDocumentationController;
+use Modules\Core\Http\Controllers\ApiDocumentationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/api-docs', [ApiDocumentationController::class, 'index'])->name('api-docs.index');
@@ -64,4 +64,5 @@ Route::get('/test-export-logo', function () {
 
     });
 }
+
 

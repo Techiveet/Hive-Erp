@@ -131,7 +131,7 @@ const SecureBrandAsset = ({ path, previewUrl, lastSaved, fallbackText, className
     return <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{fallbackText}</span>;
 };
 
-function BrandAssetPickerModal({ isOpen, onClose, onSelect }: { isOpen: boolean, onClose: () => void, onSelect: (url: string) => void }) {
+function BrandAssetPickerModal({ isOpen, onClose, onSelect, access }: { isOpen: boolean, onClose: () => void, onSelect: (url: string) => void, access: { canRead: boolean; canManage: boolean } }) {
     const { t } = useTranslation();
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -153,7 +153,7 @@ function BrandAssetPickerModal({ isOpen, onClose, onSelect }: { isOpen: boolean,
                         .file-picker-wrapper > div > div:nth-child(2) > div:nth-child(2) { display: none !important; }
                         .file-picker-wrapper > div { height: 100% !important; min-height: 100% !important; margin: 0 !important; }
                     `}} />
-                    <FileManagerClient isPickerMode={true} onFileSelect={(file) => onSelect(file.media_details?.url || file.url || file.path)} />
+                    <FileManagerClient isPickerMode={true} access={access} onFileSelect={(file) => onSelect(file.media_details?.url || file.url || file.path)} />
                 </div>
             </DialogContent>
         </Dialog>
@@ -166,6 +166,9 @@ function BrandAssetPickerModal({ isOpen, onClose, onSelect }: { isOpen: boolean,
 function BrandSettings() {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
+    const { hasPermission, hasAnyPermission } = usePermissions();
+    const canManageStorage = hasPermission("manage_storage");
+    const canBrowseBrandLibrary = hasPermission("manage_brand_settings") || hasAnyPermission(["view_storage", "manage_storage"]);
 
     const [formData, setFormData] = useState<BrandFormData>(createInitialBrandForm());
     const [savedSnapshot, setSavedSnapshot] = useState<BrandFormData>(createInitialBrandForm());
@@ -472,7 +475,12 @@ function BrandSettings() {
                 </div>
             </div>
 
-            <BrandAssetPickerModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={handleFileSelect} />
+            <BrandAssetPickerModal
+                isOpen={isPickerOpen}
+                onClose={() => setIsPickerOpen(false)}
+                onSelect={handleFileSelect}
+                access={{ canRead: canBrowseBrandLibrary, canManage: canManageStorage }}
+            />
         </div>
     );
 }
@@ -707,14 +715,14 @@ function SettingsTabs({
             </Card>
 
             <div className="flex-1 min-w-0">
-                {activeTab === 'brand' && <BrandSettings />}
-                {activeTab === 'general' && <GeneralSettings />}
-                {activeTab === 'localization' && (
+                {canManageBrand && activeTab === 'brand' && <BrandSettings />}
+                {canManageGeneral && activeTab === 'general' && <GeneralSettings />}
+                {canManageLocalization && activeTab === 'localization' && (
                     <div className="p-6 border border-border/50 rounded-[2rem] bg-card/40 backdrop-blur-sm shadow-sm transition-all animate-in fade-in slide-in-from-bottom-2">
                         <LocalizationManager />
                     </div>
                 )}
-                {activeTab === 'backup' && (
+                {canAccessBackups && activeTab === 'backup' && (
                     <div id="tour-settings-backup" className="transition-all animate-in fade-in slide-in-from-bottom-2">
                         <BackupSettings />
                     </div>

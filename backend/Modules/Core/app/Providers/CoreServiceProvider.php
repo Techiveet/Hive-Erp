@@ -16,6 +16,7 @@ use Modules\Core\Models\SystemAlert; // Correct model path
 // Import the command classes & Jobs
 use Modules\Core\Console\Commands\SyncLocalizationCommand;
 use Modules\Core\Console\Commands\ArchiveAuditLogs;
+use Modules\Core\Console\Commands\DescribeModulesCommand;
 use Modules\Core\Console\Commands\ScoutTenantImport;
 use Modules\Core\Jobs\RunSystemBackup;
 
@@ -27,6 +28,7 @@ class CoreServiceProvider extends ModuleServiceProvider
     protected array $commands = [
         SyncLocalizationCommand::class,
         ArchiveAuditLogs::class,
+        DescribeModulesCommand::class,
         ScoutTenantImport::class,
     ];
 
@@ -159,3 +161,4 @@ class CoreServiceProvider extends ModuleServiceProvider
         }
     }
 }
+

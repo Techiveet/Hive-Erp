@@ -1,0 +1,67 @@
+import { Code2, FileText, HardDrive, LayoutDashboard, Settings } from "lucide-react";
+import type { FrontendModuleDefinition } from "@/modules/types";
+import {
+  API_DOCS_ROUTE_PERMISSIONS,
+  SETTINGS_ROUTE_PERMISSIONS,
+  STORAGE_ROUTE_PERMISSIONS,
+} from "@/lib/route-permissions";
+
+export const coreModule: FrontendModuleDefinition = {
+  id: "core",
+  name: "Core",
+  description: "Shared operational capabilities such as dashboard, settings, audit logs, storage, and docs.",
+  backendModule: "Modules\\Core",
+  routePrefixes: ["/dashboard", "/dashboard/audit-logs", "/dashboard/settings", "/dashboard/storage", "/dashboard/api-docs"],
+  navItems: [
+    {
+      moduleId: "core",
+      translationKey: "nav.dashboard",
+      fallbackLabel: "Dashboard",
+      href: "/dashboard",
+      icon: LayoutDashboard,
+      permissions: ["view_system_dashboard"],
+      tourId: "tour-nav-overview",
+      placement: "primary",
+    },
+    {
+      moduleId: "core",
+      translationKey: "nav.audit_logs",
+      fallbackLabel: "Audit Logs",
+      href: "/dashboard/audit-logs",
+      icon: FileText,
+      permissions: ["view_logs"],
+      tourId: "tour-nav-audit",
+      placement: "primary",
+    },
+    {
+      moduleId: "core",
+      translationKey: "nav.storage",
+      fallbackLabel: "Storage",
+      href: "/dashboard/storage",
+      icon: HardDrive,
+      permissions: [...STORAGE_ROUTE_PERMISSIONS],
+      tourId: "tour-nav-storage",
+      placement: "secondary",
+    },
+    {
+      moduleId: "core",
+      translationKey: "nav.settings",
+      fallbackLabel: "Settings",
+      href: "/dashboard/settings",
+      icon: Settings,
+      permissions: [...SETTINGS_ROUTE_PERMISSIONS],
+      tourId: "tour-nav-settings",
+      placement: "secondary",
+    },
+    {
+      moduleId: "core",
+      translationKey: "nav.api_docs",
+      fallbackLabel: "API Docs",
+      href: "/dashboard/api-docs",
+      icon: Code2,
+      permissions: [...API_DOCS_ROUTE_PERMISSIONS],
+      tourId: "tour-nav-api-docs",
+      placement: "secondary",
+    },
+  ],
+};

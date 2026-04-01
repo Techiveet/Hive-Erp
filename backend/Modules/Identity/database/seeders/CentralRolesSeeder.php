@@ -33,7 +33,7 @@ class CentralRolesSeeder extends Seeder
             'view_alerts', 'manage_alerts', 'view_backups', 'manage_backups',
 
             // System & Settings
-            'view_system_dashboard', 'manage_system_settings', 'manage_storage',
+            'view_system_dashboard', 'manage_system_settings', 'view_storage', 'manage_storage',
             'manage_brand_settings', 'manage_general_settings', 'manage_localization', 'view_api_docs',
         ];
 
@@ -50,12 +50,12 @@ class CentralRolesSeeder extends Seeder
         $roles = [
             'Security Auditor' => [
                 'view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs',
-                'view_tenants', 'view_users', 'view_roles', 'view_permissions', 'view_logs', 'export_logs', 'view_alerts'
+                'view_tenants', 'view_users', 'view_roles', 'view_permissions', 'view_logs', 'export_logs', 'view_alerts', 'view_storage'
             ], // Strictly read-only across all tabs
 
             'Support Specialist' => [
                 'view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs',
-                'view_tenants', 'view_users', 'edit_users', 'view_alerts'
+                'view_tenants', 'view_users', 'edit_users', 'view_alerts', 'view_storage'
             ], // Can view system and reset user passwords/status, but cannot touch roles
 
             'Billing Admin' => [

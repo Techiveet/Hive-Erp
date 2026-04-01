@@ -3,7 +3,7 @@
 namespace Modules\Tenancy\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Support\ResolvesExportBranding;
+use Modules\Core\Support\ResolvesExportBranding;
 use Modules\Tenancy\Models\Tenant;
 use Modules\Identity\Models\User;
 use Illuminate\Http\Request;
@@ -387,3 +387,4 @@ public function store(Request $request)
         return response()->json(['message' => "Tenant Super Admin has been " . ($adminNewState ? 'activated' : 'suspended') . ".", 'admin_active' => $adminNewState], 200);
     }
 }
+

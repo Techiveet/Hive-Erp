@@ -28,6 +28,12 @@ import { getTenantId, isTenantSession } from '@/lib/runtime-context';
 import { DashboardOverviewPlaceholder } from "@/components/ui/loading-states";
 import { usePermissions } from "@/hooks/use-permissions";
 import { handleAuthFailureResponse } from "@/lib/auth-sync";
+import {
+    ALERTS_ROUTE_PERMISSIONS,
+    AUDIT_LOG_ROUTE_PERMISSIONS,
+    SECURITY_ROUTE_PERMISSIONS,
+    TENANTS_ROUTE_PERMISSIONS,
+} from "@/lib/route-permissions";
 
 interface DashboardData {
     company: string;
@@ -72,9 +78,16 @@ export default function DashboardHome() {
     const [isImpersonating, setIsImpersonating] = useState(false);
     const canViewDashboard = hasPermission("view_system_dashboard");
     const canProvisionTenants = hasAnyPermission(["manage_tenants", "provision_tenants"]);
-    const canInviteUsers = hasAnyPermission(["manage_users", "create_users"]);
+    const canViewUsers = hasAnyPermission(["manage_users", "view_users"]);
+    const canInviteUsers = hasPermission("manage_users") || (hasPermission("create_users") && canViewUsers);
     const canManageSystemSettings = hasPermission("manage_system_settings");
     const canManageBackups = hasPermission("manage_backups");
+    const canAccessSecurity = hasAnyPermission([...SECURITY_ROUTE_PERMISSIONS]);
+    const canViewRoles = hasAnyPermission(["manage_roles", "view_roles"]);
+    const canViewPermissions = hasPermission("view_permissions");
+    const canViewAlerts = hasAnyPermission([...ALERTS_ROUTE_PERMISSIONS]);
+    const canViewLogs = hasAnyPermission([...AUDIT_LOG_ROUTE_PERMISSIONS]);
+    const canViewTenants = hasAnyPermission([...TENANTS_ROUTE_PERMISSIONS]);
 
     // Central Telemetry State
     const [telemetry, setTelemetry] = useState(Array.from({ length: 10 }).map((_, i) => ({ time: `-${10 - i}s`, requests: Math.floor(Math.random() * 500) + 500 })));
@@ -367,11 +380,11 @@ export default function DashboardHome() {
             {/* STAT CARDS */}
             <div className={cn("grid gap-4 mt-8", isCentral ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-4" : "grid-cols-1 md:grid-cols-3")}>
                 {isCentral && (
-                    <StatCard title="Active Nodes" value={data.stats.active_tenants || 0} subtext={`Provisioned: ${data.stats.total_tenants}`} icon={<Server className="text-indigo-500" />} bgClass="bg-indigo-500/10" href="/dashboard/tenants" trend="up" />
+                    <StatCard title="Active Nodes" value={data.stats.active_tenants || 0} subtext={`Provisioned: ${data.stats.total_tenants}`} icon={<Server className="text-indigo-500" />} bgClass="bg-indigo-500/10" href={canViewTenants ? "/dashboard/tenants" : undefined} trend="up" />
                 )}
-                <StatCard title="Active Users" value={data.stats.active_users} subtext={`Total: ${data.stats.total_users}`} icon={<Users className="text-emerald-500" />} bgClass="bg-emerald-500/10" href="/dashboard/security" trend="up" />
-                <StatCard title="Security Roles" value={data.stats.total_roles} subtext="Access Matrices" icon={<ShieldCheck className="text-amber-500" />} bgClass="bg-amber-500/10" href="/dashboard/security" trend="up" />
-                <StatCard title="Permissions" value={data.stats.total_permissions} subtext="Permission Nodes" icon={<Key className="text-blue-500" />} bgClass="bg-blue-500/10" href="/dashboard/security" />
+                <StatCard title="Active Users" value={data.stats.active_users} subtext={`Total: ${data.stats.total_users}`} icon={<Users className="text-emerald-500" />} bgClass="bg-emerald-500/10" href={canAccessSecurity ? (canViewUsers ? "/dashboard/security?tab=users" : "/dashboard/security") : undefined} trend="up" />
+                <StatCard title="Security Roles" value={data.stats.total_roles} subtext="Access Matrices" icon={<ShieldCheck className="text-amber-500" />} bgClass="bg-amber-500/10" href={canViewRoles ? "/dashboard/security?tab=roles" : undefined} trend="up" />
+                <StatCard title="Permissions" value={data.stats.total_permissions} subtext="Permission Nodes" icon={<Key className="text-blue-500" />} bgClass="bg-blue-500/10" href={canViewPermissions ? "/dashboard/security?tab=permissions" : undefined} />
             </div>
 
             {/* CENTRAL ONLY: Telemetry & Modules */}
@@ -454,7 +467,6 @@ export default function DashboardHome() {
                     </div>
                 </div>
             )}
-
             {/* TENANT ONLY: Engagement Chart & Traffic */}
             {!isCentral && (
                 <div className="grid gap-4 md:grid-cols-12 mt-4">
@@ -560,11 +572,6 @@ export default function DashboardHome() {
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
                                 <Globe className="h-4 w-4 text-blue-400" /> Traffic Origins
                             </div>
-                            <Link href="/dashboard/analytics">
-                                <Button variant="ghost" size="sm" className="h-6 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground">
-                                    Show More <ChevronRight className="w-3 h-3 ml-1" />
-                                </Button>
-                            </Link>
                         </div>
                         <div className="space-y-4 flex-1">
                             {(data.traffic_origins || []).slice(0, 5).map((origin, i) => (
@@ -577,11 +584,8 @@ export default function DashboardHome() {
                     </div>
                 </div>
             )}
-
             <div className="grid gap-4 md:grid-cols-12 mt-4">
-                
-                {/* CENTRAL ONLY: Alerts */}
-                {isCentral && (
+                {isCentral && canViewAlerts && (
                     <div className="md:col-span-4 rounded-[2rem] border border-red-500/20 bg-gradient-to-br from-red-500/5 to-background p-6 flex flex-col overflow-hidden">
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
@@ -619,102 +623,132 @@ export default function DashboardHome() {
                     </div>
                 )}
 
-                {/* TENANT ONLY: Quick Actions Panel */}
-                {!isCentral && (
+                {!isCentral && (canInviteUsers || canViewRoles || canViewPermissions) && (
                      <div className="md:col-span-4 rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md flex flex-col">
                         <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground mb-6">
                             <Zap className="h-4 w-4 text-amber-500" /> Quick Actions
                         </div>
                         <div className="flex flex-col gap-3 flex-1">
-                            <Button onClick={() => router.push('/dashboard/security?tab=users')} variant="outline" className="h-14 w-full justify-start rounded-2xl bg-background/50 hover:bg-primary/5 hover:border-primary/30 transition-all group">
-                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
-                                    <UserPlus className="h-4 w-4 text-primary" />
-                                </div>
-                                <div className="text-left flex-1">
-                                    <p className="text-sm font-bold">Invite Operator</p>
-                                    <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest mt-0.5">Manage Access</p>
-                                </div>
-                                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                            </Button>
+                            {canInviteUsers && (
+                                <Button onClick={() => router.push('/dashboard/security?tab=users')} variant="outline" className="h-14 w-full justify-start rounded-2xl bg-background/50 hover:bg-primary/5 hover:border-primary/30 transition-all group">
+                                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
+                                        <UserPlus className="h-4 w-4 text-primary" />
+                                    </div>
+                                    <div className="text-left flex-1">
+                                        <p className="text-sm font-bold">Invite Operator</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest mt-0.5">Manage Access</p>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                                </Button>
+                            )}
                             
-                            <Button onClick={() => router.push('/dashboard/security?tab=roles')} variant="outline" className="h-14 w-full justify-start rounded-2xl bg-background/50 hover:bg-emerald-500/5 hover:border-emerald-500/30 transition-all group">
-                                <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
-                                    <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                                </div>
-                                <div className="text-left flex-1">
-                                    <p className="text-sm font-bold">Configure Roles</p>
-                                    <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest mt-0.5">Access Matrices</p>
-                                </div>
-                                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                            </Button>
+                            {canViewRoles && (
+                                <Button onClick={() => router.push('/dashboard/security?tab=roles')} variant="outline" className="h-14 w-full justify-start rounded-2xl bg-background/50 hover:bg-emerald-500/5 hover:border-emerald-500/30 transition-all group">
+                                    <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
+                                        <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                                    </div>
+                                    <div className="text-left flex-1">
+                                        <p className="text-sm font-bold">Configure Roles</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest mt-0.5">Access Matrices</p>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                                </Button>
+                            )}
 
-                             
+                            {canViewPermissions && (
+                                <Button onClick={() => router.push('/dashboard/security?tab=permissions')} variant="outline" className="h-14 w-full justify-start rounded-2xl bg-background/50 hover:bg-blue-500/5 hover:border-blue-500/30 transition-all group">
+                                    <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
+                                        <Key className="h-4 w-4 text-blue-500" />
+                                    </div>
+                                    <div className="text-left flex-1">
+                                        <p className="text-sm font-bold">Review Permissions</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest mt-0.5">Capability Ledger</p>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                                </Button>
+                            )}
                         </div>
                      </div>
                 )}
 
-                {/* 🚀 AUDIT LOGS: Flexibly adapts to 8 columns */}
-                <div className="md:col-span-8 rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md">
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="text-sm font-bold flex items-center gap-3 uppercase tracking-widest text-muted-foreground">
-                            <Activity className="h-4 w-4 text-primary" /> 
-                            {isCentral ? "Live System Audit" : "Live Node Audit"}
-                        </div>
-                        <Link href="/dashboard/audit-logs">
-                            <Button variant="ghost" size="sm" className="h-6 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground">
-                                Show More <ChevronRight className="w-3 h-3 ml-1" />
-                            </Button>
-                        </Link>
-                    </div>
-                    <div className="space-y-3">
-                        {(data.recent_activity || []).slice(0, 5).map((log, index) => {
-                            let causerName = log.properties?.causer_name || log.causer?.name || log.causer || 'System';
-                            if (causerName === 'HIVE OVERLORD' && log.properties?.causer_name) {
-                                causerName = log.properties.causer_name;
-                            }
-
-                            // 🚀 THE FIX: Display the Node Badge ONLY for Central Admins
-                            const nodeLabel = log.node === 'Central' ? 'CENTRAL' : (log.node || log.tenant_id);
-
-                            return (
-                                <div key={`log-${log.id}-${index}`} className="flex items-center justify-between p-4 rounded-2xl bg-background/40 border border-border/40 hover:bg-muted/30 transition-all animate-in fade-in slide-in-from-top-2 duration-500">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary"><UserIcon className="w-4 h-4" /></div>
-                                        <div>
-                                            <p className="text-sm font-bold">{log.description}</p>
-                                            <p className="text-[10px] font-mono text-muted-foreground uppercase flex items-center gap-1.5 mt-0.5">
-                                                {isCentral && (
-                                                    <span className="bg-primary/20 text-primary px-1.5 rounded-sm font-bold tracking-widest">
-                                                        [{nodeLabel}]
-                                                    </span>
-                                                )}
-                                                {log.event} • {log.time || log.time_ago || 'Just now'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <Badge variant="outline" className="font-mono text-[10px] uppercase">
-                                        {causerName}
-                                    </Badge>
-                                </div>
-                            );
-                        })}
-
-                        {(!data.recent_activity || data.recent_activity.length === 0) && (
-                            <div className="text-xs text-muted-foreground text-center py-8 flex flex-col items-center">
-                                <FileText className="h-8 w-8 text-muted/30 mb-2" />
-                                No recent audit logs found for this node.
+                {canViewLogs && (
+                    <div className={cn("rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md", (isCentral ? canViewAlerts : (canInviteUsers || canViewRoles || canViewPermissions)) ? "md:col-span-8" : "md:col-span-12")}>
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="text-sm font-bold flex items-center gap-3 uppercase tracking-widest text-muted-foreground">
+                                <Activity className="h-4 w-4 text-primary" /> 
+                                {isCentral ? "Live System Audit" : "Live Node Audit"}
                             </div>
-                        )}
+                            <Link href="/dashboard/audit-logs">
+                                <Button variant="ghost" size="sm" className="h-6 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground">
+                                    Show More <ChevronRight className="w-3 h-3 ml-1" />
+                                </Button>
+                            </Link>
+                        </div>
+                        <div className="space-y-3">
+                            {(data.recent_activity || []).slice(0, 5).map((log, index) => {
+                                let causerName = log.properties?.causer_name || log.causer?.name || log.causer || 'System';
+                                if (causerName === 'HIVE OVERLORD' && log.properties?.causer_name) {
+                                    causerName = log.properties.causer_name;
+                                }
+
+                                const nodeLabel = log.node === 'Central' ? 'CENTRAL' : (log.node || log.tenant_id);
+
+                                return (
+                                    <div key={`log-${log.id}-${index}`} className="flex items-center justify-between p-4 rounded-2xl bg-background/40 border border-border/40 hover:bg-muted/30 transition-all animate-in fade-in slide-in-from-top-2 duration-500">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary"><UserIcon className="w-4 h-4" /></div>
+                                            <div>
+                                                <p className="text-sm font-bold">{log.description}</p>
+                                                <p className="text-[10px] font-mono text-muted-foreground uppercase flex items-center gap-1.5 mt-0.5">
+                                                    {isCentral && (
+                                                        <span className="bg-primary/20 text-primary px-1.5 rounded-sm font-bold tracking-widest">
+                                                            [{nodeLabel}]
+                                                        </span>
+                                                    )}
+                                                    {log.event} - {log.time || log.time_ago || 'Just now'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <Badge variant="outline" className="font-mono text-[10px] uppercase">
+                                            {causerName}
+                                        </Badge>
+                                    </div>
+                                );
+                            })}
+
+                            {(!data.recent_activity || data.recent_activity.length === 0) && (
+                                <div className="text-xs text-muted-foreground text-center py-8 flex flex-col items-center">
+                                    <FileText className="h-8 w-8 text-muted/30 mb-2" />
+                                    No recent audit logs found for this node.
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );
 }
 
-function StatCard({ title, value, subtext, icon, bgClass, href, trend }: any) {
-    return (
-        <Link href={href} className="p-6 rounded-[2rem] border border-border/50 bg-card/40 backdrop-blur-md relative overflow-hidden group hover:border-primary/30 transition-all block">
+function StatCard({
+    title,
+    value,
+    subtext,
+    icon,
+    bgClass,
+    href,
+    trend,
+}: {
+    title: string;
+    value: React.ReactNode;
+    subtext: string;
+    icon: React.ReactNode;
+    bgClass: string;
+    href?: string;
+    trend?: string;
+}) {
+    const content = (
+        <>
             <div className={cn("absolute -right-8 -top-8 w-32 h-32 rounded-full blur-3xl opacity-20", bgClass)} />
             <div className="flex justify-between mb-4 relative z-10">
                 <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center border", bgClass)}>{icon}</div>
@@ -725,6 +759,20 @@ function StatCard({ title, value, subtext, icon, bgClass, href, trend }: any) {
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{title}</p>
                 <p className="text-[10px] text-muted-foreground font-mono mt-1">{subtext}</p>
             </div>
+        </>
+    );
+
+    if (!href) {
+        return (
+            <div className="p-6 rounded-[2rem] border border-border/50 bg-card/40 backdrop-blur-md relative overflow-hidden group block">
+                {content}
+            </div>
+        );
+    }
+
+    return (
+        <Link href={href} className="p-6 rounded-[2rem] border border-border/50 bg-card/40 backdrop-blur-md relative overflow-hidden group hover:border-primary/30 transition-all block">
+            {content}
         </Link>
     );
 }
@@ -743,3 +791,4 @@ function DashboardError({ message }: { message?: string }) {
         </div>
     );
 }
+

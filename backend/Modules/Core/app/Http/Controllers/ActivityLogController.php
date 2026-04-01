@@ -3,7 +3,7 @@
 namespace Modules\Core\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Support\AuditLogQuery;
+use Modules\Core\Support\AuditLogQuery;
 use Modules\Core\Models\ActivityArchive;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -226,3 +226,4 @@ class ActivityLogController extends Controller implements HasMiddleware
         return response()->json(['message' => 'Selected vaulted logs permanently deleted.']);
     }
 }
+

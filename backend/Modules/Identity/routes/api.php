@@ -40,10 +40,10 @@ foreach ($centralDomains as $domain) {
             // Heartbeat Endpoint
             Route::post('/ping', [AuthController::class, 'ping']);
 
-            Route::get('/user', [AuthController::class, 'user']);
+            Route::get('/user', [AuthController::class, 'user'])->middleware('permission:view_profile|edit_profile,sanctum');
             Route::post('/logout', [AuthController::class, 'logout']);
             Route::post('/profile/update', [ProfileController::class, 'updateProfile'])->middleware('permission:edit_profile,sanctum');
-            Route::get('/profile/avatar', [ProfileController::class, 'getAvatar']);
+            Route::get('/profile/avatar', [ProfileController::class, 'getAvatar'])->middleware('permission:view_profile|edit_profile,sanctum');
 
             Route::prefix('2fa')->group(function () {
                 Route::post('/enable', [TwoFactorController::class, 'enable'])->middleware('permission:edit_profile,sanctum');
@@ -122,14 +122,14 @@ Route::middleware([
         Route::post('/ping', [AuthController::class, 'ping']);
         Route::post('/tenant/ping', [AuthController::class, 'ping']);
 
-        Route::get('/user', [AuthController::class, 'user']);
-        Route::get('/tenant/user', [AuthController::class, 'user']);
+        Route::get('/user', [AuthController::class, 'user'])->middleware('permission:view_profile|edit_profile,sanctum');
+        Route::get('/tenant/user', [AuthController::class, 'user'])->middleware('permission:view_profile|edit_profile,sanctum');
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/tenant/logout', [AuthController::class, 'logout']);
         Route::post('/profile/update', [ProfileController::class, 'updateProfile'])->middleware('permission:edit_profile,sanctum');
         Route::post('/tenant/profile/update', [ProfileController::class, 'updateProfile'])->middleware('permission:edit_profile,sanctum');
-        Route::get('/profile/avatar', [ProfileController::class, 'getAvatar']);
-        Route::get('/tenant/profile/avatar', [ProfileController::class, 'getAvatar']);
+        Route::get('/profile/avatar', [ProfileController::class, 'getAvatar'])->middleware('permission:view_profile|edit_profile,sanctum');
+        Route::get('/tenant/profile/avatar', [ProfileController::class, 'getAvatar'])->middleware('permission:view_profile|edit_profile,sanctum');
 
         Route::prefix('2fa')->group(function () {
             Route::post('/enable', [TwoFactorController::class, 'enable'])->middleware('permission:edit_profile,sanctum');

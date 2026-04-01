@@ -66,6 +66,8 @@ export function UsersTabClient(props: Props) {
   const canEdit = hasAnyPermission(["manage_users", "edit_users"]);
   const canDelete = hasAnyPermission(["manage_users", "delete_users"]);
   const canImpersonate = hasAnyPermission(["manage_users"]);
+  const canManageStorage = hasAnyPermission(["manage_storage"]);
+  const canBrowseAvatarLibrary = hasAnyPermission(["view_storage", "manage_storage"]);
 
   const isProtectedUser = React.useCallback((user: any) => {
     if (!user) return false;
@@ -633,9 +635,11 @@ export function UsersTabClient(props: Props) {
             <div className="px-6 py-6 space-y-6">
               
               <div className="flex items-center gap-5">
-                <div 
-                  className={cn("relative group shrink-0 transition-all duration-200 cursor-pointer")} 
-                  onClick={() => setIsFileManagerOpen(true)}
+                <div
+                  className={cn("relative group shrink-0 transition-all duration-200", canBrowseAvatarLibrary ? "cursor-pointer" : "cursor-default")}
+                  onClick={() => canBrowseAvatarLibrary && setIsFileManagerOpen(true)}
+                  aria-disabled={!canBrowseAvatarLibrary}
+                  title={!canBrowseAvatarLibrary ? t("storage.denied", "Storage access required to browse avatars.") : undefined}
                 >
                   <Avatar className="h-20 w-20 border-2 border-dashed border-border group-hover:border-primary/50 transition-colors bg-muted">
                     {previewUrl ? (
@@ -646,7 +650,7 @@ export function UsersTabClient(props: Props) {
                       </AvatarFallback>
                     )}
                   </Avatar>
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                  <div className={cn("absolute inset-0 flex items-center justify-center bg-black/60 transition-opacity rounded-full", canBrowseAvatarLibrary ? "opacity-0 group-hover:opacity-100" : "opacity-0")}>
                     <Upload className="h-5 w-5 text-white" />
                   </div>
                 </div>
@@ -728,7 +732,7 @@ export function UsersTabClient(props: Props) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isFileManagerOpen} onOpenChange={setIsFileManagerOpen}>
+      <Dialog open={canBrowseAvatarLibrary && isFileManagerOpen} onOpenChange={setIsFileManagerOpen}>
           <DialogContent className="max-w-6xl w-[95vw] h-[85vh] p-0 overflow-hidden rounded-[2.5rem] bg-background border-border/50 shadow-2xl flex flex-col gap-0 z-[100]">
               <DialogTitle className="sr-only">Select User Avatar</DialogTitle>
               <div className="px-8 py-5 border-b border-border/50 bg-card/60 backdrop-blur-xl shrink-0 flex items-center gap-4 z-10">
@@ -745,7 +749,7 @@ export function UsersTabClient(props: Props) {
                       .file-picker-wrapper > div > div:nth-child(1), .file-picker-wrapper > div > div:nth-child(2) > div:nth-child(2) { display: none !important; }
                       .file-picker-wrapper > div { height: 100% !important; min-height: 100% !important; margin: 0 !important; }
                   `}} />
-                  <FileManagerClient isPickerMode={true} onFileSelect={handleFileSelect} />
+                  <FileManagerClient isPickerMode={true} access={{ canRead: canBrowseAvatarLibrary, canManage: canManageStorage }} onFileSelect={handleFileSelect} />
               </div>
           </DialogContent>
       </Dialog>

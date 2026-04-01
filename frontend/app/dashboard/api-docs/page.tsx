@@ -5,9 +5,12 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { getBackendOrigin, getTenantId } from "@/lib/runtime-context";
+import { getAuthHeaders, getBackendOrigin, getTenantId } from "@/lib/runtime-context";
 import { cn } from "@/lib/utils";
-import { Home, ExternalLink, ShieldCheck, Network, ServerCog, RefreshCcw, Braces } from "lucide-react";
+import { ModulePageSkeleton } from "@/components/ui/loading-states";
+import { usePermissions } from "@/hooks/use-permissions";
+import { API_DOCS_ROUTE_PERMISSIONS } from "@/lib/route-permissions";
+import { Home, ExternalLink, ShieldCheck, Network, ServerCog, RefreshCcw, Braces, ShieldAlert } from "lucide-react";
 
 declare global {
   interface Window {
@@ -65,6 +68,9 @@ export default function ApiDocsPage() {
   const [tenant, setTenant] = useState("");
   const [status, setStatus] = useState("Loading API command deck...");
 
+const { hasAnyPermission, isLoaded } = usePermissions();
+  const canViewApiDocs = hasAnyPermission([...API_DOCS_ROUTE_PERMISSIONS]);
+
   const backendOrigin = useMemo(() => getBackendOrigin(), []);
   const specUrl = `${backendOrigin}/api/docs/openapi.json`;
   const backendDocsUrl = `${backendOrigin}/api/docs`;
@@ -102,7 +108,7 @@ export default function ApiDocsPage() {
       setStatus((current) => current.startsWith("Loading") ? current : "Refreshing API command deck...");
 
       try {
-        const response = await fetch(specUrl);
+        const response = await fetch(specUrl, { headers: getAuthHeaders() });
         if (!response.ok) {
           throw new Error(`Failed to load spec (${response.status})`);
         }
@@ -182,6 +188,26 @@ export default function ApiDocsPage() {
     setTenant("");
     setMode("central");
   };
+
+  if (!isLoaded) {
+    return <ModulePageSkeleton titleWidth="w-44" subtitleWidth="w-72" rows={4} cols={2} />;
+  }
+
+  if (!canViewApiDocs) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 rounded-[2rem] border border-border/50 bg-card/40 p-8 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10">
+          <ShieldAlert className="h-8 w-8 text-destructive" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black tracking-tight">Access Denied</h2>
+          <p className="max-w-md text-sm text-muted-foreground">
+            Your current access token lacks the required <strong className="text-destructive">view_api_docs</strong> capability.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -346,4 +372,3 @@ function QuickLink({ href, label, helper }: { href: string; label: string; helpe
     </a>
   );
 }
-

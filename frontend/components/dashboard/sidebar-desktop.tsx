@@ -12,7 +12,7 @@ import { useTranslation } from "@/store/use-translation";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
-import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, isTenantSession } from "@/lib/runtime-context";
+import { getBackendApiRoot, getBackendStorageUrl, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 
 // 🚀 SECURE BRAND LOGO
@@ -107,10 +107,13 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
     const { data: brandData } = useQuery({
     queryKey: ['brandSettings'],
     queryFn: async () => {
-        const res = await fetch(`${getBackendApiRoot()}/settings/brand`, {
-            headers: getAuthHeaders(),
+        const res = await fetch(`${getBackendApiRoot()}/settings/brand/public`, {
+            headers: {
+                Accept: "application/json",
+                ...getTenantHeaders(),
+            },
         });
-        if (await handleAuthFailureResponse(res)) {
+        if (!res.ok) {
             return null;
         }
         return res.json();
@@ -308,3 +311,4 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
     </div>
   );
 }
+

@@ -2,7 +2,7 @@
 
 namespace Modules\Identity\Http\Controllers\Export;
 
-use App\Support\ResolvesExportBranding;
+use Modules\Core\Support\ResolvesExportBranding;
 use Modules\Identity\Models\Permission;
 use Modules\Core\Models\Language;
 use App\Exports\PermissionsExport;
@@ -101,3 +101,4 @@ class PermissionExportController extends Controller
         }
     }
 }
+

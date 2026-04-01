@@ -2,7 +2,7 @@
 
 namespace Modules\Tenancy\Http\Controllers\Export;
 
-use App\Support\ResolvesExportBranding;
+use Modules\Core\Support\ResolvesExportBranding;
 use Modules\Tenancy\Models\Tenant;
 use Modules\Core\Models\Language;
 use Modules\Core\Models\Translation;
@@ -137,3 +137,4 @@ class TenantExportController extends Controller implements HasMiddleware
         }
     }
 }
+

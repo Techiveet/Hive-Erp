@@ -19,7 +19,7 @@ class BrandSettingsController extends Controller
 
     // Define keys safe to expose to unauthenticated visitors on the landing/login pages
     private $publicBrandKeys = [
-        'logo_light', 'logo_dark', 'favicon', 'app_title', 'footer_text',
+        'logo_light', 'logo_dark', 'favicon', 'sidebar_icon', 'app_title', 'footer_text',
         'primary_color', 'auth_background_image', 'auth_welcome_message', 'font_family',
         'meta_description', 'og_image', 'hide_watermark'
     ];
