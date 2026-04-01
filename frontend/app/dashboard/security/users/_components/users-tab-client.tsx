@@ -24,7 +24,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, type CompanySettingsInfo, type BrandingSettingsInfo } from "@/components/datatable/data-table";
-import { fetchUsers, createUser, updateUser, deleteUser, toggleUserStatus, fetchRoles } from "@/lib/api";
+import { useOfflineMutation } from "@/hooks/use-offline-mutation";
+import { isOfflineMutationQueuedResult } from "@/lib/offline/mutation-queue";
+import {
+  createUserOfflineMutationDefinition,
+  deleteUserOfflineMutationDefinition,
+  toggleUserStatusOfflineMutationDefinition,
+  type UserOfflinePayload,
+  type UserUpdateOfflinePayload,
+  updateUserOfflineMutationDefinition,
+} from "@/modules/shared/offline-mutations";
+import { fetchRoles, fetchUsers } from "@/modules/identity/api";
 import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -276,10 +286,49 @@ export function UsersTabClient(props: Props) {
     }
   });
 
-  const createMut = useMutation({ mutationFn: createUser, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["users"] }); toast.success(t('users.user_provisioned', 'User provisioned')); setCreateDialogOpen(false); } });
-  const updateMut = useMutation({ mutationFn: updateUser, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["users"] }); toast.success(t('users.user_updated', 'User updated')); setCreateDialogOpen(false); } });
-  const toggleMut = useMutation({ mutationFn: (id: number) => toggleUserStatus(id), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }) });
-  const deleteMut = useMutation({ mutationFn: deleteUser, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["users"] }); toast.success(t('users.user_purged', 'User purged')); } });
+  const createMut = useOfflineMutation<any, Error, UserOfflinePayload>({
+    definition: createUserOfflineMutationDefinition,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast.success(t('users.user_provisioned', 'User provisioned'));
+      setCreateDialogOpen(false);
+    },
+    onQueued: () => {
+      toast.info("Offline: the new user has been queued and will provision automatically once the network returns.");
+      setCreateDialogOpen(false);
+    },
+  });
+
+  const updateMut = useOfflineMutation<any, Error, UserUpdateOfflinePayload>({
+    definition: updateUserOfflineMutationDefinition,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast.success(t('users.user_updated', 'User updated'));
+      setCreateDialogOpen(false);
+    },
+    onQueued: () => {
+      toast.info("Offline: user updates have been queued and will sync automatically when the connection returns.");
+      setCreateDialogOpen(false);
+    },
+  });
+
+  const toggleMut = useOfflineMutation<any, Error, number>({
+    definition: toggleUserStatusOfflineMutationDefinition,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    onQueued: () => {
+      toast.info("Offline: the access change has been queued and will sync automatically.");
+    },
+  });
+
+  const deleteMut = useOfflineMutation<any, Error, number>({
+    definition: deleteUserOfflineMutationDefinition,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || t('global.operation_failed', "Operation failed."));
+    },
+  });
 
   const handleQueryChange = React.useCallback((q: any) => {
     if (q.page !== undefined) setPage(q.page);
@@ -298,7 +347,10 @@ export function UsersTabClient(props: Props) {
 
   const handleToggle = React.useCallback(async (id: string, currentStatus: boolean) => {
     try {
-      await toggleMut.mutateAsync(Number(id));
+      const result = await toggleMut.mutateAsync(Number(id));
+      if (isOfflineMutationQueuedResult(result)) {
+        return;
+      }
       toast.success(`${t('users.access', 'User access')} ${currentStatus ? t('global.locked', 'locked') : t('global.restored', 'restored')}`);
     } catch (error) { toast.error(t('global.operation_failed', "Failed to update status")); }
   }, [toggleMut, t]);
@@ -310,8 +362,19 @@ export function UsersTabClient(props: Props) {
         toast.error(t('users.purge_protected_err', "Cannot purge protected accounts."));
         return; 
     }
-    await Promise.all(validRows.map((r) => deleteMut.mutateAsync(Number(r.id))));
-    toast.success(`${validRows.length} ${t('users.accounts_purged', 'accounts purged.')}`);
+    try {
+      const results = await Promise.all(validRows.map((r) => deleteMut.mutateAsync(Number(r.id))));
+      const queuedCount = results.filter(isOfflineMutationQueuedResult).length;
+      if (queuedCount === validRows.length) {
+        toast.info(`${validRows.length} account deletion${validRows.length === 1 ? "" : "s"} queued for sync.`);
+      } else if (queuedCount === 0) {
+        toast.success(`${validRows.length} ${t('users.accounts_purged', 'accounts purged.')}`);
+      } else {
+        toast.info(`${queuedCount} account deletion${queuedCount === 1 ? "" : "s"} queued. The rest were processed immediately.`);
+      }
+    } catch (error) {
+      toast.error(t('global.operation_failed', "Operation failed."));
+    }
   }, [deleteMut, t]);
 
   const resetForm = React.useCallback(() => {
@@ -368,21 +431,29 @@ export function UsersTabClient(props: Props) {
         return;
     }
 
-    const formData = new FormData();
-    formData.append("name", formName.trim());
-    formData.append("email", formEmail.trim().toLowerCase());
-    if (formPassword.trim() !== "") formData.append("password", formPassword.trim());
-    if (tenantId) formData.append("tenant_id", tenantId);
+    const payload: UserOfflinePayload = {
+      name: formName.trim(),
+      email: formEmail.trim().toLowerCase(),
+    };
+    if (formPassword.trim() !== "") payload.password = formPassword.trim();
+    if (tenantId) payload.tenant_id = tenantId;
 
     const roleObj = assignableRoles.find((r: any) => r.id === formRoleId);
-    if (roleObj) formData.append("role", roleObj.name);
+    if (roleObj) payload.role = roleObj.name;
 
-    if (formAvatarPath) formData.append("avatar_path", formAvatarPath);
-    else if (isAvatarRemoved) formData.append("remove_avatar", "1");
+    if (formAvatarPath) payload.avatar_path = formAvatarPath;
+    else if (isAvatarRemoved) payload.remove_avatar = "1";
 
     try {
-      if (isEdit && editingUser) await updateMut.mutateAsync({ id: Number(editingUser.id), formData });
-      else await createMut.mutateAsync(formData);
+      if (isEdit && editingUser) {
+        const updatePayload: UserUpdateOfflinePayload = {
+          id: Number(editingUser.id),
+          data: payload,
+        };
+        await updateMut.mutateAsync(updatePayload);
+      } else {
+        await createMut.mutateAsync(payload);
+      }
     } catch (error: any) { 
       if (error?.response?.status === 422 && error?.response?.data?.errors) {
         const errors = error.response.data.errors;
@@ -517,7 +588,7 @@ export function UsersTabClient(props: Props) {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel className="rounded-xl">{t('global.cancel', 'Cancel')}</AlertDialogCancel>
-                      <AlertDialogAction className="rounded-xl bg-destructive hover:bg-destructive/90" onClick={() => deleteMut.mutate(Number(u.id))}>{t('users.confirm_purge', 'Confirm Purge')}</AlertDialogAction>
+                      <AlertDialogAction className="rounded-xl bg-destructive hover:bg-destructive/90" onClick={() => { void deleteMut.mutateAsync(Number(u.id)).then((result) => { if (isOfflineMutationQueuedResult(result)) { toast.info(`Offline: deletion for ${u.email} has been queued for sync.`); return; } toast.success(t('users.user_purged', 'User purged')); }).catch(() => {}); }}>{t('users.confirm_purge', 'Confirm Purge')}</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>

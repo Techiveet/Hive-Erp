@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
-import { Network, Server, PlusCircle, Pencil, Trash2, Loader2, Calendar, Globe, AlertCircle, Power, UserX, UserPlus, Mail, Eye, UserCheck } from "lucide-react";
+import { Server, PlusCircle, Pencil, Trash2, Loader2, Calendar, Globe, AlertCircle, Power, UserX, UserPlus, Mail, Eye, UserCheck } from "lucide-react";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,8 +13,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DataTable, type CompanySettingsInfo, type BrandingSettingsInfo } from "@/components/datatable/data-table"; 
-import { fetchTenants, createTenant, updateTenant, deleteTenant, toggleTenantStatus, toggleTenantAdminStatus, logFrontendAction } from "@/lib/api"; 
+import { DataTable, type CompanySettingsInfo, type BrandingSettingsInfo } from "@/components/datatable/data-table";
+import { useOfflineMutation } from "@/hooks/use-offline-mutation";
+import { isOfflineMutationQueuedResult } from "@/lib/offline/mutation-queue";
+import { logFrontendAction } from "@/modules/core/api";
+import {
+    createTenantOfflineMutationDefinition,
+    deleteTenantOfflineMutationDefinition,
+    toggleTenantAdminOfflineMutationDefinition,
+    toggleTenantStatusOfflineMutationDefinition,
+    type TenantCreateOfflinePayload,
+    type TenantUpdateOfflinePayload,
+    updateTenantOfflineMutationDefinition,
+} from "@/modules/shared/offline-mutations";
+import { fetchTenants } from "@/modules/tenancy/api";
 import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -76,42 +88,78 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         placeholderData: (prev) => prev,
     });
 
-    const saveMut = useMutation({
-        mutationFn: async (payload: any) => isEdit ? updateTenant({ id: editingTenant.id, data: payload }) : createTenant(payload),
-        onSuccess: (data, variables) => {
+    const createTenantMut = useOfflineMutation<any, Error, TenantCreateOfflinePayload>({
+        definition: createTenantOfflineMutationDefinition,
+        onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ["tenants"] });
-            toast.success(isEdit ? t('tenants.updated', "Node updated.") : t('tenants.provisioned', "Node provisioned."));
-            triggerAudit(isEdit ? 'updated' : 'created', isEdit ? `Operator submitted reconfiguration parameters for Node ID: ${editingTenant.id}` : `Operator initialized new infrastructure provisioning sequence for Node ID: ${variables.id}`);
+            toast.success(t('tenants.provisioned', "Node provisioned."));
+            triggerAudit('created', `Operator initialized new infrastructure provisioning sequence for Node ID: ${variables.id}`);
+            setDialogOpen(false);
+        },
+        onQueued: (variables) => {
+            toast.info(`Offline: node ${variables.id} has been queued and will provision automatically once you're back online.`);
             setDialogOpen(false);
         },
         onError: (err: any) => toast.error(err?.response?.data?.message || t('global.operation_failed', "Operation failed.")),
     });
 
-    const deleteMut = useMutation({
-        mutationFn: (id: string) => deleteTenant(id),
+    const updateTenantMut = useOfflineMutation<any, Error, TenantUpdateOfflinePayload>({
+        definition: updateTenantOfflineMutationDefinition,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["tenants"] });
+            toast.success(t('tenants.updated', "Node updated."));
+            if (editingTenant?.id) {
+                triggerAudit('updated', `Operator submitted reconfiguration parameters for Node ID: ${editingTenant.id}`);
+            }
+            setDialogOpen(false);
+        },
+        onQueued: () => {
+            if (editingTenant?.id) {
+                toast.info(`Offline: changes for node ${editingTenant.id} were queued and will sync automatically when the connection returns.`);
+            } else {
+                toast.info("Offline: tenant changes were queued and will sync automatically when the connection returns.");
+            }
+            setDialogOpen(false);
+        },
+        onError: (err: any) => toast.error(err?.response?.data?.message || t('global.operation_failed', "Operation failed.")),
+    });
+
+    const deleteMut = useOfflineMutation<any, Error, string>({
+        definition: deleteTenantOfflineMutationDefinition,
         onSuccess: (_, id) => {
             queryClient.invalidateQueries({ queryKey: ["tenants"] });
             triggerAudit('deleted', `Operator executed fatal purge command on Node ID: ${id}`);
         },
+        onError: (err: any) => toast.error(err?.response?.data?.message || t('global.operation_failed', "Operation failed.")),
     });
 
-    const toggleStatusMut = useMutation({
-        mutationFn: (id: string) => toggleTenantStatus(id),
+    const toggleStatusMut = useOfflineMutation<any, Error, string>({
+        definition: toggleTenantStatusOfflineMutationDefinition,
         onSuccess: (data, id) => {
             queryClient.invalidateQueries({ queryKey: ["tenants"] });
             toast.success(data.message);
             triggerAudit('updated', `Operator toggled network status lock for Node ID: ${id}`);
         },
+        onQueued: (id) => {
+            toast.info(`Offline: node ${id} status change has been queued for sync.`);
+        },
+        onError: (err: any) => toast.error(err?.response?.data?.message || t('global.operation_failed', "Operation failed.")),
     });
 
-    const toggleAdminMut = useMutation({
-        mutationFn: (id: string) => toggleTenantAdminStatus(id),
+    const toggleAdminMut = useOfflineMutation<any, Error, string>({
+        definition: toggleTenantAdminOfflineMutationDefinition,
         onSuccess: (data, id) => {
             queryClient.invalidateQueries({ queryKey: ["tenants"] });
             toast.success(data.message);
             triggerAudit('updated', `Operator modified Super Admin clearance state for Node ID: ${id}`);
         },
+        onQueued: (id) => {
+            toast.info(`Offline: Super Admin clearance changes for node ${id} were queued for sync.`);
+        },
+        onError: (err: any) => toast.error(err?.response?.data?.message || t('global.operation_failed', "Operation failed.")),
     });
+
+    const isSaving = createTenantMut.isPending || updateTenantMut.isPending;
 
     const handleQueryChange = React.useCallback((q: any) => {
         if (q.page !== undefined) setPage(q.page);
@@ -140,9 +188,20 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
     }, [triggerAudit]);
 
     const handleDeleteRows = React.useCallback(async (rows: any[]) => {
-        await Promise.all(rows.map((r) => deleteMut.mutateAsync(r.id)));
-        toast.success(`${rows.length} ${t('tenants.nodes_purged', 'nodes purged.')}`);
-        triggerAudit('deleted', `Operator executed destructive bulk purge sequence on ${rows.length} nodes`);
+        try {
+            const results = await Promise.all(rows.map((r) => deleteMut.mutateAsync(r.id)));
+            const queuedCount = results.filter(isOfflineMutationQueuedResult).length;
+            if (queuedCount === rows.length) {
+                toast.info(`${rows.length} node deletion${rows.length === 1 ? "" : "s"} queued for sync.`);
+            } else if (queuedCount === 0) {
+                toast.success(`${rows.length} ${t('tenants.nodes_purged', 'nodes purged.')}`);
+            } else {
+                toast.info(`${queuedCount} node deletion${queuedCount === 1 ? "" : "s"} queued. The rest were processed immediately.`);
+            }
+            triggerAudit('deleted', `Operator executed destructive bulk purge sequence on ${rows.length} nodes`);
+        } catch (error) {
+            toast.error(t('global.operation_failed', "Operation failed."));
+        }
     }, [deleteMut, triggerAudit, t]);
 
     const openView = (tenant: any) => { 
@@ -164,10 +223,31 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const payload = isEdit 
-            ? { name: formName, plan: formPlan, admin_name: formAdminName, admin_email: formAdminEmail, admin_password: formAdminPassword } 
-            : { id: formId, name: formName, plan: formPlan, domain: formDomain, admin_name: formAdminName, admin_email: formAdminEmail, admin_password: formAdminPassword };
-        saveMut.mutate(payload);
+        if (isEdit && editingTenant) {
+            const payload: TenantUpdateOfflinePayload = {
+                id: editingTenant.id,
+                data: {
+                    name: formName,
+                    plan: formPlan,
+                    admin_name: formAdminName,
+                    admin_email: formAdminEmail,
+                    admin_password: formAdminPassword,
+                },
+            };
+            updateTenantMut.mutate(payload);
+            return;
+        }
+
+        const payload: TenantCreateOfflinePayload = {
+            id: formId,
+            name: formName,
+            plan: formPlan,
+            domain: formDomain,
+            admin_name: formAdminName,
+            admin_email: formAdminEmail,
+            admin_password: formAdminPassword,
+        };
+        createTenantMut.mutate(payload);
     };
 
     const handleIdChange = (val: string) => {
@@ -245,7 +325,7 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                                 </AlertDialogTrigger>
                                 <AlertDialogContent className="rounded-[2rem] bg-background/95 backdrop-blur-xl">
                                     <AlertDialogHeader><AlertDialogTitle className="text-destructive flex items-center gap-2"><AlertCircle className="h-5 w-5" /> {t('tenants.purge_title', "Purge Node?")}</AlertDialogTitle><AlertDialogDescription>{t('tenants.purge_desc', "This will permanently delete")} <strong>{tr.name}</strong> {t('tenants.purge_desc2', "and all data.")}</AlertDialogDescription></AlertDialogHeader>
-                                    <AlertDialogFooter><AlertDialogCancel className="rounded-xl">{t('global.cancel', "Cancel")}</AlertDialogCancel><AlertDialogAction className="rounded-xl bg-destructive" onClick={() => deleteMut.mutate(tr.id)}>{t('tenants.purge_confirm', "Confirm Purge")}</AlertDialogAction></AlertDialogFooter>
+                                    <AlertDialogFooter><AlertDialogCancel className="rounded-xl">{t('global.cancel', "Cancel")}</AlertDialogCancel><AlertDialogAction className="rounded-xl bg-destructive" onClick={() => { void deleteMut.mutateAsync(tr.id).then((result) => { if (isOfflineMutationQueuedResult(result)) { toast.info(`Offline: node ${tr.id} deletion has been queued for sync.`); return; } toast.success(t('tenants.node_purged', "Node purged.")); }).catch(() => {}); }}>{t('tenants.purge_confirm', "Confirm Purge")}</AlertDialogAction></AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>
                         )}
@@ -318,7 +398,7 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                             </div>
                         </form>
                     </div>
-                    <div className="px-6 py-4 border-t border-border/40 bg-muted/20 flex justify-end gap-3 shrink-0"><Button variant="ghost" onClick={() => setDialogOpen(false)}>{t('global.cancel', 'Cancel')}</Button><Button type="submit" form="tenant-form" disabled={saveMut.isPending} className="rounded-xl px-8 font-bold">{saveMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isEdit ? t('global.update', "Update") : t('global.provision', "Provision")}</Button></div>
+                    <div className="px-6 py-4 border-t border-border/40 bg-muted/20 flex justify-end gap-3 shrink-0"><Button variant="ghost" onClick={() => setDialogOpen(false)}>{t('global.cancel', 'Cancel')}</Button><Button type="submit" form="tenant-form" disabled={isSaving} className="rounded-xl px-8 font-bold">{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isEdit ? t('global.update', "Update") : t('global.provision', "Provision")}</Button></div>
                 </DialogContent>
             </Dialog>
 

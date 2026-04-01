@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearHiveSession } from "@/lib/auth-sync";
 import { getTenantId } from "@/lib/runtime-context";
 
 export const api = axios.create({
@@ -35,9 +36,7 @@ api.interceptors.response.use(
       const isTelemetryRequest = requestUrl.includes("/logs/client-action");
 
       if ((isUnauthorized && !isTelemetryRequest) || isEjected) {
-        localStorage.removeItem("hive_token");
-        localStorage.removeItem("hive_user");
-        localStorage.removeItem("hive_context");
+        clearHiveSession();
 
         if (isEjected) {
           sessionStorage.setItem("hive_eject_reason", msg.replace("CRITICAL: ", ""));

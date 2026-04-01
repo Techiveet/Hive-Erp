@@ -1,13 +1,16 @@
 import { getTenantId, isTenantSession } from "./runtime-context";
 import { clearSessionActivity } from "./session-activity";
+import { clearOfflineState } from "@/lib/offline/storage";
 
 export const clearHiveSession = (ejectReason?: string) => {
   if (typeof window === "undefined") return;
 
+  clearOfflineState();
   localStorage.removeItem("hive_token");
   localStorage.removeItem("hive_user");
   localStorage.removeItem("hive_context");
   clearSessionActivity();
+  window.dispatchEvent(new Event("hive_session_cleared"));
 
   if (ejectReason) {
     sessionStorage.setItem("hive_eject_reason", ejectReason);

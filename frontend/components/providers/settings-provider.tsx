@@ -102,9 +102,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const settings = data?.data as SystemSettings | null;
 
     const handleEmergencyLogout = () => {
-        localStorage.removeItem("hive_token");
-        localStorage.removeItem("hive_user");
-        localStorage.removeItem("hive_context");
+        clearHiveSession();
         router.push("/sign-in");
     };
 
