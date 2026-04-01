@@ -3,28 +3,9 @@
 
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-
-const getApiUrl = () => {
-  if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-  const host = window.location.hostname;
-  return `http://${host}:8085/api/v1`;
-};
-
-const getTenantHeaders = () => {
-  if (typeof window === "undefined") return {};
-  const host = window.location.hostname;
-  if (host !== "localhost" && host !== "127.0.0.1" && host.includes(".")) {
-    return { "X-Tenant": host.split(".")[0] };
-  }
-  return {};
-};
-
-const getStorageUrl = (url: string | null | undefined): string | null => {
-  if (!url) return null;
-  if (url.startsWith('http')) return url;
-  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-  return `http://${host}:8085/storage/${url.replace(/^\/+/, '')}`;
-};
+import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl } from "@/lib/runtime-context";
+import { applyBrandRuntime } from "@/lib/brand-theme";
+import { handleAuthFailureResponse } from "@/lib/auth-sync";
 
 export function BrandSyncProvider() {
     // 🚀 FETCH PROTECTED BRAND SETTINGS FOR METADATA SYNC
@@ -34,13 +15,13 @@ export function BrandSyncProvider() {
           const token = localStorage.getItem('hive_token');
           if (!token) return null;
 
-          const res = await fetch(`${getApiUrl()}/settings/brand`, {
-              headers: { 
-                  'Authorization': `Bearer ${token}`,
-                  'Accept': 'application/json',
-                  ...getTenantHeaders(),
-              }
+          const res = await fetch(`${getBackendApiRoot()}/settings/brand`, {
+              headers: getAuthHeaders(),
           });
+
+          if (await handleAuthFailureResponse(res)) {
+              return null;
+          }
           
           if (!res.ok) throw new Error("Failed to fetch brand settings");
           return res.json();
@@ -52,9 +33,13 @@ export function BrandSyncProvider() {
 
     // 🌍 BROWSER METADATA SYNC (Favicon & Title)
     useEffect(() => {
+      if (brandSettings) {
+          applyBrandRuntime(brandSettings);
+      }
+
       // Safely apply Favicon
       if (brandSettings?.favicon) {
-        const favUrl = getStorageUrl(brandSettings.favicon);
+        const favUrl = getBackendStorageUrl(brandSettings.favicon);
         if (favUrl) {
             let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
             if (!link) {

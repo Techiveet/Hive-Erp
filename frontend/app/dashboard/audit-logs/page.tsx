@@ -3,27 +3,30 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldAlert, Loader2, Activity, Home, HelpCircle } from "lucide-react";
+import { ShieldAlert, Activity, Home, HelpCircle } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
 import { logFrontendAction } from "@/lib/api";
+import { isTenantSession } from "@/lib/runtime-context";
 import { AuditLogsClient } from "./_components/audit-logs-client";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button"; 
 import { useTour } from "@/components/providers/tour-provider"; 
 import { useTranslation } from "@/store/use-translation"; // 🚀 Added Translation Hook
+import { ModulePageSkeleton } from "@/components/ui/loading-states";
 
 export default function AuditLogsPage() {
     const router = useRouter();
-    const { hasPermission } = usePermissions();
+    const { hasPermission, isLoaded } = usePermissions();
     const { t } = useTranslation(); // 🚀 Initialize translator
     const [accessStatus, setAccessStatus] = useState<"checking" | "granted" | "denied">("checking");
     const { startTour } = useTour(); 
     
     const viewLogged = useRef(false);
+    const canViewLogs = hasPermission("view_logs");
 
     // 🚀 DYNAMIC TOUR BUILDER (Fully Localized)
     const triggerPageTour = () => {
-        const isTenant = typeof window !== 'undefined' ? window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' : false;
+        const isTenant = typeof window !== 'undefined' ? isTenantSession() : false;
 
         const steps: any[] = [
             {
@@ -112,8 +115,13 @@ export default function AuditLogsPage() {
     };
 
     useEffect(() => {
+        if (!isLoaded) {
+            setAccessStatus("checking");
+            return;
+        }
+
         // 🛡️ THE SECURITY GATE
-        if (!hasPermission("view_logs")) {
+        if (!canViewLogs) {
             setAccessStatus("denied");
             
             if (!viewLogged.current) {
@@ -141,7 +149,7 @@ export default function AuditLogsPage() {
                 }).catch(err => console.error("Telemetry failed", err));
             }
         }
-    }, [hasPermission, router]);
+    }, [canViewLogs, isLoaded, router]);
 
     // 🚀 AUTO-RUN PAGE TOUR FOR FIRST TIMERS
     useEffect(() => {
@@ -157,17 +165,10 @@ export default function AuditLogsPage() {
                 return () => clearTimeout(timer);
             }
         }
-    }, [accessStatus]);
+    }, [accessStatus, startTour, t]);
 
     if (accessStatus === "checking") {
-        return (
-            <div className="flex h-[60vh] flex-col items-center justify-center space-y-4">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground animate-pulse">
-                    {t('audit.verifying', 'Verifying Clearance...')}
-                </p>
-            </div>
-        );
+        return <ModulePageSkeleton titleWidth="w-64" subtitleWidth="w-96" rows={7} cols={6} />;
     }
 
     if (accessStatus === "denied") {

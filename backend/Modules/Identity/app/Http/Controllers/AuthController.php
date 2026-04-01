@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PragmaRX\Google2FA\Google2FA;
 use Stevebauman\Location\Facades\Location;
+use Spatie\Permission\PermissionRegistrar;
 
 // Aliased to prevent naming conflicts
 use Illuminate\Support\Facades\Password as PasswordFacade;
@@ -23,6 +24,8 @@ class AuthController extends Controller
      */
     public function user(Request $request)
     {
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
         $user = $request->user();
 
         return response()->json([
@@ -51,6 +54,8 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
         $request->validate([
             'email'    => 'required|email',
             'password' => 'required',
@@ -179,6 +184,8 @@ class AuthController extends Controller
      */
     public function verify2FA(Request $request)
     {
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
         $request->validate([
             'email'            => 'required|email',
             'two_factor_token' => 'required|string',

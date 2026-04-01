@@ -16,29 +16,13 @@ import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { getBackendApiRoot, getBackendStorageUrl } from "@/lib/runtime-context";
 
 interface LandingUIProps {
   initialPortalName: string;
   initialTenantSlug: string;
   initialIsTenant: boolean;
 }
-
-const getApiUrl = () => {
-  if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-  const host = window.location.hostname;
-  if (host.endsWith(".localhost")) {
-    return `http://${host}:8085/api/v1`; 
-  }
-  return "http://localhost:8085/api/v1";
-};
-
-// Formatting helper for standard storage URLs
-const getStorageUrl = (url: string | null | undefined): string | null => {
-  if (!url) return null;
-  if (url.startsWith('http')) return url;
-  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-  return `http://${host}:8085/storage/${url.replace(/^\/+/, '')}`;
-};
 
 // 🚀 SAFE LOGO COMPONENT
 // This uses a native <img> tag to completely bypass CORS preflight issues for public assets.
@@ -185,7 +169,7 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
   const { data: brandData } = useQuery({
     queryKey: ['publicBrandSettings'],
     queryFn: async () => {
-        const res = await fetch(`${getApiUrl()}/settings/brand/public`);
+        const res = await fetch(`${getBackendApiRoot()}/settings/brand/public`);
         if (!res.ok) throw new Error("Failed to fetch brand settings");
         return res.json();
     },
@@ -203,7 +187,7 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
     const darkLogo = brandSettings?.logo_dark;
     const lightLogo = brandSettings?.logo_light;
     const activeLogo = isDark ? (darkLogo || lightLogo) : (lightLogo || darkLogo);
-    return getStorageUrl(activeLogo);
+    return getBackendStorageUrl(activeLogo);
   }, [brandSettings, isDark]);
 
   const appTitle = brandSettings?.app_title || initialPortalName;
@@ -211,7 +195,7 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
   // 🌍 BROWSER METADATA SYNC
   useEffect(() => {
     if (brandSettings?.favicon) {
-      const favUrl = getStorageUrl(brandSettings.favicon);
+      const favUrl = getBackendStorageUrl(brandSettings.favicon);
       let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
       if (!link) {
         link = document.createElement('link');
@@ -387,7 +371,7 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
 
       {/* --- HERO SECTION --- */}
       <section className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 pt-24 text-center">
-        <div className="mb-6 inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-mono tracking-widest text-primary shadow-[0_0_15px_rgba(var(--primary),0.3)] animate-in fade-in slide-in-from-bottom-4 duration-1000">
+        <div className="mb-6 inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-mono tracking-widest text-primary shadow-[0_0_15px_hsl(var(--primary)_/_0.3)] animate-in fade-in slide-in-from-bottom-4 duration-1000">
           <span className="mr-2 h-2 w-2 rounded-full bg-primary animate-pulse"></span>
           {initialIsTenant ? `CONNECTED NODE: ${appTitle}` : 'DEVELOPED BY TECHIVE TECHNOLOGY SOLUTIONS'}
         </div>
@@ -421,7 +405,7 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
               <div className="absolute inset-0 w-full h-[2px] bg-primary/50 shadow-[0_0_15px_hsl(var(--primary))] z-50 animate-scan-beam pointer-events-none"></div>
               
               <div className="flex flex-col items-center gap-6 border-r border-border bg-muted/20 pt-8 z-10">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/30 shadow-[0_0_15px_rgba(var(--primary),0.2)] hover:scale-110 transition-transform cursor-pointer"><LineChart className="h-6 w-6"/></div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/30 shadow-[0_0_15px_hsl(var(--primary)_/_0.2)] hover:scale-110 transition-transform cursor-pointer"><LineChart className="h-6 w-6"/></div>
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg hover:bg-primary/5 text-muted-foreground hover:text-primary transition-colors cursor-pointer"><Truck className="h-6 w-6"/></div>
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg hover:bg-primary/5 text-muted-foreground hover:text-primary transition-colors cursor-pointer"><Users className="h-6 w-6"/></div>
                 <div className="mt-auto mb-5 text-muted-foreground"><Activity className="h-6 w-6 animate-pulse"/></div>
@@ -468,17 +452,17 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
                 </div>
                 
                 <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="rounded-lg border border-border bg-card/50 p-5 relative overflow-hidden shadow-sm hover:border-primary/50 hover:shadow-[0_0_20px_rgba(var(--primary),0.15)] transition-all duration-300 group cursor-pointer hover:-translate-y-1">
+                  <div className="rounded-lg border border-border bg-card/50 p-5 relative overflow-hidden shadow-sm hover:border-primary/50 hover:shadow-[0_0_20px_hsl(var(--primary)_/_0.15)] transition-all duration-300 group cursor-pointer hover:-translate-y-1">
                     <div className="font-mono text-xs text-muted-foreground mb-2 group-hover:text-primary transition-colors">ACTIVE LOADS</div>
                     <div className="font-space text-3xl font-bold">142</div>
                     <div className="text-xs text-green-500 mt-1 flex items-center gap-1"><ArrowRight className="rotate-[-45deg] h-3 w-3"/> 12 In Transit</div>
                   </div>
-                  <div className="rounded-lg border border-border bg-card/50 p-5 relative overflow-hidden shadow-sm hover:border-primary/50 hover:shadow-[0_0_20px_rgba(var(--primary),0.15)] transition-all duration-300 group cursor-pointer hover:-translate-y-1">
+                  <div className="rounded-lg border border-border bg-card/50 p-5 relative overflow-hidden shadow-sm hover:border-primary/50 hover:shadow-[0_0_20px_hsl(var(--primary)_/_0.15)] transition-all duration-300 group cursor-pointer hover:-translate-y-1">
                     <div className="font-mono text-xs text-muted-foreground mb-2 group-hover:text-primary transition-colors">EMPLOYEE HEADCOUNT</div>
                     <div className="font-space text-3xl font-bold">420</div>
                     <div className="text-xs text-muted-foreground mt-1">Across 4 Branches</div>
                   </div>
-                  <div className="rounded-lg border border-border bg-card/50 p-5 relative overflow-hidden shadow-sm hover:border-primary/50 hover:shadow-[0_0_20px_rgba(var(--primary),0.15)] transition-all duration-300 group cursor-pointer hover:-translate-y-1">
+                  <div className="rounded-lg border border-border bg-card/50 p-5 relative overflow-hidden shadow-sm hover:border-primary/50 hover:shadow-[0_0_20px_hsl(var(--primary)_/_0.15)] transition-all duration-300 group cursor-pointer hover:-translate-y-1">
                     <div className="font-mono text-xs text-muted-foreground mb-2 group-hover:text-primary transition-colors">SYSTEM LATENCY</div>
                     <div className="font-space text-3xl font-bold">12ms</div>
                     <div className="mt-4 h-1 w-full bg-muted rounded-full overflow-hidden relative">

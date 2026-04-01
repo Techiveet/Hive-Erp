@@ -95,6 +95,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--brand-font-family, var(--font-inter), sans-serif);
     font-feature-settings: "rlig" 1, "calt" 1;
     cursor: none;
   }
@@ -234,9 +235,9 @@
   mix-blend-mode: exclusion;
   transform-origin: center;
   transition:
-    transform 0.14s ease,
-    background-color 0.14s ease,
-    opacity 0.14s ease;
+    transform 0.08s ease,
+    background-color 0.08s ease,
+    opacity 0.08s ease;
   will-change: transform;
 }
 
@@ -249,8 +250,8 @@
   background: hsl(var(--primary));
   border-radius: 9999px;
   transition:
-    transform 0.12s ease,
-    opacity 0.12s ease;
+    transform 0.06s ease,
+    opacity 0.06s ease;
   will-change: transform;
 }
 

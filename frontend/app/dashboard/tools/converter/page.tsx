@@ -21,6 +21,7 @@ import { FileManagerClient } from "@/components/dashboard/file-manager-client";
 import { useTour } from "@/components/providers/tour-provider"; 
 import { PdfViewer } from '@/components/ui/pdf-viewer'; 
 import { CodeEditor, type VirtualFile } from '@/components/ui/code-editor';
+import { usePermissions } from "@/hooks/use-permissions";
 
 const getApiUrl = () => {
     if (typeof window === "undefined") return "http://localhost:8085/api/v1";
@@ -63,7 +64,9 @@ function CloudFilePickerModal({ isOpen, mode, onClose, onSelect }: any) {
 
 export default function FileConverterPage() {
     const { t } = useTranslation();
-    const { startTour } = useTour(); 
+    const { startTour } = useTour();
+    const { hasPermission, isLoaded } = usePermissions();
+    const canManageStorage = hasPermission("manage_storage");
     
     const [inputMethod, setInputMethod] = useState<'upload' | 'code'>('upload');
     const [showCodePreview, setShowCodePreview] = useState(false);
@@ -124,6 +127,30 @@ export default function FileConverterPage() {
     useEffect(() => {
         return () => { if (pdfPreviewUrl) window.URL.revokeObjectURL(pdfPreviewUrl); };
     }, [pdfPreviewUrl]);
+
+    if (!isLoaded) {
+        return (
+            <div className="flex min-h-[60vh] items-center justify-center rounded-[2rem] border border-border/50 bg-card/40 p-8 text-sm text-muted-foreground">
+                {t('global.loading', 'Loading...')}
+            </div>
+        );
+    }
+
+    if (!canManageStorage) {
+        return (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 rounded-[2rem] border border-border/50 bg-card/40 p-8 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10">
+                    <FileType className="h-8 w-8 text-destructive" />
+                </div>
+                <div className="space-y-2">
+                    <h2 className="text-2xl font-black tracking-tight">{t('global.access_denied', 'Access Denied')}</h2>
+                    <p className="max-w-md text-sm text-muted-foreground">
+                        {t('tools.converter_denied', 'Your current role does not have permission to use the document converter workspace.')}
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     // INJECT VIRTUAL FILES INTO LIVE PREVIEW IFRAME
     const getCodePreviewHtml = () => {

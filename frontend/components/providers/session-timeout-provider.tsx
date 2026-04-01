@@ -5,6 +5,8 @@ import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { ShieldAlert, Clock } from "lucide-react";
 import { useSystemSettings } from "@/components/providers/settings-provider"; 
+import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
+import { getTenantHeaders } from "@/lib/runtime-context";
 import {
     AlertDialog,
     AlertDialogContent,
@@ -45,22 +47,20 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
     try {
       const host = window.location.hostname;
       const protocol = window.location.protocol;
-      const isTenant = host !== "localhost" && host !== "127.0.0.1" && host.includes(".");
       const endpoint = "/api/v1/logout";
       
       await fetch(`${protocol}//${host}:8085${endpoint}`, {
         method: "POST",
         headers: {
           "Accept": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Authorization": `Bearer ${token}`,
+          ...getTenantHeaders(),
         }
       });
     } catch (error) {
       console.error("Logout notification failed", error);
     } finally {
-      localStorage.removeItem("hive_token");
-      localStorage.removeItem("hive_user");
-      localStorage.removeItem("hive_context");
+      clearHiveSession();
       setShowWarning(false);
 
       toast("SECURITY OVERRIDE", {
@@ -80,13 +80,14 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
     try {
       const host = window.location.hostname;
       const protocol = window.location.protocol;
-      const isTenant = host !== "localhost" && host !== "127.0.0.1" && host.includes(".");
       const url = `${protocol}//${host}:8085/api/v1/ping`;
 
-      await fetch(url, {
+      const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }
       });
+
+      await handleAuthFailureResponse(response);
     } catch (e) {}
   }, []);
 

@@ -3,8 +3,9 @@
 namespace Modules\Core\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
-use Modules\Core\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Modules\Core\Models\Setting;
 
 class BrandSettingsController extends Controller
 {
@@ -28,27 +29,9 @@ class BrandSettingsController extends Controller
      */
     public function getBrandSettings()
     {
-        $settings = Setting::whereIn('key', $this->allBrandKeys)->pluck('value', 'key');
-
-        $data = [];
-        foreach ($this->allBrandKeys as $key) {
-            $data[$key] = $settings[$key] ?? null;
-        }
-
-        // Apply fallback defaults
-        $data['app_title'] = $data['app_title'] ?? 'HIVE.OS';
-        $data['footer_text'] = $data['footer_text'] ?? 'Powered by HIVE.OS';
-        $data['primary_color'] = $data['primary_color'] ?? '#10b981'; // Default Emerald
-        $data['document_header_color'] = $data['document_header_color'] ?? '#1e293b';
-        $data['font_family'] = $data['font_family'] ?? 'Inter';
-        $data['auth_welcome_message'] = $data['auth_welcome_message'] ?? 'Sign in to access your secure control hub.';
-
-        // Convert string booleans back to strict boolean types for the frontend
-        $data['hide_watermark'] = filter_var($data['hide_watermark'] ?? false, FILTER_VALIDATE_BOOLEAN);
-
         return response()->json([
             'success' => true,
-            'data' => $data
+            'data' => $this->resolveBrandSettings($this->allBrandKeys, 'protected')
         ]);
     }
 
@@ -57,24 +40,9 @@ class BrandSettingsController extends Controller
      */
     public function getPublicBrandSettings()
     {
-        $settings = Setting::whereIn('key', $this->publicBrandKeys)->pluck('value', 'key');
-
-        $data = [];
-        foreach ($this->publicBrandKeys as $key) {
-            $data[$key] = $settings[$key] ?? null;
-        }
-
-        // Apply fallback defaults
-        $data['app_title'] = $data['app_title'] ?? 'HIVE.OS';
-        $data['footer_text'] = $data['footer_text'] ?? 'Powered by HIVE.OS';
-        $data['primary_color'] = $data['primary_color'] ?? '#10b981';
-        $data['font_family'] = $data['font_family'] ?? 'Inter';
-        $data['auth_welcome_message'] = $data['auth_welcome_message'] ?? 'Sign in to access your secure control hub.';
-        $data['hide_watermark'] = filter_var($data['hide_watermark'] ?? false, FILTER_VALIDATE_BOOLEAN);
-
         return response()->json([
             'success' => true,
-            'data' => $data
+            'data' => $this->resolveBrandSettings($this->publicBrandKeys, 'public')
         ]);
     }
 
@@ -115,9 +83,50 @@ class BrandSettingsController extends Controller
             );
         }
 
+        $this->clearBrandSettingsCache();
+
         return response()->json([
             'success' => true,
             'message' => 'White-Label Settings matrix updated successfully.'
         ]);
+    }
+
+    private function resolveBrandSettings(array $keys, string $scope): array
+    {
+        return Cache::rememberForever($this->brandSettingsCacheKey($scope), function () use ($keys) {
+            $settings = Setting::whereIn('key', $keys)->pluck('value', 'key');
+
+            $data = [];
+            foreach ($keys as $key) {
+                $data[$key] = $settings[$key] ?? null;
+            }
+
+            $data['app_title'] = $data['app_title'] ?? 'HIVE.OS';
+            $data['footer_text'] = $data['footer_text'] ?? 'Powered by HIVE.OS';
+            $data['primary_color'] = $data['primary_color'] ?? '#10b981';
+            $data['document_header_color'] = $data['document_header_color'] ?? '#1e293b';
+            $data['font_family'] = $data['font_family'] ?? 'Inter';
+            $data['auth_welcome_message'] = $data['auth_welcome_message'] ?? 'Sign in to access your secure control hub.';
+            $data['hide_watermark'] = filter_var($data['hide_watermark'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+            return $data;
+        });
+    }
+
+    private function clearBrandSettingsCache(): void
+    {
+        Cache::forget($this->brandSettingsCacheKey('protected'));
+        Cache::forget($this->brandSettingsCacheKey('public'));
+    }
+
+    private function brandSettingsCacheKey(string $scope): string
+    {
+        $context = 'central';
+
+        if (function_exists('tenant') && tenant('id')) {
+            $context = 'tenant:' . tenant('id');
+        }
+
+        return "brand_settings:{$scope}:{$context}";
     }
 }

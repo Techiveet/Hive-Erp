@@ -15,6 +15,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTranslation } from '@/store/use-translation';
 import { cn } from "@/lib/utils";
+import { SettingsPanelSkeleton } from "@/components/ui/loading-states";
+import { usePermissions } from "@/hooks/use-permissions";
 
 const getApiUrl = () => {
     if (typeof window === "undefined") return "http://localhost:8085/api/v1";
@@ -55,6 +57,9 @@ interface BackupFile {
 export function BackupSettings() {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
+    const { hasAnyPermission, hasPermission } = usePermissions();
+    const canViewBackups = hasAnyPermission(["view_backups", "manage_backups"]);
+    const canManageBackups = hasPermission("manage_backups");
 
     const [formData, setFormData] = useState({
         backup_frequency: 'daily',
@@ -136,9 +141,17 @@ export function BackupSettings() {
         window.open(url, '_blank');
     };
 
-    if (isSettingsLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    if (isSettingsLoading) return <SettingsPanelSkeleton />;
 
     const backups: BackupFile[] = backupsData?.data || [];
+
+    if (!canViewBackups) {
+        return (
+            <div className="rounded-[2rem] border border-border/50 bg-card/40 p-8 text-center text-sm text-muted-foreground">
+                {t('settings.backup_locked', 'Your role does not have access to the backup workspace.')}
+            </div>
+        );
+    }
 
     return (
         <div className="pb-24 space-y-6">
@@ -212,7 +225,7 @@ export function BackupSettings() {
                     <div className="pt-6 border-t border-amber-500/10 mt-auto flex flex-col gap-3">
                         <Button 
                             onClick={() => triggerMut.mutate('db')} 
-                            disabled={triggerMut.isPending} 
+                            disabled={triggerMut.isPending || !canManageBackups}
                             variant="outline"
                             className="w-full justify-start rounded-xl h-12 px-6 font-bold bg-background/50 hover:bg-blue-500/10 hover:text-blue-500 hover:border-blue-500/50 transition-all"
                         >
@@ -222,7 +235,7 @@ export function BackupSettings() {
 
                         <Button 
                             onClick={() => triggerMut.mutate('files')} 
-                            disabled={triggerMut.isPending} 
+                            disabled={triggerMut.isPending || !canManageBackups}
                             variant="outline"
                             className="w-full justify-start rounded-xl h-12 px-6 font-bold bg-background/50 hover:bg-emerald-500/10 hover:text-emerald-500 hover:border-emerald-500/50 transition-all"
                         >
@@ -232,7 +245,7 @@ export function BackupSettings() {
 
                         <Button 
                             onClick={() => triggerMut.mutate('all')} 
-                            disabled={triggerMut.isPending} 
+                            disabled={triggerMut.isPending || !canManageBackups}
                             className="w-full justify-start rounded-xl h-12 px-6 font-bold shadow-lg shadow-amber-500/20 bg-amber-500 hover:bg-amber-600 text-white transition-all"
                         >
                             {triggeringType === 'all' ? <Loader2 className="mr-3 h-5 w-5 animate-spin text-white" /> : <Layers className="mr-3 h-5 w-5 text-white" />}
@@ -317,6 +330,7 @@ export function BackupSettings() {
                                                     size="icon" 
                                                     className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" 
                                                     title="Purge Snapshot"
+                                                    disabled={!canManageBackups}
                                                     onClick={() => {
                                                         if(confirm("Are you sure you want to permanently delete this backup?")) {
                                                             deleteMut.mutate(file.id);
@@ -337,7 +351,7 @@ export function BackupSettings() {
 
             {/* FLOATING SAVE BUTTON */}
             <div className="fixed bottom-6 right-6 left-6 md:left-[320px] flex justify-end p-4 rounded-[2rem] bg-card/80 backdrop-blur-xl border border-border/50 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 animate-in slide-in-from-bottom-12 duration-700">
-                <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="rounded-xl px-12 font-bold shadow-xl bg-primary text-primary-foreground h-12">
+                <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !canManageBackups} className="rounded-xl px-12 font-bold shadow-xl bg-primary text-primary-foreground h-12">
                     {saveMut.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />} Save Automation Rules
                 </Button>
             </div>

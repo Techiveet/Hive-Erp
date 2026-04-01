@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HIVE.OS የተጠቃሚ መመሪያ</title>
+<style>
+    @page {
+      margin: 16mm 14mm 18mm 14mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: #17324a;
+      font-family: DejaVu Sans, sans-serif;
+      font-size: 11px;
+      line-height: 1.58;
+      background: #edf3f8;
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0 0 8px 0;
+      line-height: 1.22;
+      color: #0f172a;
+    }
+
+    h1 {
+      font-size: 30px;
+      letter-spacing: 0.2px;
+    }
+
+    h2 {
+      margin-top: 28px;
+      padding: 14px 16px;
+      font-size: 18px;
+      border: 1px solid #d4e0eb;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #f8fbfe 0%, #eef5fb 100%);
+    }
+
+    h3 {
+      font-size: 14px;
+      margin-top: 8px;
+    }
+
+    h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #0b6b64;
+      margin-top: 0;
+    }
+
+    p {
+      margin: 0 0 10px 0;
+    }
+
+    ul, ol {
+      margin: 0 0 12px 18px;
+      padding: 0;
+    }
+
+    li {
+      margin: 0 0 5px 0;
+    }
+
+    a {
+      color: #0b7665;
+      text-decoration: none;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 16px 0;
+      table-layout: fixed;
+      background: #ffffff;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    th, td {
+      border: 1px solid #d7e2ec;
+      padding: 8px 9px;
+      vertical-align: top;
+      text-align: left;
+      word-wrap: break-word;
+    }
+
+    th {
+      background: #eef5fb;
+      color: #102033;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.55px;
+    }
+
+    tbody tr:nth-child(even) td {
+      background: #fbfdff;
+    }
+
+    .page-shell {
+      width: 100%;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 18px 0 24px 0;
+    }
+
+    .doc-topbar {
+      margin-bottom: 16px;
+      padding: 15px 18px 13px 18px;
+      border: 1px solid #12253b;
+      border-radius: 22px;
+      background: linear-gradient(135deg, #0f1f33 0%, #163a59 55%, #22526f 100%);
+      color: #ffffff;
+    }
+
+    .topbar-brand,
+    .topbar-meta {
+      display: inline-block;
+      vertical-align: top;
+    }
+
+    .topbar-brand {
+      width: 56%;
+    }
+
+    .topbar-meta {
+      width: 43%;
+      text-align: right;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      color: #dbeeff;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.95px;
+      text-transform: uppercase;
+    }
+
+    .topbar-title {
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 0.2px;
+    }
+
+    .topbar-copy {
+      margin-top: 6px;
+      color: #d7e8f8;
+      font-size: 10px;
+    }
+
+    .top-pill {
+      display: inline-block;
+      margin: 0 0 6px 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.13);
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.55px;
+      text-transform: uppercase;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 18px;
+      padding: 30px 30px 24px 30px;
+      border-radius: 26px;
+      border: 1px solid #d4e0eb;
+      background: linear-gradient(130deg, #10324d 0%, #1f5d77 46%, #f2f8fc 46%, #ffffff 100%);
+    }
+
+    .hero-band {
+      display: inline-block;
+      margin-bottom: 12px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      background: #e5fbf5;
+      color: #0b6b64;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .hero h1 {
+      width: 58%;
+      color: #ffffff;
+    }
+
+    .hero-subtitle {
+      width: 57%;
+      margin-top: 8px;
+      font-size: 14px;
+      color: #d8ebf8;
+    }
+
+    .hero-grid {
+      margin-top: 20px;
+    }
+
+    .hero-card {
+      display: inline-block;
+      width: 31.5%;
+      min-height: 98px;
+      margin-right: 2%;
+      padding: 12px 12px 10px 12px;
+      vertical-align: top;
+      border: 1px solid #d8e3ef;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .hero-card.last {
+      margin-right: 0;
+    }
+
+    .hero-card .label {
+      display: inline-block;
+      margin-bottom: 7px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #ebf7ff;
+      color: #1f4d76;
+      font-size: 9px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .hero-card p {
+      margin: 0;
+      font-size: 10px;
+      color: #486077;
+    }
+
+    .meta-line {
+      margin-top: 14px;
+      color: #daf0fb;
+      font-size: 10px;
+    }
+
+    .callout, .callout-tip, .callout-warn {
+      margin: 12px 0 14px 0;
+      padding: 12px 14px;
+      border-radius: 14px;
+    }
+
+    .callout {
+      background: #f6fbff;
+      border-left: 4px solid #60a5fa;
+      border: 1px solid #dce9f5;
+    }
+
+    .callout-tip {
+      background: #f3fbf7;
+      border-left: 4px solid #34d399;
+      border: 1px solid #d9efe6;
+    }
+
+    .callout-warn {
+      background: #fff8f0;
+      border-left: 4px solid #f59e0b;
+      border: 1px solid #f2e2c8;
+    }
+
+    .docs-nav {
+      margin: 14px 0 20px 0;
+      padding: 18px 18px 12px 18px;
+      border: 1px solid #d7e1eb;
+      border-radius: 22px;
+      background: #ffffff;
+    }
+
+    .docs-nav-title {
+      margin-bottom: 6px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #0f172a;
+    }
+
+    .docs-nav-copy {
+      max-width: 88%;
+      color: #476073;
+      font-size: 11px;
+    }
+
+    .docs-nav-grid {
+      margin-top: 14px;
+      font-size: 0;
+    }
+
+    .nav-card {
+      display: inline-block;
+      width: 48.6%;
+      margin-right: 2.8%;
+      margin-bottom: 12px;
+      padding: 14px 14px 12px 14px;
+      vertical-align: top;
+      border: 1px solid #d7e2ee;
+      border-radius: 16px;
+      background: #f9fbfd;
+      font-size: 11px;
+      page-break-inside: avoid;
+    }
+
+    .nav-card.right {
+      margin-right: 0;
+    }
+
+    .nav-card-label {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #eaf3fb;
+      color: #204467;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.75px;
+      text-transform: uppercase;
+    }
+
+    .nav-card p {
+      margin-bottom: 8px;
+      color: #51697f;
+    }
+
+    .nav-links a {
+      display: block;
+      margin-bottom: 5px;
+      padding: 7px 9px;
+      border-radius: 10px;
+      background: #ffffff;
+      border: 1px solid #d9e4ee;
+      color: #0b6b64;
+      font-weight: bold;
+    }
+
+    .panel {
+      margin-top: 12px;
+      padding: 14px 15px;
+      border: 1px solid #d7e2ee;
+      border-radius: 16px;
+      background: #ffffff;
+    }
+
+    .panel-title {
+      margin-bottom: 7px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #0f5c7a;
+    }
+
+    .two-col {
+      margin-top: 8px;
+      font-size: 0;
+    }
+
+    .two-col .col {
+      display: inline-block;
+      width: 48.6%;
+      margin-right: 2.8%;
+      vertical-align: top;
+      font-size: 11px;
+    }
+
+    .two-col .col.last {
+      margin-right: 0;
+    }
+
+    .pill {
+      display: inline-block;
+      margin: 0 6px 6px 0;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #edf4fb;
+      color: #23415d;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .pill.route {
+      background: #e8fff8;
+      color: #0f6b46;
+    }
+
+    .pill.guard {
+      background: #fff5dc;
+      color: #9a6700;
+    }
+
+    .pill.context {
+      background: #edf0ff;
+      color: #3247a8;
+    }
+
+    .toc-table td:first-child,
+    .toc-table th:first-child {
+      width: 34%;
+    }
+
+    .mini-grid {
+      margin-top: 6px;
+      font-size: 0;
+    }
+
+    .mini-card {
+      display: inline-block;
+      width: 48.6%;
+      margin-right: 2.8%;
+      margin-bottom: 10px;
+      padding: 12px 12px 10px 12px;
+      vertical-align: top;
+      border: 1px solid #d7e2ee;
+      border-radius: 14px;
+      background: #ffffff;
+      font-size: 11px;
+      page-break-inside: avoid;
+    }
+
+    .mini-card.right {
+      margin-right: 0;
+    }
+
+    .mini-card h4 {
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .module {
+      margin-top: 16px;
+      padding: 15px 16px 14px 16px;
+      border: 1px solid #d7e2ee;
+      border-radius: 20px;
+      background: #ffffff;
+      page-break-inside: auto;
+    }
+
+    .module-header {
+      margin: -15px -16px 12px -16px;
+      padding: 16px 16px 12px 16px;
+      border-bottom: 1px solid #e2eaf2;
+      border-radius: 20px 20px 0 0;
+      background: linear-gradient(180deg, #f8fbfe 0%, #f2f7fb 100%);
+    }
+
+    .module-lead {
+      color: #456075;
+      margin-bottom: 8px;
+    }
+
+    .feature-table th:nth-child(1) {
+      width: 24%;
+    }
+
+    .feature-table th:nth-child(2) {
+      width: 36%;
+    }
+
+    .feature-table th:nth-child(3) {
+      width: 18%;
+    }
+
+    .feature-table th:nth-child(4) {
+      width: 22%;
+    }
+
+    .journey {
+      margin-top: 12px;
+      padding: 14px 15px;
+      border: 1px dashed #cbd7e4;
+      border-radius: 16px;
+      background: #fbfdff;
+      page-break-inside: avoid;
+    }
+
+    .journey-step {
+      margin-top: 8px;
+      padding: 9px 10px;
+      border-radius: 12px;
+      background: #ffffff;
+      border: 1px solid #dee7f0;
+    }
+
+    .step-no {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      margin-right: 7px;
+      border-radius: 999px;
+      background: #0f766e;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: bold;
+      line-height: 20px;
+      text-align: center;
+    }
+
+    .route-map td:first-child,
+    .route-map th:first-child {
+      width: 24%;
+    }
+
+    .route-map td:nth-child(2),
+    .route-map th:nth-child(2) {
+      width: 20%;
+    }
+
+    .route-map td:nth-child(3),
+    .route-map th:nth-child(3) {
+      width: 24%;
+    }
+
+    .small {
+      font-size: 10px;
+      color: #60748a;
+    }
+
+    .mono {
+      font-family: DejaVu Sans Mono, monospace;
+      font-size: 10px;
+      color: #1c3851;
+    }
+
+    .footer {
+      margin-top: 24px;
+      padding: 14px 16px;
+      border: 1px solid #d7e2ee;
+      border-radius: 16px;
+      background: #ffffff;
+      font-size: 10px;
+      color: #5d7287;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+  
+    .lang-switch {
+      margin-top: 10px;
+      text-align: right;
+    }
+
+    .action-btn {
+      display: inline-block;
+      margin: 6px 0 0 6px;
+      padding: 7px 11px;
+      border-radius: 12px;
+      border: 1px solid #d7e2ee;
+      background: #ffffff;
+      color: #16324a;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 0.2px;
+    }
+
+    .action-btn.active {
+      border-color: #8fdcc7;
+      background: #e5fbf5;
+      color: #0b6b64;
+    }
+
+    .action-btn.pdf {
+      background: #f5f9fc;
+    }
+
+    @media print {
+      body {
+        background: #edf3f8 !important;
+      }
+
+      .screen-only {
+        display: none !important;
+      }
+
+      .page-shell {
+        max-width: none;
+        padding: 0;
+      }
+
+      .doc-topbar,
+      .hero,
+      .docs-nav,
+      .nav-card,
+      .hero-card,
+      .mini-card,
+      .panel,
+      .module,
+      .journey,
+      .footer {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="doc-topbar">
+      <div class="topbar-brand">
+        <div class="eyebrow">HIVE.OS ሰነድ</div>
+        <div class="topbar-title">የተጠቃሚ መመሪያ እና የመዳረሻ መመኪያ</div>
+        <div class="topbar-copy">ይህ ሰነድ የመግቢያ ሂደትን፣ ፈቃዶችን፣ ሞጁሎችን፣ የተጠቃሚ ስራ ደረጃዎችን እና ዋና ዋና ባህሪዎችን በአንድ ቦታ ያሳያል።</div>
+      </div>
+      <div class="topbar-meta">
+        <span class="top-pill">መግቢያ</span>
+        <span class="top-pill">ሞጁሎች</span>
+        <span class="top-pill">ፈቃዶች</span>
+        <span class="top-pill">ሂደቶች</span>
+        <div class="lang-switch screen-only">
+          <a class="action-btn" href="user-access-guide.html">English HTML</a>
+          <a class="action-btn active" href="user-access-guide-amharic.html">አማርኛ HTML</a>
+          <a class="action-btn pdf" href="HIVE_User_Access_Guide.pdf">English PDF</a>
+          <a class="action-btn pdf" href="HIVE_User_Access_Guide_Amharic.pdf">አማርኛ PDF</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-band">ሙሉ የተጠቃሚ መመሪያ</div>
+      <h1>HIVE.OS የተጠቃሚ መዳረሻ እና የሞጁል መመሪያ</h1>
+      <p class="hero-subtitle">
+        ተጠቃሚዎች እንዴት እንደሚገቡ፣ ከማዕከላዊ እና ከtenant አካባቢ መካከል እንዴት እንደሚሰሩ፣
+        ምን እንደሚያዩ እና በየሞጁሉ ውስጥ ምን ማድረግ እንደሚችሉ በግልጽ መልኩ የሚያብራራ መመሪያ ነው።
+      </p>
+
+      <div class="hero-grid">
+        <div class="hero-card">
+          <div class="label">የተለመዱ ተጠቃሚዎች</div>
+          <p>ኦፕሬተሮች፣ tenant admins፣ central admins፣ support ቡድኖች፣ auditors እና ቴክኒካል አገልግሎት ተጠቃሚዎች።</p>
+        </div>
+        <div class="hero-card">
+          <div class="label">የሚሸፍነው</div>
+          <p>Login፣ 2FA፣ navigation፣ dashboard፣ tenant management፣ security፣ audit logs፣ storage፣ settings፣ alerts፣ profile፣ API docs እና tools።</p>
+        </div>
+        <div class="hero-card last">
+          <div class="label">ዋና ግብ</div>
+          <p>ተጠቃሚዎች ስርዓቱን በቀላሉ እንዲያገኙ እና ሞጁል ውስጥ ያሉ ዋና ተግባራትን እንዳያልፉ ማድረግ።</p>
+        </div>
+      </div>
+
+      <div class="meta-line">
+        የተፈጠረበት ቀን: {{GENERATED_DATE}}<br>
+        የሰነዱ መሠረት: በዚህ repository ውስጥ ያሉ ንቁ frontend እና backend ፋይሎች
+      </div>
+    </div>
+
+    <div class="callout-tip">
+      <strong>ይህን መመሪያ እንዴት እንደሚጠቀሙ:</strong> ፈጣን አቅጣጫ ካስፈለገዎት ከ quick access map ይጀምሩ፤
+      ከዚያ የሚፈልጉትን ሞጁል ወይም የስራ ሂደት ክፍል ይክፈቱ።
+    </div>
+
+    <div class="docs-nav">
+      <div class="eyebrow" style="background:#eaf3fb;color:#204467;">የሰነድ ካርታ</div>
+      <div class="docs-nav-title">መመሪያውን በተግባር መሠረት ይክፈቱ</div>
+      <p class="docs-nav-copy">ይህ ካርታ መመሪያውን በመግቢያ፣ በፈቃድ መርሀ ግብር፣ በዋና ሞጁሎች፣ በኦፕሬሽን ሂደቶች እና በእርዳታ ክፍሎች ይከፍላል።</p>
+
+      <div class="docs-nav-grid">
+        <div class="nav-card">
+          <div class="nav-card-label">ጀምር</div>
+          <p>አጠቃላይ አቅጣጫ፣ login እና ፈጣን መዳረሻ ለሚፈልጉ ተጠቃሚዎች።</p>
+          <div class="nav-links">
+            <a href="#contents">የይዘት ማውጫ</a>
+            <a href="#quick-map">ፈጣን የመዳረሻ ካርታ</a>
+            <a href="#getting-started">መግቢያ እና 2FA</a>
+            <a href="#access-model">የመዳረሻ ሞዴል</a>
+          </div>
+        </div>
+        <div class="nav-card right">
+          <div class="nav-card-label">አጋራ ተሞክሮ</div>
+          <p>በስርዓቱ ውስጥ በአብዛኛው ገጾች ላይ የሚታዩ የጋራ መቆጣጠሪያዎች።</p>
+          <div class="nav-links">
+            <a href="#shared-ui">Navigation እና common controls</a>
+            <a href="#module-dashboard">Dashboard</a>
+            <a href="#module-profile">Profile settings</a>
+            <a href="#module-api-docs">API docs</a>
+          </div>
+        </div>
+        <div class="nav-card">
+          <div class="nav-card-label">አስተዳደር ሞጁሎች</div>
+          <p>ለcentral admins፣ tenant admins፣ support እና security ቡድኖች የሚጠቅሙ ክፍሎች።</p>
+          <div class="nav-links">
+            <a href="#module-tenants">Tenant management</a>
+            <a href="#module-security">Identity and access</a>
+            <a href="#module-audit">Audit logs</a>
+            <a href="#module-settings">Settings</a>
+          </div>
+        </div>
+        <div class="nav-card right">
+          <div class="nav-card-label">ኦፕሬሽን እና እርዳታ</div>
+          <p>የተለመዱ workflows፣ troubleshooting እና route ማብራሪያዎች።</p>
+          <div class="nav-links">
+            <a href="#module-storage">Storage workspace</a>
+            <a href="#module-converter">Document converter</a>
+            <a href="#workflows">የተለመዱ ሂደቶች</a>
+            <a href="#troubleshooting">ችግኝ መፍትሄ</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2 id="contents">1. የይዘት ማውጫ</h2>
+    <table class="toc-table">
+      <thead>
+        <tr>
+          <th>ክፍል</th>
+          <th>የሚሸፍነው</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>1. የይዘት ማውጫ</td><td>ዋና ክፍሎች እና ፈጣን መዳረሻ መረጃ</td></tr>
+        <tr><td>2. ፈጣን የመዳረሻ ካርታ</td><td>Route, የሚያዩት ሰዎች እና ዋና ተግባር</td></tr>
+        <tr><td>3. መጀመሪያ መግቢያ</td><td>Central login, tenant login, 2FA እና redirect</td></tr>
+        <tr><td>4. የመዳረሻ ሞዴል</td><td>Central vs tenant, role እና permission visibility</td></tr>
+        <tr><td>5. የጋራ ተጠቃሚ በይነገጽ</td><td>Sidebar, mobile navigation, topbar controls</td></tr>
+        <tr><td>6. የሞጁል መመሪያ</td><td>Dashboard እስከ Converter ድረስ ሁሉንም ዋና ክፍሎች</td></tr>
+        <tr><td>7. የተለመዱ workflows</td><td>ኦፕሬተር ግብዣ፣ file upload፣ 2FA እና PDF generation</td></tr>
+        <tr><td>8. Troubleshooting</td><td>በተደጋጋሚ የሚከሰቱ ችግኞች እና ፈጣን መፍትሄዎች</td></tr>
+        <tr><td>9. Route and permission matrix</td><td>የገጽ መዳረሻ እና ተጨማሪ permission ማብራሪያ</td></tr>
+      </tbody>
+    </table>    <h2 id="quick-map">2. ፈጣን የመዳረሻ ካርታ</h2>
+    <table class="route-map">
+      <thead>
+        <tr>
+          <th>ገጽ</th>
+          <th>Route</th>
+          <th>ማን ያየዋል</th>
+          <th>ዋና ስራ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Dashboard</td><td><span class="mono">/dashboard</span></td><td>Central እና tenant users</td><td>ጠቅላላ ሁኔታ፣ KPIs እና quick actions</td></tr>
+        <tr><td>Tenant Management</td><td><span class="mono">/dashboard/tenants</span></td><td>Central admins</td><td>Tenant ፍጠር፣ provision፣ suspend እና manage</td></tr>
+        <tr><td>Identity &amp; Access</td><td><span class="mono">/dashboard/security</span></td><td>Permission ያላቸው users</td><td>Users, roles እና permission dictionary</td></tr>
+        <tr><td>Audit Logs</td><td><span class="mono">/dashboard/audit-logs</span></td><td>Logs ማየት የሚችሉ users</td><td>Live logs, archived logs እና forensic review</td></tr>
+        <tr><td>Storage</td><td><span class="mono">/dashboard/storage</span></td><td>Storage managers</td><td>Upload, preview, share, subtitle እና media actions</td></tr>
+        <tr><td>Settings</td><td><span class="mono">/dashboard/settings</span></td><td>Settings permissions ያላቸው users</td><td>Brand, general, localization እና backup setup</td></tr>
+        <tr><td>Alerts</td><td><span class="mono">/dashboard/alerts</span></td><td>Alert viewers</td><td>Critical, warning, info alerts ማየት እና dismiss</td></tr>
+        <tr><td>Profile</td><td><span class="mono">/dashboard/profile</span></td><td>Authenticated users</td><td>Avatar, account info እና 2FA management</td></tr>
+        <tr><td>API Docs</td><td><span class="mono">/dashboard/api-docs</span></td><td>Dashboard users</td><td>Swagger testing, bearer token እና tenant header</td></tr>
+        <tr><td>Converter</td><td><span class="mono">/dashboard/tools/converter</span></td><td>Storage permission ያላቸው users</td><td>HTML ወደ PDF መቀየር እና save-to-cloud</td></tr>
+      </tbody>
+    </table>
+
+    <div class="mini-grid">
+      <div class="mini-card">
+        <h4>Central context</h4>
+        <p>Tenant Management ያሉ ሞጁሎች በcentral context ብቻ ይታያሉ። impersonation banner ካለ ወደ admin መመለስ ይችላሉ።</p>
+      </div>
+      <div class="mini-card right">
+        <h4>Tenant context</h4>
+        <p>Tenant-side users ለእርስዎ የተፈቀዱ ገጾችን ብቻ ያያሉ፤ central-only modules አይታዩም።</p>
+      </div>
+      <div class="mini-card">
+        <h4>Role priority</h4>
+        <p>UI visibility በrole እና permission ላይ ይመሠረታል። ተጠቃሚው ከማይፈቀድለት ጊዜ ቁልፎች ሊጠፉ ወይም ሊዘጉ ይችላሉ።</p>
+      </div>
+      <div class="mini-card right">
+        <h4>Common helpers</h4>
+        <p>Search, filters, export, print, copy, refresh, theme toggle እና profile controls በብዙ ገጾች ላይ ይደጋገማሉ።</p>
+      </div>
+    </div>
+
+    <h2 id="getting-started">3. መጀመሪያ መግቢያ</h2>
+    <div class="panel">
+      <div class="panel-title">3.1 Central Sign-In</div>
+      <ol>
+        <li>ወደ <span class="mono">/sign-in</span> ይሂዱ።</li>
+        <li>ኢሜይል እና password ያስገቡ።</li>
+        <li>2FA ካለ ወደ ማረጋገጫ ገጽ ይመራሉ።</li>
+        <li>ስኬታማ ከሆነ ወደ <span class="mono">/dashboard</span> ይገባሉ።</li>
+      </ol>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">3.2 Tenant Sign-In</div>
+      <p>Tenant users ከtenant domain ወይም tenant subdomain ይገባሉ። የsession አውድ ከመጀመሪያው ቦታ ጋር ይተሳሰራል።</p>
+      <p class="small">ምሳሌ: <span class="mono">tenantapple.localhost</span> ወይም የተለየ tenant URL</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">3.3 Two-Factor Authentication</div>
+      <p>2FA በsign-in ጊዜ ወይም በProfile &gt; Security ታብ ውስጥ ይሰራል። QR code, setup key እና recovery codes ይቀርባሉ።</p>
+      <div class="callout-warn">
+        የስርዓቱ አጠቃላይ ቅንብር 2FA ካስገደደ ተጠቃሚዎች 2FA ሳይጨርሱ ስርዓቱን ማግኘት አይችሉም።
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">3.4 ከመግቢያ በኋላ የሚከሰት</div>
+      <ul>
+        <li>Authenticated session ይፈጠራል።</li>
+        <li>Central ወይም tenant runtime context ይወሰናል።</li>
+        <li>Sidebar በpermission መሠረት ይሞላል።</li>
+        <li>Search, notifications, theme እና profile controls በtopbar ላይ ይታያሉ።</li>
+      </ul>
+    </div>
+
+    <h2 id="access-model">4. የመዳረሻ ሞዴል እና የእይታ መመሪያ</h2>
+    <table class="feature-table">
+      <thead>
+        <tr>
+          <th>መርሀ ግብር</th>
+          <th>ማብራሪያ</th>
+          <th>ውጤት</th>
+          <th>ማስታወሻ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Context-driven access</td><td>Central users እና tenant users ተለያዩ ነገሮችን ያያሉ።</td><td>Central-only modules tenant users አያዩም።</td><td>Tenant management በcentral context ብቻ ይታያል።</td></tr>
+        <tr><td>Role and permission gating</td><td>Tab, button ወይም page visibility በpermission ይታያል።</td><td>Buttons hidden ወይም disabled ሊሆኑ ይችላሉ።</td><td>Example: <span class="mono">manage_alerts</span>, <span class="mono">view_logs</span></td></tr>
+        <tr><td>Protected actions</td><td>Delete, archive, impersonate, suspend ያሉ አደገኛ ተግባራት ተጨማሪ permission ይፈልጋሉ።</td><td>ማየት ይችላሉ ነገር ግን መፈጸም አይችሉም።</td><td>UI ላይ action-specific gating አለ።</td></tr>
+      </tbody>
+    </table>
+
+    <div class="two-col">
+      <div class="col">
+        <div class="panel">
+          <div class="panel-title">ሞጁል ለምን ይጠፋል?</div>
+          <ul>
+            <li>ተጠቃሚው አሁን ባለው context ውስጥ አይፈቀድለትም።</li>
+            <li>Navigation item ለዚያ role አይገኝም።</li>
+            <li>Feature central-only ወይም tenant-only ነው።</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col last">
+        <div class="panel">
+          <div class="panel-title">Button ለምን disabled ይሆናል?</div>
+          <ul>
+            <li>Action ለመፈጸም ተጨማሪ permission ይፈልጋል።</li>
+            <li>አስፈላጊ ውሂብ አልተሞላም።</li>
+            <li>Current item በlocked ወይም protected ሁኔታ ላይ ነው።</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <h2 id="shared-ui">5. የጋራ በይነገጽ እና common controls</h2>
+    <div class="module">
+      <div class="module-header"><h3>Desktop sidebar</h3></div>
+      <p class="module-lead">ዋና መንገድ እዚህ ነው። ሞጁሎችን ይክፈታል፣ collapse ወይም expand ማድረግ ይቻላል።</p>
+      <ul>
+        <li>Primary navigation, secondary links እና Apps &amp; Tools accordion</li>
+        <li>Theme toggle እና disconnect controls</li>
+        <li>Brand logo, sidebar icon እና module-specific visibility</li>
+      </ul>
+    </div>
+
+    <div class="module">
+      <div class="module-header"><h3>Mobile navigation</h3></div>
+      <p class="module-lead">በትንሽ ስክሪን ላይ sidebar እንደ sheet ይከፈታል።</p>
+      <ul>
+        <li>Search-driven menu filtering</li>
+        <li>Theme toggle እና disconnect</li>
+        <li>Permission-based links ብቻ ይታያሉ</li>
+      </ul>
+    </div>
+
+    <div class="module">
+      <div class="module-header"><h3>Topbar controls</h3></div>
+      <p class="module-lead">Topbar ከሁሉም ገጾች ላይ የሚታይ ፈጣን መቆጣጠሪያ ነው።</p>
+      <div class="mini-grid">
+        <div class="mini-card"><h4>Global search</h4><p>አቅጣጫ ፈጣን ለማግኘት ይረዳል።</p></div>
+        <div class="mini-card right"><h4>Language and theme</h4><p>Language selector እና light/dark preference.</p></div>
+        <div class="mini-card"><h4>Notifications</h4><p>Alert counter, notifications እና shortcut access.</p></div>
+        <div class="mini-card right"><h4>Profile and tour</h4><p>Profile menu, fullscreen እና guided system tour.</p></div>
+      </div>
+    </div>
+
+    <h2 id="module-playbook">6. የሞጁል መመሪያ</h2>
+    <div class="module" id="dashboard-module">
+      <div class="module-header">
+        <div class="pill route">Route /dashboard</div>
+        <div class="pill guard">Permission view_system_dashboard</div>
+        <div class="pill context">Central and tenant</div>
+        <h3 id="module-dashboard">6.1 Dashboard</h3>
+      </div>
+      <p class="module-lead">Dashboard ከlogin በኋላ የሚታየው ዋና ማስነሻ ገጽ ነው። የcentral እና tenant ተጠቃሚዎች የሚያዩት ይለያያል።</p>
+      <table class="feature-table">
+        <thead><tr><th>ክፍል</th><th>የሚያሳየው</th><th>ማን ያየዋል</th><th>ማስታወሻ</th></tr></thead>
+        <tbody>
+          <tr><td>Central summary</td><td>Tenant counts, revenue intelligence, cluster health, traffic origins, alerts እና module telemetry</td><td>Central users</td><td>Operations እና oversight ለማድረግ</td></tr>
+          <tr><td>Tenant summary</td><td>Tenant activity trend, quick actions እና local visibility widgets</td><td>Tenant users</td><td>Invite operator እና role configuration shortcuts</td></tr>
+          <tr><td>Live activity</td><td>Recent audit events እና runtime changes</td><td>Both</td><td>Impersonation banner ካለ ይታያል</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="module" id="tenants-module">
+      <div class="module-header">
+        <div class="pill route">Route /dashboard/tenants</div>
+        <div class="pill guard">Permissions manage_tenants or view_tenants</div>
+        <div class="pill context">Central only</div>
+        <h3 id="module-tenants">6.2 Tenant Management</h3>
+      </div>
+      <p class="module-lead">ይህ ክፍል ለtenant node ፍጠር፣ ማየት እና አስተዳደር የሚጠቅም የcentral operations workspace ነው።</p>
+      <ul>
+        <li>Search, filters, export, print, copy እና refresh</li>
+        <li>Provision node, inspect node, reconfigure tenant</li>
+        <li>Suspend, restore, Super Admin login toggle, edit እና purge</li>
+      </ul>
+      <div class="callout-warn">Tenant context ውስጥ ይህ ሞጁል አይታይም።</div>
+    </div>
+
+    <div class="module" id="security-module">
+      <div class="module-header">
+        <div class="pill route">Route /dashboard/security</div>
+        <div class="pill context">Central and tenant</div>
+        <h3 id="module-security">6.3 Identity &amp; Access</h3>
+      </div>
+      <p class="module-lead">ይህ ገጽ Users, Roles እና Permissions የሚሉ ታቦችን ያካትታል። እያንዳንዱ tab በተለየ permission ይታያል።</p>
+      <table class="feature-table">
+        <thead><tr><th>Tab</th><th>የሚያደርገው</th><th>Visibility</th><th>ተጨማሪ ተግባራት</th></tr></thead>
+        <tbody>
+          <tr><td>Operators</td><td>Users ማየት፣ create/edit/delete፣ lock/unlock፣ impersonate</td><td><span class="mono">manage_users</span> or <span class="mono">view_users</span></td><td>Status, role, date filters እና export tools</td></tr>
+          <tr><td>Roles</td><td>Roles ፍጠር፣ edit፣ delete እና inspect</td><td><span class="mono">manage_roles</span> or <span class="mono">view_roles</span></td><td>Permission search እና protected built-in roles</td></tr>
+          <tr><td>Permissions</td><td>Read-only permission dictionary</td><td><span class="mono">view_permissions</span></td><td>Scope: central or tenant</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="module" id="audit-module">
+      <div class="module-header">
+        <div class="pill route">Route /dashboard/audit-logs</div>
+        <div class="pill guard">Permission view_logs</div>
+        <div class="pill context">Central and tenant</div>
+        <h3 id="module-audit">6.4 Audit Logs</h3>
+      </div>
+      <p class="module-lead">Audit workspace በactive live logs እና archived cold storage logs ይከፈላል።</p>
+      <ul>
+        <li>Search, event, module, operator, node, date range filters</li>
+        <li>Export, print, copy, refresh</li>
+        <li>Archive retention setup, manual archive, archived delete, bulk delete</li>
+        <li>Raw payload እና forensic inspection</li>
+      </ul>
+    </div>
+
+    <div class="module" id="storage-module">
+      <div class="module-header">
+        <div class="pill route">Route /dashboard/storage</div>
+        <div class="pill guard">Permission manage_storage</div>
+        <div class="pill context">Central and tenant</div>
+        <h3 id="module-storage">6.5 Storage and Media Workspace</h3>
+      </div>
+      <p class="module-lead">Storage ለfile manager፣ media preview እና asset reuse የሚጠቅም አጠቃላይ workspace ነው።</p>
+      <table class="feature-table">
+        <thead><tr><th>ክፍል</th><th>የሚደረገው</th><th>አይነት</th><th>ማስታወሻ</th></tr></thead>
+        <tbody>
+          <tr><td>File views</td><td>All, favorites, recent, trash እና type filters</td><td>Image, video, document, audio, archive, other</td><td>Grid እና list view ይገኛሉ</td></tr>
+          <tr><td>Folder actions</td><td>Create, rename, move, trash, restore, delete forever</td><td>Folders</td><td>Protected actions እንደ permission ይታያሉ</td></tr>
+          <tr><td>File actions</td><td>Upload, rename, move, share, favorite, trash, restore, force delete</td><td>Files</td><td>Custom thumbnail እና save-to-cloud flows</td></tr>
+          <tr><td>Preview tools</td><td>Image edit, video player, audio player, PDF viewer, subtitles</td><td>Media</td><td>Crop, resize, filters, HLS, playlist እና subtitles</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="module" id="settings-module">
+      <div class="module-header">
+        <div class="pill route">Route /dashboard/settings</div>
+        <div class="pill context">Central and tenant</div>
+        <h3 id="module-settings">6.6 Settings</h3>
+      </div>
+      <p class="module-lead">Settings በbrand, general, localization እና backup tabs ይከፈላል። የተጠቃሚው ፈቃድ መሰረት ላይ ክፍሎቹ ይታያሉ።</p>
+      <ul>
+        <li><strong>Brand:</strong> logos, favicon, sidebar icon, title, footer text, primary color, typography, auth background, PDF logo, tax ID, header color, OG image</li>
+        <li><strong>General:</strong> sender/support contacts, timezone, currency, date/time format, public registration, enforce global 2FA, maintenance mode, max upload, session timeout</li>
+        <li><strong>Localization:</strong> languages መጨመር፣ default language ማስቀመጥ፣ translation keys ማስተካከል፣ publish project</li>
+        <li><strong>Backups:</strong> daily/weekly/monthly schedule, manual snapshots, download/delete backups</li>
+      </ul>
+    </div>
+
+    <div class="module" id="alerts-module">
+      <div class="module-header">
+        <div class="pill route">Route /dashboard/alerts</div>
+        <div class="pill guard">Permission view_alerts</div>
+        <div class="pill context">Central and tenant</div>
+        <h3 id="module-alerts">6.7 System Alerts</h3>
+      </div>
+      <p class="module-lead">Alerts page critical, warning እና info messages ለማየት ይረዳል።</p>
+      <ul>
+        <li>Filter by severity</li>
+        <li>Dismiss single alert ወይም dismiss all</li>
+        <li><span class="mono">manage_alerts</span> ከሌለ dismiss actions አይታዩም ወይም disabled ይሆናሉ</li>
+      </ul>
+    </div>
+
+    <div class="module" id="profile-module">
+      <div class="module-header">
+        <div class="pill route">Route /dashboard/profile</div>
+        <div class="pill context">Authenticated users</div>
+        <h3 id="module-profile">6.8 Profile Settings</h3>
+      </div>
+      <p class="module-lead">Profile ተጠቃሚው ራሱን የሚያስተካክልበት ክፍል ነው።</p>
+      <ul>
+        <li>Avatar upload ወይም storage picker</li>
+        <li>Name እና email update</li>
+        <li>2FA enable/disable ከpassword confirmation ጋር</li>
+        <li>QR code, setup code እና recovery codes copy</li>
+      </ul>
+    </div>
+
+    <div class="module" id="api-docs-module">
+      <div class="module-header">
+        <div class="pill route">Route /dashboard/api-docs</div>
+        <div class="pill context">Central and tenant</div>
+        <h3 id="module-api-docs">6.9 API Docs</h3>
+      </div>
+      <p class="module-lead">Swagger-based API docs ነው፤ token በመጠቀም requests መሞከር ይቻላል።</p>
+      <ul>
+        <li>Central / tenant mode toggle</li>
+        <li><span class="mono">hive_token</span> ከsession የሚመጣ bearer token auto-fill</li>
+        <li><span class="mono">X-Tenant</span> header ለtenant context</li>
+        <li>Backend docs link, raw spec link እና interactive request testing</li>
+      </ul>
+    </div>
+
+    <div class="module" id="converter-module">
+      <div class="module-header">
+        <div class="pill route">Route /dashboard/tools/converter</div>
+        <div class="pill guard">Permission manage_storage</div>
+        <div class="pill context">Central and tenant</div>
+        <h3 id="module-converter">6.10 Document Converter</h3>
+      </div>
+      <p class="module-lead">Converter የHTML ፋይሎችን ወደ PDF ለመቀየር የሚጠቅም tool ነው።</p>
+      <ul>
+        <li>Local HTML upload, cloud HTML select ወይም IDE mode</li>
+        <li>Extra assets upload/select</li>
+        <li>Paper size, orientation, margins እና print backgrounds settings</li>
+        <li>PDF preview እና save-to-cloud</li>
+      </ul>
+    </div>
+
+    <h2 id="workflows">7. የተለመዱ የተጠቃሚ ሂደቶች</h2>
+    <div class="journey">
+      <h3>Workflow A. ወደ ስርዓቱ መግባት እና 2FA ማጠናቀቅ</h3>
+      <div class="journey-step"><span class="step-no">1</span> ወደ <span class="mono">/sign-in</span> ይሂዱ።</div>
+      <div class="journey-step"><span class="step-no">2</span> መለያ መረጃ ያስገቡ።</div>
+      <div class="journey-step"><span class="step-no">3</span> 2FA code ካስፈለገ ያስገቡ።</div>
+      <div class="journey-step"><span class="step-no">4</span> Dashboard ውስጥ የሚታዩትን modules ይከፍቱ።</div>
+    </div>
+
+    <div class="journey">
+      <h3>Workflow B. አዲስ operator መጨመር</h3>
+      <div class="journey-step"><span class="step-no">1</span> Security &gt; Operators tab ይክፈቱ።</div>
+      <div class="journey-step"><span class="step-no">2</span> Create user ይጫኑ እና ዝርዝሮችን ያስገቡ።</div>
+      <div class="journey-step"><span class="step-no">3</span> Role ይመድቡ እና status ያረጋግጡ።</div>
+      <div class="journey-step"><span class="step-no">4</span> ከዚያ ተጠቃሚው login ማድረግ ይችላል።</div>
+    </div>
+
+    <div class="journey">
+      <h3>Workflow C. Tenant node provision ማድረግ</h3>
+      <div class="journey-step"><span class="step-no">1</span> Tenant Management ይክፈቱ።</div>
+      <div class="journey-step"><span class="step-no">2</span> Provision node ይምረጡ።</div>
+      <div class="journey-step"><span class="step-no">3</span> Tenant መረጃ እና configuration ያስገቡ።</div>
+      <div class="journey-step"><span class="step-no">4</span> Status እና generated node ይፈትሹ።</div>
+    </div>
+
+    <div class="journey">
+      <h3>Workflow D. File upload እና አስተዳደር</h3>
+      <div class="journey-step"><span class="step-no">1</span> Storage ይክፈቱ።</div>
+      <div class="journey-step"><span class="step-no">2</span> Folder ይምረጡ ወይም አዲስ folder ይፍጠሩ።</div>
+      <div class="journey-step"><span class="step-no">3</span> Upload ይጫኑ፣ file ይምረጡ እና optional thumbnail ይጨምሩ።</div>
+      <div class="journey-step"><span class="step-no">4</span> Preview, share, favorite, move ወይም trash actions ይጠቀሙ።</div>
+    </div>
+
+    <div class="journey">
+      <h3>Workflow E. 2FA ከProfile ማንቃት</h3>
+      <div class="journey-step"><span class="step-no">1</span> Profile &gt; Security tab ይክፈቱ።</div>
+      <div class="journey-step"><span class="step-no">2</span> Enable 2FA ይጫኑ እና password ያረጋግጡ።</div>
+      <div class="journey-step"><span class="step-no">3</span> QR ወይም setup key ይጠቀሙ።</div>
+      <div class="journey-step"><span class="step-no">4</span> Recovery codes ይቅዱ እና በደህና ያስቀምጡ።</div>
+    </div>
+
+    <div class="journey">
+      <h3>Workflow F. PDF በConverter መፍጠር</h3>
+      <div class="journey-step"><span class="step-no">1</span> Converter ይክፈቱ።</div>
+      <div class="journey-step"><span class="step-no">2</span> HTML source ይምረጡ።</div>
+      <div class="journey-step"><span class="step-no">3</span> Paper size, margins እና background options ያስተካክሉ።</div>
+      <div class="journey-step"><span class="step-no">4</span> Preview PDF ይፍጠሩ እና cloud ውስጥ ያስቀምጡ።</div>
+    </div>
+    <h2 id="troubleshooting">8. ችግኝ መፍትሄ</h2>
+    <table class="feature-table">
+      <thead>
+        <tr>
+          <th>ችግኝ</th>
+          <th>ሊሆን የሚችለው ምክንያት</th>
+          <th>ፈጣን መፍትሄ</th>
+          <th>ማስታወሻ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Login አይሳካም</td><td>Wrong credentials ወይም inactive account</td><td>ኢሜይል/password ያረጋግጡ እና account status ይፈትሹ</td><td>2FA redirect ካለ የሚቀጥለውን ገጽ ይመልከቱ</td></tr>
+        <tr><td>2FA code አይሰራም</td><td>Authenticator clock drift ወይም wrong account</td><td>የስልኩን ሰዓት ያመሳስሉ እና recovery code ይጠቀሙ</td><td>Profile Security ታብ ውስጥ እንደገና setup ሊፈልግ ይችላል</td></tr>
+        <tr><td>Module አይታይም</td><td>Permission ወይም context ጉዳይ</td><td>Role እና assigned permissions ይፈትሹ</td><td>Central-only modules tenant users አያዩም</td></tr>
+        <tr><td>Action button disabled ነው</td><td>Manage permission የለም ወይም item protected ነው</td><td>Action-specific permission ይፈትሹ</td><td>Example: delete, archive, impersonate</td></tr>
+        <tr><td>Storage upload አይሳካም</td><td>File too large ወይም unsupported state</td><td>General settings ውስጥ max upload ይፈትሹ</td><td>Folder permission እና network ሁኔታ ደግሞ ይፈትሹ</td></tr>
+        <tr><td>Alert dismiss አይሰራም</td><td><span class="mono">manage_alerts</span> የለም</td><td>Role ላይ permission ያክሉ</td><td>View-only users እንዲያዩ ብቻ ይችላሉ</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="route-matrix">9. Route and Permission Matrix</h2>
+    <table class="route-map">
+      <thead>
+        <tr>
+          <th>ገጽ / tool</th>
+          <th>Route</th>
+          <th>ዋና visibility rule</th>
+          <th>ተጨማሪ permission የሚፈልጉ ተግባራት</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Dashboard</td><td><span class="mono">/dashboard</span></td><td><span class="mono">view_system_dashboard</span></td><td>Quick actions በtenant, settings እና backup permissions ይለያያሉ</td></tr>
+        <tr><td>Tenant Management</td><td><span class="mono">/dashboard/tenants</span></td><td><span class="mono">manage_tenants</span> or <span class="mono">view_tenants</span></td><td>Create, edit, suspend, Super Admin toggle, delete</td></tr>
+        <tr><td>Security - Operators</td><td><span class="mono">/dashboard/security?tab=users</span></td><td><span class="mono">manage_users</span> or <span class="mono">view_users</span></td><td>Create, edit, delete, lock/unlock, impersonate</td></tr>
+        <tr><td>Security - Roles</td><td><span class="mono">/dashboard/security?tab=roles</span></td><td><span class="mono">manage_roles</span> or <span class="mono">view_roles</span></td><td>Create, edit, delete</td></tr>
+        <tr><td>Security - Permissions</td><td><span class="mono">/dashboard/security?tab=permissions</span></td><td><span class="mono">view_permissions</span></td><td>Mainly read-only plus table tools</td></tr>
+        <tr><td>Audit Logs</td><td><span class="mono">/dashboard/audit-logs</span></td><td><span class="mono">view_logs</span></td><td>Export, archive, delete archived logs</td></tr>
+        <tr><td>Storage</td><td><span class="mono">/dashboard/storage</span></td><td><span class="mono">manage_storage</span></td><td>File actions, media tools, converter access</td></tr>
+        <tr><td>Settings - Brand</td><td><span class="mono">/dashboard/settings?tab=brand</span></td><td><span class="mono">manage_brand_settings</span></td><td>Logos, metadata, PDF branding</td></tr>
+        <tr><td>Settings - General</td><td><span class="mono">/dashboard/settings?tab=general</span></td><td><span class="mono">manage_general_settings</span></td><td>Registration, 2FA policy, maintenance mode, session timeout</td></tr>
+        <tr><td>Settings - Localization</td><td><span class="mono">/dashboard/settings?tab=localization</span></td><td><span class="mono">manage_localization</span></td><td>Languages, keys, publishing</td></tr>
+        <tr><td>Settings - Backups</td><td><span class="mono">/dashboard/settings?tab=backup</span></td><td><span class="mono">view_backups</span> or <span class="mono">manage_backups</span></td><td>Run, schedule, download, delete backups</td></tr>
+        <tr><td>System Alerts</td><td><span class="mono">/dashboard/alerts</span></td><td><span class="mono">view_alerts</span></td><td>Dismissing alerts requires <span class="mono">manage_alerts</span></td></tr>
+        <tr><td>Profile Settings</td><td><span class="mono">/dashboard/profile</span></td><td>Authenticated session</td><td>2FA enable/disable requires password confirmation</td></tr>
+        <tr><td>API Docs</td><td><span class="mono">/dashboard/api-docs</span></td><td>Visible in dashboard navigation</td><td>Interactive requests need valid token and optional tenant header</td></tr>
+        <tr><td>Document Converter</td><td><span class="mono">/dashboard/tools/converter</span></td><td><span class="mono">manage_storage</span></td><td>Preview and save-to-cloud depend on successful generation</td></tr>
+      </tbody>
+    </table>
+
+    <div class="footer">
+      ይህ አማርኛ መመሪያ ከአሁኑ repository ውስጥ ባሉ ንቁ UI እና route ሎጂኮች ተመስርቶ በ {{GENERATED_DATE}} ተፈጥሯል።
+      የroute ስሞች፣ permission keys እና አንዳንድ technical labels ከስርዓቱ ጋር እንዲጣጣሙ በእንግሊዝኛ ተዉተዋል።
+    </div>
+  </div>
+</body>
+</html>

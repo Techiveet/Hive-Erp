@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import api from "@/lib/api";
+import { getBackendStorageUrl } from "@/lib/runtime-context";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -41,6 +42,11 @@ export interface CompanySettingsInfo {
 
 export interface BrandingSettingsInfo {
   logo?: string;
+  app_title?: string;
+  footer_text?: string;
+  document_header_color?: string;
+  company_tax_id?: string;
+  pdf_logo?: string;
   [key: string]: any;
 }
 
@@ -121,20 +127,80 @@ function downloadBlob(blob: Blob, filename: string) {
   window.URL.revokeObjectURL(url);
 }
 
+type ExportBrandingPayload = {
+  app_title?: string;
+  footer_text?: string;
+  document_header_color?: string;
+  company_tax_id?: string;
+  logo_url?: string | null;
+};
+
+function normalizeExportHexColor(value: unknown, fallback = "#1E293B") {
+  const candidate = String(value ?? "").trim().toUpperCase();
+  return /^#(?:[0-9A-F]{3}|[0-9A-F]{6})$/.test(candidate) ? candidate : fallback;
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildExportBranding(
+  backendBranding: any,
+  backendLogoUrl?: string | null,
+  brandingSettings?: BrandingSettingsInfo,
+  companySettings?: CompanySettingsInfo
+): ExportBrandingPayload {
+  const merged = {
+    ...(brandingSettings ?? {}),
+    ...(backendBranding ?? {}),
+  };
+
+  const fallbackLogo =
+    backendLogoUrl ||
+    merged.logo_url ||
+    (typeof merged.pdf_logo === "string" ? getBackendStorageUrl(merged.pdf_logo) : null) ||
+    (typeof merged.logo === "string" ? getBackendStorageUrl(merged.logo) : null);
+
+  return {
+    app_title: String(merged.app_title || companySettings?.name || "HIVE.OS"),
+    footer_text: String(merged.footer_text || companySettings?.name || "Powered by HIVE.OS"),
+    document_header_color: normalizeExportHexColor(merged.document_header_color),
+    company_tax_id: merged.company_tax_id ? String(merged.company_tax_id) : undefined,
+    logo_url: fallbackLogo,
+  };
+}
+
 // 🚀 UPDATED: Professional ERP Print Template matching Blade PDFs
-function printSimpleTable(dataRows: any[], title = "System Report", printWindow?: Window | null, logoUrl?: string | null) {
+function printSimpleTable(
+  dataRows: any[],
+  title = "System Report",
+  printWindow?: Window | null,
+  branding: ExportBrandingPayload = {}
+) {
   if (!dataRows || dataRows.length === 0) throw new Error("No data available to print.");
   
+  const headerColor = normalizeExportHexColor(branding.document_header_color);
+  const logoUrl = branding.logo_url ? escapeHtml(branding.logo_url) : null;
+  const appTitle = escapeHtml(branding.app_title || "HIVE.OS");
+  const footerText = escapeHtml(branding.footer_text || appTitle);
+  const taxId = branding.company_tax_id ? escapeHtml(branding.company_tax_id) : "";
+  const safeTitle = escapeHtml(title);
+
   // Filter out system keys that shouldn't be printed
   const keys = Object.keys(dataRows[0]).filter(key => !["id", "uuid", "user_id", "serial", "tenant_id", "logo_url"].includes(key));
   
-  let headers = `<th width="6%">SEQ</th>` + keys.map(k => `<th>${k.replace(/_/g, " ").toUpperCase()}</th>`).join("");
+  let headers = `<th width="6%">SEQ</th>` + keys.map(k => `<th>${escapeHtml(k.replace(/_/g, " ").toUpperCase())}</th>`).join("");
   
   // Create rows with zero-padded Sequence numbers (0001, 0002, etc.)
   let rows = dataRows.map((row, i) => 
     `<tr>
       <td class="seq">${String(i + 1).padStart(4, '0')}</td>
-      ${keys.map(k => `<td>${row[k] ?? ""}</td>`).join("")}
+      ${keys.map(k => `<td>${escapeHtml(row[k] ?? "")}</td>`).join("")}
     </tr>`
   ).join("");
 
@@ -145,7 +211,7 @@ function printSimpleTable(dataRows: any[], title = "System Report", printWindow?
       <!DOCTYPE html>
       <html>
       <head>
-        <title>${title}</title>
+        <title>${safeTitle}</title>
         <style>
           /* 🚀 FORCE browsers to print background colors (crucial for the dark header) */
           @media print {
@@ -170,7 +236,7 @@ function printSimpleTable(dataRows: any[], title = "System Report", printWindow?
           .header-table {
             width: 100%;
             border-collapse: collapse;
-            border-bottom: 2px solid #1e293b;
+            border-bottom: 2px solid ${headerColor};
             padding-bottom: 15px;
             margin-bottom: 20px;
           }
@@ -179,7 +245,7 @@ function printSimpleTable(dataRows: any[], title = "System Report", printWindow?
           
           .title-td { vertical-align: middle; text-align: left; }
           .title-td h2 {
-            font-size: 16px; font-weight: bold; color: #0f172a; 
+            font-size: 16px; font-weight: bold; color: ${headerColor};
             text-transform: uppercase; letter-spacing: 1px; margin: 0 0 3px 0;
           }
           .title-td p {
@@ -192,6 +258,7 @@ function printSimpleTable(dataRows: any[], title = "System Report", printWindow?
             font-size: 8px; color: #475569; line-height: 1.5;
           }
           .meta-td strong { color: #1e293b; }
+          .meta-td strong.brand { color: ${headerColor}; }
 
           /* ----------------------------------------------------
              DATA TABLE
@@ -203,11 +270,11 @@ function printSimpleTable(dataRows: any[], title = "System Report", printWindow?
             table-layout: auto;
           }
           .data-table th {
-            background-color: #1e293b !important;
+            background-color: ${headerColor} !important;
             color: #ffffff !important;
             font-size: 9px; font-weight: bold; text-transform: uppercase; 
             letter-spacing: 0.5px; padding: 10px 8px; text-align: left;
-            border: 1px solid #1e293b;
+            border: 1px solid ${headerColor};
           }
           .data-table td {
             padding: 8px 8px; border-bottom: 1px solid #e2e8f0;
@@ -235,13 +302,14 @@ function printSimpleTable(dataRows: any[], title = "System Report", printWindow?
               ${logoUrl ? `<img src="${logoUrl}" class="logo" alt="Logo" />` : ''}
             </td>
             <td class="title-td">
-              <h2>${title}</h2>
+              <h2>${safeTitle}</h2>
               <p>Enterprise Management - Browser Print Extract</p>
             </td>
             <td class="meta-td">
-              <div><strong>Date Generated:</strong> ${new Date().toLocaleString()}</div>
-              <div><strong>Total Records:</strong> ${dataRows.length}</div>
-              <div><strong>Generated By:</strong> HIVE.OS Web Client</div>
+              <div><strong class="brand">Date Generated:</strong> ${escapeHtml(new Date().toLocaleString())}</div>
+              <div><strong class="brand">Total Records:</strong> ${dataRows.length}</div>
+              ${taxId ? `<div><strong class="brand">Tax ID:</strong> ${taxId}</div>` : ""}
+              <div><strong class="brand">Generated By:</strong> ${appTitle} Web Client</div>
             </td>
           </tr>
         </table>
@@ -253,8 +321,8 @@ function printSimpleTable(dataRows: any[], title = "System Report", printWindow?
         
         <table class="footer-table">
           <tr>
-            <td style="text-align: left; width: 33%;">HIVE.OS Enterprise Management</td>
-            <td style="text-align: center; width: 34%;">Strictly Confidential</td>
+            <td style="text-align: left; width: 33%;">${footerText}</td>
+            <td style="text-align: center; width: 34%;">${taxId ? `Tax ID: ${taxId}` : "Strictly Confidential"}</td>
             <td style="text-align: right; width: 33%;">Printed via Secure Web Client</td>
           </tr>
         </table>
@@ -444,7 +512,12 @@ function DataTableInner<TData, TValue>({
       } else {
         // Parse the new JSON format containing the logo_url
         const rows = Array.isArray(res.data) ? res.data : (res.data?.data || []);
-        const logoUrl = res.data?.logo_url || null;
+        const branding = buildExportBranding(
+          res.data?.branding,
+          res.data?.logo_url || null,
+          brandingSettings,
+          companySettings
+        );
         
         if (rows.length === 0) {
           if (printWin) printWin.close();
@@ -455,12 +528,19 @@ function DataTableInner<TData, TValue>({
           const keys = Object.keys(rows[0]).filter(k => !["id", "uuid", "user_id", "serial", "tenant_id", "logo_url"].includes(k));
           const headerString = ["#", ...keys.map(k => k.replace(/_/g, " ").toUpperCase())].join("\t");
           const dataStrings = rows.map((r: any, i: number) => [i + 1, ...keys.map(k => r[k])].join("\t"));
-          
-          await navigator.clipboard.writeText([headerString, ...dataStrings].join("\n"));
+
+          const prefixLines = [
+            branding.app_title || "HIVE.OS",
+            title || "System Report",
+            branding.company_tax_id ? `Tax ID: ${branding.company_tax_id}` : null,
+            `Generated: ${new Date().toLocaleString()}`,
+            "",
+          ].filter(Boolean);
+
+          await navigator.clipboard.writeText([...prefixLines, headerString, ...dataStrings].join("\n"));
           return `Copied ${rows.length} ${resourceName} to your clipboard!`;
         } else if (type === "print") {
-          // Pass the logoUrl to the print helper
-          printSimpleTable(rows, title || "System Report", printWin, logoUrl);
+          printSimpleTable(rows, title || "System Report", printWin, branding);
           return `Print document generated with ${rows.length} ${resourceName}.`;
         }
       }

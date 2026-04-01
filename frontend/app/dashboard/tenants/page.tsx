@@ -3,24 +3,27 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldAlert, Loader2, Network, Home, HelpCircle } from "lucide-react";
+import { ShieldAlert, Network, Home, HelpCircle } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
 import { logFrontendAction } from "@/lib/api"; 
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button"; 
 import { useTour } from "@/components/providers/tour-provider"; 
 import { useTranslation } from "@/store/use-translation"; // 🚀 Added Translation Hook
+import { ModulePageSkeleton } from "@/components/ui/loading-states";
+import { isTenantSession } from "@/lib/runtime-context";
 
 import { TenantsTableClient } from "./_components/tenants-table-client";
 
 export default function TenantsPage() {
     const router = useRouter();
-    const { hasPermission } = usePermissions();
+    const { hasAnyPermission, isLoaded } = usePermissions();
     const { t } = useTranslation(); // 🚀 Initialize translator
     const [accessStatus, setAccessStatus] = useState<"checking" | "granted" | "denied">("checking");
     const { startTour } = useTour(); 
     
     const viewLogged = useRef(false);
+    const canViewTenants = hasAnyPermission(["manage_tenants", "view_tenants"]);
 
     // 🚀 Fully Localized Tour Steps
     const tenantTourSteps = [
@@ -119,29 +122,31 @@ export default function TenantsPage() {
     ];
 
     useEffect(() => {
-        const checkClearanceTimer = setTimeout(() => {
-            const host = window.location.hostname;
-            const isCentral = host === 'localhost' || host === '127.0.0.1';
+        if (!isLoaded) {
+            setAccessStatus("checking");
+            return;
+        }
 
-            if (!isCentral || !hasPermission("view_tenants")) {
-                setAccessStatus("denied");
-                
-                if (!viewLogged.current) {
-                    viewLogged.current = true;
-                    logFrontendAction({ module: 'Tenant Management', action: 'access_denied', description: 'Operator blocked from accessing Master Node Management.' }).catch(()=>{});
-                }
-                setTimeout(() => router.replace("/dashboard"), 3000);
-            } else {
-                setAccessStatus("granted");
-                if (!viewLogged.current) {
-                    viewLogged.current = true;
-                    logFrontendAction({ module: 'Tenant Management', action: 'viewed', description: 'Accessed Master Node Management module.' }).catch(()=>{});
-                }
+        const isCentral = !isTenantSession();
+
+        if (!isCentral || !canViewTenants) {
+            setAccessStatus("denied");
+
+            if (!viewLogged.current) {
+                viewLogged.current = true;
+                logFrontendAction({ module: 'Tenant Management', action: 'access_denied', description: 'Operator blocked from accessing Master Node Management.' }).catch(()=>{});
             }
-        }, 500); 
 
-        return () => clearTimeout(checkClearanceTimer);
-    }, [hasPermission, router]);
+            const timer = setTimeout(() => router.replace("/dashboard"), 3000);
+            return () => clearTimeout(timer);
+        }
+
+        setAccessStatus("granted");
+        if (!viewLogged.current) {
+            viewLogged.current = true;
+            logFrontendAction({ module: 'Tenant Management', action: 'viewed', description: 'Accessed Master Node Management module.' }).catch(()=>{});
+        }
+    }, [canViewTenants, isLoaded, router]);
 
     useEffect(() => {
         if (accessStatus === "granted") {
@@ -157,14 +162,7 @@ export default function TenantsPage() {
     }, [accessStatus, startTour]);
 
     if (accessStatus === "checking") {
-        return (
-            <div className="flex h-[60vh] flex-col items-center justify-center space-y-4">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground animate-pulse">
-                    {t('tenants.verifying', 'Verifying Network Clearance...')}
-                </p>
-            </div>
-        );
+        return <ModulePageSkeleton titleWidth="w-60" subtitleWidth="w-80" rows={7} cols={6} />;
     }
 
     if (accessStatus === "denied") {

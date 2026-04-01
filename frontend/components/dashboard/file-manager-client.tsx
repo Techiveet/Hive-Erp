@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl } from "@/lib/runtime-context";
 import { useTranslation } from "@/store/use-translation";
 
 // Reusable Viewer Components
@@ -139,16 +140,8 @@ const formatBytes = (bytes: number, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
-const getApiUrl = () => {
-  if (typeof window !== 'undefined') return `http://${window.location.hostname}:8085/api`;
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8085/api';
-};
-
 const getStorageUrl = (url: string | null | undefined) => {
-  if (!url) return '';
-  const storageIndex = url.indexOf('/storage/');
-  if (storageIndex !== -1) return `http://${window.location.hostname}:8085${url.substring(storageIndex)}`;
-  return url;
+  return getBackendStorageUrl(url) || '';
 };
 
 // ============================================================================
@@ -231,8 +224,7 @@ export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, o
       }
       setIsLoadingBlob(true);
       try {
-        const token = localStorage.getItem('hive_token');
-        const response = await fetch(fetchUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+        const response = await fetch(fetchUrl, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error("Failed to secure image");
         const blob = await response.blob();
         setBlobSrc(URL.createObjectURL(blob));
@@ -351,11 +343,9 @@ export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, o
           const formData = new FormData();
           formData.append('file', blob, 'image.png');
 
-          const token = localStorage.getItem('hive_token');
-          
-          const apiRes = await fetch(`${getApiUrl()}/v1/files/remove-background`, {
+          const apiRes = await fetch(`${getBackendApiRoot()}/files/remove-background`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+            headers: getAuthHeaders(),
             body: formData
           });
 
@@ -394,11 +384,9 @@ export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, o
           const formData = new FormData();
           formData.append('file', imageBlob, 'image.png');
 
-          const token = localStorage.getItem('hive_token');
-          
-          const apiRes = await fetch(`${getApiUrl()}/v1/files/remove-logo-background`, {
+          const apiRes = await fetch(`${getBackendApiRoot()}/files/remove-logo-background`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+            headers: getAuthHeaders(),
             body: formData
           });
 
@@ -905,12 +893,11 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
   const { data, isLoading } = useQuery({
     queryKey: ["files", currentFolderId, activeFilter],
     queryFn: async () => {
-      const token = localStorage.getItem('hive_token');
       const params = new URLSearchParams({ filter: activeFilter });
       if (currentFolderId) params.append('folder_id', currentFolderId.toString());
 
-      const res = await fetch(`${getApiUrl()}/v1/files?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      const res = await fetch(`${getBackendApiRoot()}/files?${params}`, {
+        headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error("Failed to fetch files");
       return res.json();
@@ -923,9 +910,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
   
   const renameMut = useMutation({
     mutationFn: async ({ type, id, name }: any) => {
-        const token = localStorage.getItem('hive_token');
-        const res = await fetch(`${getApiUrl()}/v1/files/rename`, {
-            method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        const res = await fetch(`${getBackendApiRoot()}/files/rename`, {
+            method: 'POST', headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ type, id, name })
         });
         if (!res.ok) throw new Error("Failed to rename item");
@@ -942,10 +928,9 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
 
   const moveItemsMut = useMutation({
       mutationFn: async () => {
-          const token = localStorage.getItem('hive_token');
           const destId = moveTargetFolder === "root" ? null : parseInt(moveTargetFolder);
-          const res = await fetch(`${getApiUrl()}/v1/files/move`, {
-              method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          const res = await fetch(`${getBackendApiRoot()}/files/move`, {
+              method: 'POST', headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
               body: JSON.stringify({ items: itemsToMove, destination_folder_id: destId })
           });
           if (!res.ok) throw new Error("Failed to move items");
@@ -962,8 +947,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
 
   const emptyTrashMut = useMutation({
     mutationFn: async () => {
-        const token = localStorage.getItem('hive_token');
-        const res = await fetch(`${getApiUrl()}/v1/files/trash/empty`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }});
+        const res = await fetch(`${getBackendApiRoot()}/files/trash/empty`, { method: 'POST', headers: getAuthHeaders() });
         if (!res.ok) throw new Error("Failed to empty trash");
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["files"] }); toast.success("Recycle bin emptied"); setSelectedItems([]); }
@@ -971,9 +955,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
 
   const restoreItemsMut = useMutation({
     mutationFn: async (items: any[]) => {
-        const token = localStorage.getItem('hive_token');
-        const res = await fetch(`${getApiUrl()}/v1/files/trash/restore`, {
-            method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        const res = await fetch(`${getBackendApiRoot()}/files/trash/restore`, {
+            method: 'POST', headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ items })
         });
         if (!res.ok) throw new Error("Failed to restore items");
@@ -983,9 +966,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
 
   const forceDeleteItemsMut = useMutation({
     mutationFn: async (items: any[]) => {
-        const token = localStorage.getItem('hive_token');
-        const res = await fetch(`${getApiUrl()}/v1/files/trash/force-delete`, {
-            method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        const res = await fetch(`${getBackendApiRoot()}/files/trash/force-delete`, {
+            method: 'POST', headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ items })
         });
         if (!res.ok) throw new Error("Failed to delete items permanently");
@@ -995,8 +977,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
 
   const shareLinkMut = useMutation({
     mutationFn: async ({ type, id }: any) => {
-        const token = localStorage.getItem('hive_token');
-        const res = await fetch(`${getApiUrl()}/v1/files/${type}/${id}/share`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${getBackendApiRoot()}/files/${type}/${id}/share`, { method: 'POST', headers: getAuthHeaders() });
         if (!res.ok) throw new Error("Failed to generate link");
         return res.json();
     },
@@ -1012,13 +993,12 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
 
   const saveEditedImageMut = useMutation({
     mutationFn: async ({ file, originalId }: { file: File, originalId: number }) => {
-      const token = localStorage.getItem('hive_token');
       const formData = new FormData();
       formData.append('file', file);
       formData.append('original_id', originalId.toString());
 
-      const res = await fetch(`${getApiUrl()}/v1/files/save-edited`, {
-        method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }, body: formData
+      const res = await fetch(`${getBackendApiRoot()}/files/save-edited`, {
+        method: 'POST', headers: getAuthHeaders(), body: formData
       });
       if (!res.ok) throw new Error("Failed to save edited image");
       return res.json();
@@ -1028,9 +1008,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
 
   const deleteMut = useMutation({
     mutationFn: async ({ type, id }: { type: 'file' | 'folder', id: number }) => {
-      const token = localStorage.getItem('hive_token');
-      const res = await fetch(`${getApiUrl()}/v1/files/${type}/${id}`, {
-        method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      const res = await fetch(`${getBackendApiRoot()}/files/${type}/${id}`, {
+        method: 'DELETE', headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error("Failed to delete");
       return res.json();
@@ -1040,9 +1019,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
 
   const toggleFavoriteMut = useMutation({
     mutationFn: async ({ type, id }: { type: 'file' | 'folder', id: number }) => {
-      const token = localStorage.getItem('hive_token');
-      const res = await fetch(`${getApiUrl()}/v1/files/${type}/${id}/favorite`, {
-        method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      const res = await fetch(`${getBackendApiRoot()}/files/${type}/${id}/favorite`, {
+        method: 'POST', headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error("Failed to toggle favorite");
       return res.json();
@@ -1061,9 +1039,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
 
   const createFolderMut = useMutation({
     mutationFn: async (name: string) => {
-      const token = localStorage.getItem('hive_token');
-      const res = await fetch(`${getApiUrl()}/v1/files/folder`, {
-        method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      const res = await fetch(`${getBackendApiRoot()}/files/folder`, {
+        method: 'POST', headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ name, parent_id: currentFolderId })
       });
       if (!res.ok) throw new Error("Failed to create folder");
@@ -1075,7 +1052,6 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
   const uploadFileMut = useMutation({
     mutationFn: async () => {
       if (!uploadFile) throw new Error("No file selected");
-      const token = localStorage.getItem('hive_token');
       const uploadId = `${Date.now()}-${uploadFile.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const totalChunks = Math.ceil(uploadFile.size / CHUNK_SIZE);
       
@@ -1095,8 +1071,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
         if (uploadBaseName) formData.append("base_name", uploadBaseName);
         if (chunkIndex === totalChunks - 1 && customThumbnail) formData.append("custom_thumbnail", customThumbnail);
 
-        const res = await fetch(`${getApiUrl()}/v1/files/upload`, {
-          method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData
+        const res = await fetch(`${getBackendApiRoot()}/files/upload`, {
+          method: 'POST', headers: getAuthHeaders(), body: formData
         });
 
         if (!res.ok) throw new Error(`Server Error during upload.`);
@@ -1109,14 +1085,13 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
 
   const uploadSubtitleMut = useMutation({
     mutationFn: async ({ fileId, file, lang, label }: any) => {
-      const token = localStorage.getItem('hive_token');
       const formData = new FormData();
       formData.append('subtitle', file);
       formData.append('language', lang);
       formData.append('label', label);
 
-      const res = await fetch(`${getApiUrl()}/v1/files/upload-subtitle/${fileId}`, {
-        method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }, body: formData
+      const res = await fetch(`${getBackendApiRoot()}/files/upload-subtitle/${fileId}`, {
+        method: 'POST', headers: getAuthHeaders(), body: formData
       });
       if (!res.ok) throw new Error("Failed to upload subtitle");
       return res.json();
@@ -1126,9 +1101,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
 
   const deleteSubtitleMut = useMutation({
     mutationFn: async (subtitleUuid: string) => {
-      const token = localStorage.getItem('hive_token');
-      const res = await fetch(`${getApiUrl()}/v1/files/subtitle/${subtitleUuid}`, {
-        method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      const res = await fetch(`${getBackendApiRoot()}/files/subtitle/${subtitleUuid}`, {
+        method: 'DELETE', headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error("Failed to delete subtitle");
       return res.json();
@@ -1222,13 +1196,13 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
     let hlsUrl = '';
     if (media.hls_path) {
         const cleanPath = media.hls_path.replace(/^\/?(storage\/)?/, '');
-        hlsUrl = `${getApiUrl()}/v1/files/stream/${cleanPath.split('/')[0]}/playlist.m3u8`;
+        hlsUrl = `${getBackendApiRoot()}/files/stream/${cleanPath.split('/')[0]}/playlist.m3u8`;
     }
 
     if (mime.startsWith('image/')) {
       return (
         <div className="w-full h-full flex flex-col rounded-2xl overflow-hidden min-h-[50vh]">
-           <ImageViewer src={safeUrl} fetchUrl={`${getApiUrl()}/v1/files/${file.id}/download`} alt={media.name} onSaveEdited={(f: any) => saveEditedImageMut.mutate({ file: f, originalId: file.id })} />
+           <ImageViewer src={safeUrl} fetchUrl={`${getBackendApiRoot()}/files/${file.id}/download`} alt={media.name} onSaveEdited={(f: any) => saveEditedImageMut.mutate({ file: f, originalId: file.id })} />
         </div>
       );
     }
@@ -1238,7 +1212,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect }: { 
       const currentIndex = videoFiles.findIndex((f: any) => f.id === file.id);
       const handleNext = () => { if (currentIndex < videoFiles.length - 1) setSelectedFile(videoFiles[currentIndex + 1]); };
       const handlePrev = () => { if (currentIndex > 0) setSelectedFile(videoFiles[currentIndex - 1]); };
-      const formattedSubtitles = (media.subtitles || []).map((sub: any) => ({ ...sub, src: sub.uuid ? `${getApiUrl()}/v1/files/subtitle/${sub.uuid}` : sub.src, srcLang: sub.srcLang || 'en', label: sub.label || 'Subtitle', default: sub.default || false }));
+      const formattedSubtitles = (media.subtitles || []).map((sub: any) => ({ ...sub, src: sub.uuid ? `${getBackendApiRoot()}/files/subtitle/${sub.uuid}` : sub.src, srcLang: sub.srcLang || 'en', label: sub.label || 'Subtitle', default: sub.default || false }));
       const formattedVersions = (media.video_versions || []).map((v: any) => ({ label: v.label, url: getStorageUrl(v.url) }));
 
       return (

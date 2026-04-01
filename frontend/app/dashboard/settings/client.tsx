@@ -19,7 +19,17 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTranslation } from '@/store/use-translation';
 import { cn } from "@/lib/utils";
-import { isTenantSession } from "@/lib/runtime-context";
+import { usePermissions } from "@/hooks/use-permissions";
+import {
+    extractStorageRelativePath,
+    getAuthHeaders,
+    getBackendApiRoot,
+    getBackendStorageUrl,
+    isTenantSession,
+} from "@/lib/runtime-context";
+import { applyBrandRuntime, normalizeBrandHex, resolveBrandFontStack } from "@/lib/brand-theme";
+import { SettingsPanelSkeleton, SettingsWorkspaceSkeleton } from "@/components/ui/loading-states";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Modules
 import { LocalizationManager } from '@/components/settings/localization-manager';
@@ -29,41 +39,11 @@ import { BackupSettings } from '@/components/settings/backup-settings';
 // ==========================================
 // 🚀 1. UTILITIES & FETCH HELPERS
 // ==========================================
-const getApiUrl = () => {
-    if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-    const host = window.location.hostname;
-    const protocol = window.location.protocol;
-    if (host !== "localhost" && host !== "127.0.0.1" && host.includes(".")) {
-        return `${protocol}//${host}:8085/api/v1`; 
-    }
-    return `${protocol}//${host}:8085/api/v1`;
-};
-
-const getStorageUrl = (url: string | null | undefined): string | null => {
-    if (!url) return null;
-    const storageIndex = url.indexOf('/storage/');
-    if (storageIndex !== -1) {
-        return `http://${window.location.hostname}:8085${url.substring(storageIndex)}`;
-    }
-    if (url.startsWith('http')) return url;
-    return `http://${window.location.hostname}:8085/storage/${url.replace(/^\/+/, '')}`;
-};
-
-const extractRelativePath = (url: string | null | undefined) => {
-    if (!url) return null;
-    const storageIndex = url.indexOf('/storage/');
-    if (storageIndex !== -1) return url.substring(storageIndex);
-    return url;
-};
-
 const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
-    const token = localStorage.getItem('hive_token');
-    const url = `${getApiUrl()}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-    const headers: HeadersInit = {
-        'Accept': 'application/json',
-        ...(options.body && typeof options.body === 'string' ? { 'Content-Type': 'application/json' } : {})
-    };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const url = `${getBackendApiRoot()}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    const headers: HeadersInit = getAuthHeaders(
+        options.body && typeof options.body === 'string' ? { 'Content-Type': 'application/json' } : {}
+    );
     const res = await fetch(url, { ...options, headers: { ...headers, ...options.headers } });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -71,6 +51,41 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
     }
     return res.json();
 };
+
+const createInitialBrandForm = () => ({
+    logo_light: '',
+    logo_dark: '',
+    favicon: '',
+    sidebar_icon: '',
+    app_title: '',
+    footer_text: '',
+    primary_color: '#10b981',
+    auth_background_image: '',
+    auth_welcome_message: '',
+    font_family: 'Inter',
+    meta_description: '',
+    og_image: '',
+    hide_watermark: false,
+    document_header_color: '#1e293b',
+    company_tax_id: '',
+    pdf_logo: ''
+});
+
+type BrandFormData = ReturnType<typeof createInitialBrandForm>;
+
+const BRAND_FONT_OPTIONS = [
+    { value: 'Inter', label: 'Inter' },
+    { value: 'Space Grotesk', label: 'Space Grotesk' },
+    { value: 'JetBrains Mono', label: 'JetBrains Mono' },
+    { value: 'System UI', label: 'System UI' },
+];
+
+const BRAND_THEME_PRESETS = [
+    { label: 'Emerald Core', primary: '#10b981', document: '#1e293b', font: 'Inter' },
+    { label: 'Solar Gold', primary: '#eab308', document: '#111827', font: 'Space Grotesk' },
+    { label: 'Signal Blue', primary: '#2563eb', document: '#0f172a', font: 'Inter' },
+    { label: 'Neon Rose', primary: '#ec4899', document: '#312e81', font: 'Space Grotesk' },
+];
 
 // ============================================================================
 // 🚀 SECURE BRAND ASSET & MODAL (Brand Settings Helpers)
@@ -83,16 +98,15 @@ const SecureBrandAsset = ({ path, previewUrl, lastSaved, fallbackText, className
         if (previewUrl) { setBlobUrl(previewUrl); setIsFetching(false); return; }
         if (!path) { setBlobUrl(null); setIsFetching(false); return; }
 
-        const resolvedUrl = getStorageUrl(path);
+        const resolvedUrl = getBackendStorageUrl(path);
         if (!resolvedUrl) { setBlobUrl(null); setIsFetching(false); return; }
 
         let isMounted = true;
         const fetchSecureAsset = async () => {
             setIsFetching(true);
             try {
-                const token = localStorage.getItem('hive_token');
                 const res = await fetch(`${resolvedUrl}?cb=${lastSaved}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: getAuthHeaders()
                 });
                 if (!res.ok) throw new Error(`Backend returned ${res.status}`);
                 
@@ -112,7 +126,7 @@ const SecureBrandAsset = ({ path, previewUrl, lastSaved, fallbackText, className
         return () => { isMounted = false; };
     }, [path, previewUrl, lastSaved]);
 
-    if (isFetching && !blobUrl) return <div className="flex items-center justify-center h-full w-full opacity-50"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
+    if (isFetching && !blobUrl) return <Skeleton className="h-full w-full rounded-xl bg-muted/60" />;
     if (blobUrl) return <img src={blobUrl} alt="Brand Asset" className={cn("transition-all duration-500 group-hover:scale-105", className, isWide ? "object-cover w-full h-full p-0" : "object-contain p-2")} />;
     return <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{fallbackText}</span>;
 };
@@ -153,19 +167,16 @@ function BrandSettings() {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
 
-    const [formData, setFormData] = useState({
-        logo_light: '', logo_dark: '', favicon: '', sidebar_icon: '', app_title: '', footer_text: '',
-        primary_color: '#10b981', auth_background_image: '', auth_welcome_message: '', font_family: 'Inter',
-        meta_description: '', og_image: '', hide_watermark: false, document_header_color: '#1e293b',
-        company_tax_id: '', pdf_logo: ''
-    });
+    const [formData, setFormData] = useState<BrandFormData>(createInitialBrandForm());
+    const [savedSnapshot, setSavedSnapshot] = useState<BrandFormData>(createInitialBrandForm());
 
     const [previews, setPreviews] = useState<Record<string, string>>({});
     const [isPickerOpen, setIsPickerOpen] = useState(false);
     
     // 🚀 THE FIX: Strongly type activeTarget so TS knows it maps to formData keys
-    const [activeTarget, setActiveTarget] = useState<keyof typeof formData | null>(null);
+    const [activeTarget, setActiveTarget] = useState<keyof BrandFormData | null>(null);
     const [lastSaved, setLastSaved] = useState(Date.now());
+    const savedBrandRef = React.useRef({ primary_color: '#10b981', font_family: 'Inter' });
 
     const { data: settingsData, isLoading } = useQuery({
         queryKey: ['brandSettings'],
@@ -174,9 +185,37 @@ function BrandSettings() {
 
     useEffect(() => {
         if (settingsData?.data) {
-            setFormData(prev => ({ ...prev, ...settingsData.data }));
+            const sanitizedData = { ...settingsData.data };
+            Object.keys(sanitizedData).forEach((key) => {
+                if (sanitizedData[key] === null) {
+                    sanitizedData[key] = key === 'hide_watermark' ? false : '';
+                }
+            });
+
+            const nextSnapshot = { ...createInitialBrandForm(), ...sanitizedData };
+            setFormData(nextSnapshot);
+            setSavedSnapshot(nextSnapshot);
+            savedBrandRef.current = {
+                primary_color: nextSnapshot.primary_color,
+                font_family: nextSnapshot.font_family,
+            };
         }
     }, [settingsData]);
+
+    useEffect(() => {
+        if (isLoading) return;
+
+        applyBrandRuntime({
+            primary_color: formData.primary_color,
+            font_family: formData.font_family,
+        });
+    }, [formData.primary_color, formData.font_family, isLoading]);
+
+    useEffect(() => {
+        return () => {
+            applyBrandRuntime(savedBrandRef.current);
+        };
+    }, []);
 
     const saveMut = useMutation({
         mutationFn: () => apiFetch('/settings/brand', { method: 'POST', body: JSON.stringify(formData) }),
@@ -184,15 +223,24 @@ function BrandSettings() {
             toast.success(t('settings.matrix_updated', "Identity Matrix Synchronized!"));
             setPreviews({}); 
             setLastSaved(Date.now()); 
+            setSavedSnapshot(formData);
+            savedBrandRef.current = {
+                primary_color: formData.primary_color,
+                font_family: formData.font_family,
+            };
             queryClient.invalidateQueries({ queryKey: ['brandSettings'] });
+            queryClient.invalidateQueries({ queryKey: ['publicBrandSettings'] });
+        },
+        onError: (err: any) => {
+            toast.error(err.message || t('settings.matrix_update_failed', 'Failed to save brand settings.'));
         }
     });
 
     const handleFileSelect = (rawUrl: string) => {
         if (!activeTarget) return;
-        const relativePath = extractRelativePath(rawUrl) || '';
+        const relativePath = extractStorageRelativePath(rawUrl) || '';
         setFormData(p => ({ ...p, [activeTarget]: relativePath }));
-        const fullPreviewUrl = getStorageUrl(rawUrl);
+        const fullPreviewUrl = getBackendStorageUrl(rawUrl);
         setPreviews(p => ({ ...p, [activeTarget]: fullPreviewUrl || '' }));
         
         setIsPickerOpen(false);
@@ -200,8 +248,43 @@ function BrandSettings() {
         toast.success(t('settings.asset_attached', "Asset attached! Click 'Commit Identity Changes'."));
     };
 
+    const updateColorField = (key: 'primary_color' | 'document_header_color', value: string, normalize = false) => {
+        const fallback = key === 'document_header_color' ? '#1e293b' : '#10b981';
+        setFormData((prev) => ({
+            ...prev,
+            [key]: normalize ? normalizeBrandHex(value, fallback) : value,
+        }));
+    };
+
+    const applyPreset = (preset: typeof BRAND_THEME_PRESETS[number]) => {
+        setFormData((prev) => ({
+            ...prev,
+            primary_color: preset.primary,
+            document_header_color: preset.document,
+            font_family: preset.font,
+        }));
+        toast.success(`${preset.label} ${t('settings.preset_applied', 'preset applied.')}`);
+    };
+
+    const resetBrandDraft = () => {
+        setFormData({ ...savedSnapshot });
+        setPreviews({});
+        setLastSaved(Date.now());
+        applyBrandRuntime({
+            primary_color: savedSnapshot.primary_color,
+            font_family: savedSnapshot.font_family,
+        });
+        toast.success(t('settings.brand_reset', 'Brand draft reset to saved settings.'));
+    };
+
+    const hasUnsavedChanges = JSON.stringify(formData) !== JSON.stringify(savedSnapshot) || Object.keys(previews).length > 0;
+    const previewPrimaryColor = normalizeBrandHex(formData.primary_color);
+    const previewDocumentColor = normalizeBrandHex(formData.document_header_color, '#1e293b');
+    const previewLogoPath = formData.logo_dark || formData.logo_light || formData.sidebar_icon;
+    const previewLogoUrl = previews.logo_dark || previews.logo_light || previews.sidebar_icon;
+
     // 🚀 THE FIX: Strongly typed the targetKey prop to match formData keys
-    const BrandImageSelector = ({ label, targetKey, fallback, wide = false }: { label: string, targetKey: keyof typeof formData, fallback: string, wide?: boolean }) => (
+    const BrandImageSelector = ({ label, targetKey, fallback, wide = false }: { label: string, targetKey: keyof BrandFormData, fallback: string, wide?: boolean }) => (
         <div className={cn("flex flex-col gap-2", wide ? "col-span-1 sm:col-span-2 md:col-span-3" : "col-span-1")}>
             <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">{label}</Label>
             <div className="relative group p-1 rounded-2xl bg-card border-2 border-dashed border-border/50 hover:border-primary transition-all duration-300">
@@ -218,7 +301,7 @@ function BrandSettings() {
         </div>
     );
 
-    if (isLoading) return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    if (isLoading) return <SettingsPanelSkeleton />;
 
     return (
         <div className="pb-24 space-y-6">
@@ -231,8 +314,90 @@ function BrandSettings() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-border/50">
                     <div className="space-y-2"><Label className="text-[10px] font-bold uppercase text-muted-foreground">{t('settings.app_title', 'App Title')}</Label><Input value={formData.app_title} onChange={e => setFormData(p => ({...p, app_title: e.target.value}))} className="bg-muted/30 h-12 rounded-xl" /></div>
-                    <div className="space-y-2"><Label className="text-[10px] font-bold uppercase text-muted-foreground">{t('settings.primary_color', 'Theme Color')}</Label><div className="flex gap-2 bg-muted/30 h-12 rounded-xl p-2 border border-input"><input type="color" value={formData.primary_color} onChange={e => setFormData(p => ({...p, primary_color: e.target.value}))} className="w-8 h-8 rounded cursor-pointer border-none p-0" /><Input value={formData.primary_color} onChange={e => setFormData(p => ({...p, primary_color: e.target.value}))} className="border-none bg-transparent font-mono" /></div></div>
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">{t('settings.primary_color', 'Theme Color')}</Label>
+                        <div className="flex gap-2 bg-muted/30 h-12 rounded-xl p-2 border border-input">
+                            <input type="color" value={previewPrimaryColor} onChange={e => updateColorField('primary_color', e.target.value, true)} className="w-8 h-8 rounded cursor-pointer border-none p-0" />
+                            <Input
+                                value={formData.primary_color}
+                                onChange={e => updateColorField('primary_color', e.target.value)}
+                                onBlur={e => updateColorField('primary_color', e.target.value, true)}
+                                className="border-none bg-transparent font-mono uppercase"
+                            />
+                        </div>
+                    </div>
                     <div className="space-y-2"><Label className="text-[10px] font-bold uppercase text-muted-foreground">{t('settings.footer', 'Footer Text')}</Label><Input value={formData.footer_text} onChange={e => setFormData(p => ({...p, footer_text: e.target.value}))} className="bg-muted/30 h-12 rounded-xl" /></div>
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">{t('settings.font_family', 'Interface Font')}</Label>
+                        <Select value={formData.font_family || 'Inter'} onValueChange={(value) => setFormData((prev) => ({ ...prev, font_family: value }))}>
+                            <SelectTrigger className="bg-muted/30 h-12 rounded-xl">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {BRAND_FONT_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">{t('settings.meta_description', 'Meta Description')}</Label>
+                        <textarea value={formData.meta_description} onChange={e => setFormData(p => ({...p, meta_description: e.target.value}))} className="w-full bg-muted/30 min-h-24 rounded-xl p-3 text-sm border border-input focus:ring-1 focus:ring-primary" />
+                    </div>
+                </div>
+
+                <div className="mt-8 grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
+                    <div className="rounded-[2rem] border border-border/50 bg-background/60 p-6 shadow-inner" style={{ borderColor: `${previewPrimaryColor}40`, background: `linear-gradient(135deg, ${previewPrimaryColor}1f, transparent 65%)` }}>
+                        <div className="flex items-start justify-between gap-4">
+                            <div style={{ fontFamily: resolveBrandFontStack(formData.font_family) }}>
+                                <p className="text-[10px] uppercase tracking-[0.35em] text-muted-foreground">{t('settings.live_preview', 'Live Preview')}</p>
+                                <h3 className="mt-3 text-2xl font-black tracking-tight text-foreground">{formData.app_title || 'HIVE.OS'}</h3>
+                                <p className="mt-2 max-w-xl text-sm text-muted-foreground">{formData.auth_welcome_message || t('settings.preview_copy', 'Your central cluster or tenant node will inherit this theme, title, and typography after save.')}</p>
+                            </div>
+                            <div className="h-10 w-10 rounded-xl border border-white/10 shadow-inner" style={{ backgroundColor: previewPrimaryColor }} />
+                        </div>
+                        <div className="mt-6 flex items-center gap-4 rounded-2xl border border-border/50 bg-card/60 px-4 py-4">
+                            <div className="h-14 w-14 overflow-hidden rounded-2xl border border-border/50 bg-background/70 flex items-center justify-center">
+                                <SecureBrandAsset path={previewLogoPath} previewUrl={previewLogoUrl} lastSaved={lastSaved} fallbackText="H" className="w-full h-full" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-sm font-black text-foreground truncate" style={{ fontFamily: resolveBrandFontStack(formData.font_family) }}>{formData.app_title || 'HIVE.OS Dashboard'}</p>
+                                <p className="text-xs text-muted-foreground truncate">{formData.footer_text || 'Powered by HIVE.OS'}</p>
+                            </div>
+                            <div className="ml-auto flex items-center gap-2">
+                                <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest text-primary-foreground" style={{ backgroundColor: previewPrimaryColor }}>{t('settings.primary', 'Primary')}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-[2rem] border border-border/50 bg-background/60 p-6 shadow-inner">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                                <Palette className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-black tracking-tight">{t('settings.theme_presets', 'Theme Presets')}</h3>
+                                <p className="text-xs text-muted-foreground">{t('settings.theme_presets_desc', 'Quick-start combinations for colors and typography.')}</p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {BRAND_THEME_PRESETS.map((preset) => (
+                                <button
+                                    key={preset.label}
+                                    type="button"
+                                    onClick={() => applyPreset(preset)}
+                                    className="rounded-2xl border border-border/50 bg-card/60 p-4 text-left transition-all hover:border-primary/50 hover:bg-card"
+                                >
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <span className="h-4 w-4 rounded-full border border-white/20" style={{ backgroundColor: preset.primary }} />
+                                        <span className="h-4 w-4 rounded-full border border-white/20" style={{ backgroundColor: preset.document }} />
+                                    </div>
+                                    <p className="text-sm font-black">{preset.label}</p>
+                                    <p className="text-[11px] text-muted-foreground mt-1">{preset.font}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -246,10 +411,65 @@ function BrandSettings() {
                 </div>
             </div>
 
+            <div className="p-8 border border-border/50 rounded-[2rem] bg-card/40 backdrop-blur-md shadow-sm transition-all animate-in fade-in slide-in-from-bottom-6">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                    <BrandImageSelector label={t('settings.og_image', 'Open Graph Image')} targetKey="og_image" fallback="OG" />
+                    <BrandImageSelector label={t('settings.pdf_logo', 'PDF Logo')} targetKey="pdf_logo" fallback="PDF" />
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">{t('settings.pdf_header_color', 'PDF Header Color')}</Label>
+                            <div className="flex gap-2 bg-muted/30 h-12 rounded-xl p-2 border border-input">
+                                <input type="color" value={previewDocumentColor} onChange={e => updateColorField('document_header_color', e.target.value, true)} className="w-8 h-8 rounded cursor-pointer border-none p-0" />
+                                <Input
+                                    value={formData.document_header_color}
+                                    onChange={e => updateColorField('document_header_color', e.target.value)}
+                                    onBlur={e => updateColorField('document_header_color', e.target.value, true)}
+                                    className="border-none bg-transparent font-mono uppercase"
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">{t('settings.tax_id', 'Company Tax ID')}</Label>
+                            <Input value={formData.company_tax_id} onChange={e => setFormData(p => ({...p, company_tax_id: e.target.value}))} className="bg-muted/30 h-12 rounded-xl" />
+                        </div>
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setFormData((prev) => ({ ...prev, hide_watermark: !prev.hide_watermark }))}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setFormData((prev) => ({ ...prev, hide_watermark: !prev.hide_watermark }));
+                                }
+                            }}
+                            className={cn("w-full rounded-2xl border p-4 text-left transition-all cursor-pointer", formData.hide_watermark ? "border-primary/40 bg-primary/10" : "border-border/50 bg-muted/20")}
+                        >
+                            <div className="flex items-center justify-between gap-4">
+                                <div>
+                                    <p className="text-sm font-black">{t('settings.hide_watermark', 'Hide Watermark')}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{t('settings.hide_watermark_desc', 'Control whether branded document exports include the HIVE.OS watermark.')}</p>
+                                </div>
+                                <Switch checked={formData.hide_watermark} className="pointer-events-none" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="tour-settings-save" className="fixed bottom-6 right-6 left-6 md:left-[320px] flex justify-end p-4 rounded-[2rem] bg-card/80 backdrop-blur-xl border border-border/50 shadow-2xl z-50">
-                <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="rounded-xl px-12 font-bold bg-primary text-primary-foreground h-12 hover:scale-105 transition-all">
-                    {saveMut.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : t('settings.commit_changes', 'Commit Identity Changes')}
-                </Button>
+                <div className="flex flex-col md:flex-row items-center gap-3 w-full justify-between">
+                    <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                        {hasUnsavedChanges ? t('settings.unsaved_brand_changes', 'Unsaved brand changes detected') : t('settings.brand_synced', 'Brand settings are synced')}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Button type="button" variant="outline" onClick={resetBrandDraft} disabled={!hasUnsavedChanges || saveMut.isPending} className="rounded-xl h-12 px-6 font-bold">
+                            {t('settings.reset', 'Reset')}
+                        </Button>
+                        <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="rounded-xl px-12 font-bold bg-primary text-primary-foreground h-12 hover:scale-105 transition-all">
+                            {saveMut.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : t('settings.commit_changes', 'Commit Identity Changes')}
+                        </Button>
+                    </div>
+                </div>
             </div>
 
             <BrandAssetPickerModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={handleFileSelect} />
@@ -303,7 +523,7 @@ function GeneralSettings() {
         onError: (err: any) => toast.error(err.message)
     });
 
-    if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    if (isLoading) return <SettingsPanelSkeleton />;
 
     const handleToggle = (key: keyof typeof formData) => { setFormData(prev => ({ ...prev, [key]: !prev[key as keyof typeof formData] })); };
 
@@ -408,7 +628,17 @@ function GeneralSettings() {
 // ==========================================
 // ⚙️ 4. TAB ROUTING LOGIC & MAIN EXPORT
 // ==========================================
-function SettingsTabs() {
+function SettingsTabs({
+    canManageBrand,
+    canManageGeneral,
+    canManageLocalization,
+    canAccessBackups,
+}: {
+    canManageBrand: boolean;
+    canManageGeneral: boolean;
+    canManageLocalization: boolean;
+    canAccessBackups: boolean;
+}) {
     const { t } = useTranslation();
     const router = useRouter();
     const pathname = usePathname();
@@ -439,11 +669,24 @@ function SettingsTabs() {
     };
 
     const TABS = [
-        { id: 'brand', label: t('nav.settings_brand', 'Brand Settings'), icon: Palette },
-        { id: 'general', label: t('nav.settings_general', 'General'), icon: Settings },
-        { id: 'localization', label: t('nav.settings_loc', 'Localization'), icon: Globe },
-        { id: 'backup', label: t('nav.settings_backup', 'System Backups'), icon: Database },
-    ];
+        canManageBrand ? { id: 'brand', label: t('nav.settings_brand', 'Brand Settings'), icon: Palette } : null,
+        canManageGeneral ? { id: 'general', label: t('nav.settings_general', 'General'), icon: Settings } : null,
+        canManageLocalization ? { id: 'localization', label: t('nav.settings_loc', 'Localization'), icon: Globe } : null,
+        canAccessBackups ? { id: 'backup', label: t('nav.settings_backup', 'System Backups'), icon: Database } : null,
+    ].filter(Boolean) as Array<{ id: string; label: string; icon: any }>;
+
+    useEffect(() => {
+        if (TABS.length === 0) return;
+
+        if (!TABS.some((tab) => tab.id === activeTab)) {
+            const nextTab = TABS[0].id;
+            setActiveTab(nextTab);
+            localStorage.setItem('hive_settings_tab', nextTab);
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("tab", nextTab);
+            router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+        }
+    }, [TABS, activeTab, pathname, router, searchParams]);
 
     return (
         <div className="flex flex-col xl:flex-row gap-6 pt-2">
@@ -483,6 +726,30 @@ function SettingsTabs() {
 
 export default function SettingsClient() {
     const { t } = useTranslation();
+    const { hasPermission, hasAnyPermission, isLoaded } = usePermissions();
+
+    const canManageBrand = hasPermission("manage_brand_settings");
+    const canManageGeneral = hasPermission("manage_general_settings");
+    const canManageLocalization = hasPermission("manage_localization");
+    const canAccessBackups = hasAnyPermission(["view_backups", "manage_backups"]);
+    const hasAnySettingsAccess = canManageBrand || canManageGeneral || canManageLocalization || canAccessBackups;
+
+    if (!isLoaded) {
+        return <SettingsWorkspaceSkeleton />;
+    }
+
+    if (!hasAnySettingsAccess) {
+        return (
+            <div className="flex min-h-[50vh] flex-col items-center justify-center rounded-[2rem] border border-border/50 bg-card/40 p-8 text-center">
+                <Shield className="h-10 w-10 text-destructive mb-4" />
+                <h3 className="text-xl font-black tracking-tight">{t('global.access_denied', 'Access Denied')}</h3>
+                <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                    {t('settings.locked', 'Your current role does not have permission to access the settings workspace.')}
+                </p>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-4 mt-6">
             <div id="tour-settings-header" className="flex flex-col sm:flex-row justify-between items-center bg-card/40 p-6 rounded-[2rem] border border-border/50 backdrop-blur-md shadow-sm gap-4 mt-2">
@@ -490,8 +757,13 @@ export default function SettingsClient() {
                     <Settings className="h-6 w-6 text-primary" /> {t('nav.settings', 'System Preferences')}
                 </h2>
             </div>
-            <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
-                <SettingsTabs />
+            <Suspense fallback={<SettingsWorkspaceSkeleton />}>
+                <SettingsTabs
+                    canManageBrand={canManageBrand}
+                    canManageGeneral={canManageGeneral}
+                    canManageLocalization={canManageLocalization}
+                    canAccessBackups={canAccessBackups}
+                />
             </Suspense>
         </div>
     );

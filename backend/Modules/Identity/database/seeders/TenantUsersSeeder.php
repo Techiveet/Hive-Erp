@@ -3,6 +3,7 @@
 namespace Modules\Identity\Database\Seeders;
 
 use Modules\Identity\Models\User;
+use Modules\Identity\Models\Permission;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\PermissionRegistrar;
@@ -32,7 +33,10 @@ class TenantUsersSeeder extends Seeder
         );
 
         $admin->guard_name = $guard;
-        $admin->assignRole('Super Admin');
+        $admin->syncRoles(['Super Admin']);
+        $admin->syncPermissions(
+            Permission::where('guard_name', $guard)->pluck('name')->all()
+        );
 
         // 2. Department Heads
         $staff = [
@@ -56,7 +60,7 @@ class TenantUsersSeeder extends Seeder
             );
 
             $user->guard_name = $guard;
-            $user->assignRole($member['role']);
+            $user->syncRoles([$member['role']]);
         }
 
         // 3. General Staff
@@ -68,7 +72,9 @@ class TenantUsersSeeder extends Seeder
             'two_factor_recovery_codes' => null,
         ])->each(function ($u) use ($guard) {
             $u->guard_name = $guard;
-            $u->assignRole('Employee');
+            $u->syncRoles(['Employee']);
         });
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
     }
 }

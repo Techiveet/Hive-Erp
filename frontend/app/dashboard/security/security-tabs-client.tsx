@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useTour } from "@/components/providers/tour-provider";
 import { useTranslation } from "@/store/use-translation"; 
 import { cn } from "@/lib/utils";
+import { TabbedModuleSkeleton } from "@/components/ui/loading-states";
 
 type Props = {
   tenantId: string | null;
@@ -20,7 +21,7 @@ type Props = {
 };
 
 export function SecurityTabsClient({ tenantId, tenantName, defaultTab }: Props) {
-  const { hasPermission, isLoaded } = usePermissions();
+  const { hasPermission, hasAnyPermission, isLoaded } = usePermissions();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -33,8 +34,8 @@ export function SecurityTabsClient({ tenantId, tenantName, defaultTab }: Props) 
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }, [pathname, router, searchParams]);
 
-  const showUsers = hasPermission("view_users");
-  const showRoles = hasPermission("view_roles");
+  const showUsers = hasAnyPermission(["manage_users", "view_users"]);
+  const showRoles = hasAnyPermission(["manage_roles", "view_roles"]);
   const showPerms = hasPermission("view_permissions");
 
   let activeTab = searchParams.get("tab") || defaultTab;
@@ -137,7 +138,9 @@ export function SecurityTabsClient({ tenantId, tenantName, defaultTab }: Props) 
     }
   }, [isLoaded, isCompletelyDenied, isTabAllowed, handleStartTour]);
 
-  if (!isLoaded) return null; 
+  if (!isLoaded) {
+    return <TabbedModuleSkeleton rows={6} cols={5} />;
+  }
 
   if (isCompletelyDenied) {
     return (

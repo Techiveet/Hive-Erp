@@ -18,7 +18,7 @@ class CentralRolesSeeder extends Seeder
 
         $permissions = [
             // Tenant Nodes
-            'view_tenants', 'provision_tenants', 'edit_tenants', 'suspend_tenants', 'delete_tenants',
+            'view_tenants', 'manage_tenants', 'provision_tenants', 'edit_tenants', 'suspend_tenants', 'delete_tenants',
 
             // Identity & Access (Granular)
             'view_users', 'create_users', 'edit_users', 'delete_users', 'manage_users',
@@ -26,10 +26,14 @@ class CentralRolesSeeder extends Seeder
             'view_permissions', // 🚀 Dedicated capability for the Dictionary Tab
 
             // Audit Logs
-            'view_logs', 'export_logs',
+            'view_logs', 'export_logs', 'manage_log_settings', 'archive_logs', 'delete_archived_logs',
+
+            // Alerts & Backups
+            'view_alerts', 'manage_alerts', 'view_backups', 'manage_backups',
 
             // System & Settings
-            'view_system_dashboard', 'manage_system_settings', 'manage_storage'
+            'view_system_dashboard', 'manage_system_settings', 'manage_storage',
+            'manage_brand_settings', 'manage_general_settings', 'manage_localization',
         ];
 
         // 1. Establish the Capability Dictionary
@@ -44,15 +48,15 @@ class CentralRolesSeeder extends Seeder
         // 3. Establish Standard Roles
         $roles = [
             'Security Auditor' => [
-                'view_system_dashboard', 'view_tenants', 'view_users', 'view_roles', 'view_permissions', 'view_logs'
+                'view_system_dashboard', 'view_tenants', 'view_users', 'view_roles', 'view_permissions', 'view_logs', 'export_logs', 'view_alerts'
             ], // Strictly read-only across all tabs
 
             'Support Specialist' => [
-                'view_system_dashboard', 'view_tenants', 'view_users', 'edit_users'
+                'view_system_dashboard', 'view_tenants', 'view_users', 'edit_users', 'view_alerts'
             ], // Can view system and reset user passwords/status, but cannot touch roles
 
             'Billing Admin' => [
-                'view_system_dashboard', 'view_tenants', 'suspend_tenants'
+                'view_system_dashboard', 'view_tenants', 'suspend_tenants', 'view_alerts'
             ], // Financial operations
         ];
 

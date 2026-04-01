@@ -12,17 +12,8 @@ import { useTranslation } from "@/store/use-translation";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
-import { getTenantId, isTenantSession } from "@/lib/runtime-context";
-
-const getApiUrl = () => {
-  if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-  return `http://${window.location.hostname}:8085/api/v1`;
-};
-
-const getTenantHeaders = () => {
-  const tenantId = getTenantId();
-  return tenantId ? { "X-Tenant": tenantId } : {};
-};
+import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, isTenantSession } from "@/lib/runtime-context";
+import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 
 // 🚀 SECURE BRAND LOGO
 const SecureSidebarLogo = ({ path, fallbackTitle, collapsed }: { path?: string, fallbackTitle?: string, collapsed: boolean }) => {
@@ -31,13 +22,19 @@ const SecureSidebarLogo = ({ path, fallbackTitle, collapsed }: { path?: string, 
     useEffect(() => {
         if (!path) { setBlobUrl(null); return; }
         let isMounted = true;
-        const fullUrl = path.startsWith('http') 
-            ? path : `http://${window.location.hostname}:8085${path.startsWith('/') ? '' : '/'}${path}`;
+        const fullUrl = getBackendStorageUrl(path);
+
+        if (!fullUrl) {
+            setBlobUrl(null);
+            return;
+        }
 
         const fetchLogo = async () => {
             try {
-                const token = localStorage.getItem('hive_token');
-                const res = await fetch(fullUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+                const res = await fetch(fullUrl, { headers: getAuthHeaders() });
+                if (await handleAuthFailureResponse(res)) {
+                    return;
+                }
                 if (!res.ok) throw new Error("Fetch blocked by server");
                 
                 const contentType = res.headers.get('content-type');
@@ -100,19 +97,22 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   
   // 🚀 Apps dropdown state
   const [isAppsOpen, setIsAppsOpen] = useState(false);
+  const canAccessConverter = hasAnyPermission(["manage_storage"]);
 
   useEffect(() => {
       setIsMounted(true);
       setIsTenantNode(isTenantSession());
   }, []);
 
-  const { data: brandData } = useQuery({
+    const { data: brandData } = useQuery({
     queryKey: ['brandSettings'],
     queryFn: async () => {
-        const token = localStorage.getItem('hive_token');
-        const res = await fetch(`${getApiUrl()}/settings/brand`, {
-            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }
+        const res = await fetch(`${getBackendApiRoot()}/settings/brand`, {
+            headers: getAuthHeaders(),
         });
+        if (await handleAuthFailureResponse(res)) {
+            return null;
+        }
         return res.json();
     },
     enabled: isMounted
@@ -121,9 +121,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   const brandSettings = brandData?.data;
 
   const handleLogout = () => {
-    localStorage.removeItem("hive_token");
-    localStorage.removeItem("hive_user");
-    localStorage.removeItem("hive_context");
+    clearHiveSession();
     router.push("/sign-in");
   };
 
@@ -217,7 +215,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
         })}
 
         {/* 🚀 THE NEW APPS DROPDOWN */}
-        {isMounted && !searchQuery && (
+        {isMounted && canAccessConverter && !searchQuery && (
           <div className="mt-2 flex flex-col gap-1">
             <button 
               onClick={() => setIsAppsOpen(!isAppsOpen)}

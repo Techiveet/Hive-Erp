@@ -5,21 +5,24 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { 
     Shield, Server, Clock, User as UserIcon, Filter, Eye, Activity, Zap, 
-    Archive, Hash, Globe, Key, FileText, Fingerprint, Settings2, Database, DatabaseBackup, Trash2, Calendar, RotateCcw
+    Archive, Hash, FileText, Fingerprint, Settings2, Database, DatabaseBackup, Trash2, Calendar, RotateCcw
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { DataTable } from "@/components/datatable/data-table";
-import { fetchLogs, logFrontendAction } from "@/lib/api"; 
+import api, { logFrontendAction } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogHeader, DialogFooter as DialogFooterUI } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox"; 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useTour } from "@/components/providers/tour-provider"; 
 import { useTranslation } from "@/store/use-translation";
+import { isTenantSession } from "@/lib/runtime-context";
 import { cn } from "@/lib/utils"; 
+import { usePermissions } from "@/hooks/use-permissions";
 
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -28,17 +31,34 @@ import {
 
 const globalActionLock: Record<string, number> = {};
 
-const getApiUrl = () => {
-    if (typeof window !== 'undefined') {
-        return `http://${window.location.hostname}:8085/api`;
-    }
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8085/api';
+type FilterOption = {
+    value: string;
+    label: string;
 };
+
+function buildFallbackOptions(values: Array<string | null | undefined>, formatLabel?: (value: string) => string): FilterOption[] {
+    const uniqueValues = Array.from(
+        new Map(
+            values
+                .map((value) => String(value ?? "").trim())
+                .filter(Boolean)
+                .map((value) => [value.toLowerCase(), value])
+        ).values()
+    );
+
+    return uniqueValues
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+        .map((value) => ({
+            value,
+            label: formatLabel ? formatLabel(value) : value,
+        }));
+}
 
 export function AuditLogsClient() {
     const queryClient = useQueryClient();
     const { isActive } = useTour(); 
     const { t, locale } = useTranslation();
+    const { hasPermission } = usePermissions();
 
     const [viewMode, setViewMode] = React.useState<"active" | "archived">("active");
     const [page, setPage] = React.useState(1);
@@ -46,10 +66,12 @@ export function AuditLogsClient() {
     const [search, setSearch] = React.useState("");
     const [sortCol, setSortCol] = React.useState<string | null>("created_at");
     const [sortDir, setSortDir] = React.useState<string | null>("desc");
-    const [tableKey, setTableKey] = React.useState(0);
 
     const [eventFilter, setEventFilter] = React.useState<"all" | "crud" | "telemetry" | "system">("all");
     const [nodeFilter, setNodeFilter] = React.useState<"all" | "central" | "tenant">("all");
+    const [moduleFilter, setModuleFilter] = React.useState("all");
+    const [operatorFilter, setOperatorFilter] = React.useState("all");
+    const [nodeIdFilter, setNodeIdFilter] = React.useState("all");
     
     const [startDate, setStartDate] = React.useState<string>("");
     const [endDate, setEndDate] = React.useState<string>("");
@@ -72,19 +94,32 @@ export function AuditLogsClient() {
     });
 
     React.useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const host = window.location.hostname;
-            if (host !== 'localhost' && host !== '127.0.0.1') {
-                setIsTenant(true);
-            }
-        }
+        setIsTenant(isTenantSession());
     }, []);
+
+    const canExportLogs = hasPermission("export_logs");
+    const canManageLogSettings = hasPermission("manage_log_settings");
+    const canArchiveLogs = hasPermission("archive_logs");
+    const canDeleteArchivedLogs = hasPermission("delete_archived_logs");
 
     const openAlert = (title: string, description: string, confirmText: string, variant: "default" | "destructive", action: () => void) => {
         setAlertConfig({ isOpen: true, title, description, confirmText, variant, action });
     };
 
     React.useEffect(() => { setSelectedIds([]); }, [viewMode]);
+
+    const eventOptions = React.useMemo<FilterOption[]>(() => ([
+        { value: "all", label: t('audit.filter_all', 'All Activity') },
+        { value: "crud", label: t('audit.filter_crud', 'Modifications') },
+        { value: "telemetry", label: t('audit.filter_telemetry', 'Telemetry') },
+        { value: "system", label: t('audit.filter_system', 'System') },
+    ]), [t]);
+
+    const nodeScopeOptions = React.useMemo<FilterOption[]>(() => ([
+        { value: "all", label: t('audit.node_all', 'All Nodes') },
+        { value: "central", label: t('audit.node_central', 'Central') },
+        { value: "tenant", label: t('audit.node_tenant', 'Tenants') },
+    ]), [t]);
 
     const triggerAudit = React.useCallback(async (action: string, description: string) => {
         if (typeof window === "undefined") return;
@@ -105,12 +140,8 @@ export function AuditLogsClient() {
     }, [queryClient]);
 
     const { data: logsData, isLoading, isFetching } = useQuery({
-        queryKey: ["logs", page, pageSize, search, sortCol, sortDir, eventFilter, nodeFilter, viewMode, startDate, endDate],
+        queryKey: ["logs", page, pageSize, search, sortCol, sortDir, eventFilter, nodeFilter, moduleFilter, operatorFilter, nodeIdFilter, viewMode, startDate, endDate],
         queryFn: async () => {
-            const endpoint = viewMode === "archived" ? "/v1/logs/archived" : "/v1/logs";
-            const apiUrl = getApiUrl();
-            const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
-            
             const params: any = {
                 page: page.toString(), pageSize: pageSize.toString(), search, 
                 sort_by: sortCol || "created_at", sort_direction: sortDir || "desc",
@@ -118,13 +149,12 @@ export function AuditLogsClient() {
             };
             if (startDate) params.start_date = startDate;
             if (endDate) params.end_date = endDate;
+            if (moduleFilter !== "all") params.module = moduleFilter;
+            if (operatorFilter !== "all") params.operator = operatorFilter;
+            if (nodeIdFilter !== "all" && !isTenant) params.node_id = nodeIdFilter;
 
-            const queryParams = new URLSearchParams(params);
-
-            const res = await fetch(`${apiUrl}${endpoint}?${queryParams}`, {
-                headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-            });
-            const json = await res.json();
+            const endpoint = viewMode === "archived" ? "/logs/archived" : "/logs";
+            const { data: json } = await api.get(endpoint, { params });
             
             return { 
                 rows: json?.data || [], 
@@ -133,35 +163,93 @@ export function AuditLogsClient() {
             };
         },
         placeholderData: (prev) => prev,
+        staleTime: 15_000,
+        refetchOnWindowFocus: false,
     });
+
+    const { data: filterOptions, isFetching: isFilterOptionsFetching } = useQuery({
+        queryKey: ["log-filter-options", viewMode, eventFilter, nodeFilter, startDate, endDate, isTenant],
+        queryFn: async () => {
+            const params: any = {
+                mode: viewMode,
+                event: eventFilter,
+                node: nodeFilter,
+            };
+
+            if (startDate) params.start_date = startDate;
+            if (endDate) params.end_date = endDate;
+
+            const { data } = await api.get('/logs/filter-options', { params });
+
+            return {
+                modules: Array.isArray(data?.modules) ? data.modules : [],
+                operators: Array.isArray(data?.operators) ? data.operators : [],
+                nodes: Array.isArray(data?.nodes) ? data.nodes : [],
+            } as {
+                modules: FilterOption[];
+                operators: FilterOption[];
+                nodes: FilterOption[];
+            };
+        },
+        placeholderData: (prev) => prev,
+        staleTime: 15_000,
+        refetchOnWindowFocus: false,
+    });
+
+    const moduleOptions = React.useMemo(
+        () => (filterOptions?.modules?.length ? filterOptions.modules : buildFallbackOptions((logsData?.rows || []).map((row: any) => row.log_name))),
+        [filterOptions?.modules, logsData?.rows]
+    );
+
+    const operatorOptions = React.useMemo(
+        () => (filterOptions?.operators?.length ? filterOptions.operators : buildFallbackOptions((logsData?.rows || []).map((row: any) => row.causer))),
+        [filterOptions?.operators, logsData?.rows]
+    );
+
+    const nodeOptions = React.useMemo(
+        () => (
+            filterOptions?.nodes?.length
+                ? filterOptions.nodes
+                : buildFallbackOptions(
+                    (logsData?.rows || []).map((row: any) => row.tenant_id || "central"),
+                    (value) => value.toLowerCase() === "central" ? "Central Command" : value.toUpperCase()
+                )
+        ),
+        [filterOptions?.nodes, logsData?.rows]
+    );
+
+    React.useEffect(() => {
+        if (moduleFilter !== "all" && !moduleOptions.some((option) => option.value === moduleFilter)) {
+            setModuleFilter("all");
+        }
+    }, [moduleOptions, moduleFilter]);
+
+    React.useEffect(() => {
+        if (operatorFilter !== "all" && !operatorOptions.some((option) => option.value === operatorFilter)) {
+            setOperatorFilter("all");
+        }
+    }, [operatorOptions, operatorFilter]);
+
+    React.useEffect(() => {
+        if (nodeIdFilter !== "all" && !nodeOptions.some((option) => option.value === nodeIdFilter)) {
+            setNodeIdFilter("all");
+        }
+    }, [nodeOptions, nodeIdFilter]);
 
     const openSettings = async () => {
         setIsSettingsOpen(true);
         try {
-            const apiUrl = getApiUrl();
-            const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
-            const res = await fetch(`${apiUrl}/v1/logs/settings`, {
-                headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-            });
-            const data = await res.json();
+            const { data } = await api.get('/logs/settings');
             if (data.retention_days !== undefined) setRetentionDays(data.retention_days);
         } catch (e) {}
     };
 
     const saveSettings = async () => {
         try {
-            const apiUrl = getApiUrl();
-            const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
-            const res = await fetch(`${apiUrl}/v1/logs/settings`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ retention_days: retentionDays })
-            });
-            if (res.ok) {
-                toast.success(t('audit.policy_updated', `Policy updated. Logs older than ${retentionDays} days will be vaulted.`));
-                triggerAudit('updated', `Changed archive retention policy to ${retentionDays} days`);
-                setIsSettingsOpen(false);
-            }
+            await api.post('/logs/settings', { retention_days: retentionDays });
+            toast.success(t('audit.policy_updated', `Policy updated. Logs older than ${retentionDays} days will be vaulted.`));
+            triggerAudit('updated', `Changed archive retention policy to ${retentionDays} days`);
+            setIsSettingsOpen(false);
         } catch (e) {
             toast.error(t('global.operation_failed', "Failed to update settings."));
         }
@@ -176,17 +264,10 @@ export function AuditLogsClient() {
             async () => {
                 setIsArchiving(true);
                 try {
-                    const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
-                    const apiUrl = getApiUrl();
-                    const res = await fetch(`${apiUrl}/v1/logs/archive`, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-                    });
-                    if (res.ok) {
-                        toast.success(t('audit.archive_success', "Archiving engine engaged. Check the Vault tab shortly."));
-                        triggerAudit('archived', 'Manually triggered the mass WORM archival engine.');
-                        setTimeout(() => queryClient.invalidateQueries({ queryKey: ["logs"] }), 2000);
-                    }
+                    await api.post('/logs/archive');
+                    toast.success(t('audit.archive_success', "Archiving engine engaged. Check the Vault tab shortly."));
+                    triggerAudit('archived', 'Manually triggered the mass WORM archival engine.');
+                    setTimeout(() => queryClient.invalidateQueries({ queryKey: ["logs"] }), 2000);
                 } catch (error) {
                     toast.error(t('global.operation_failed', "Network error triggering archive."));
                 } finally {
@@ -204,17 +285,10 @@ export function AuditLogsClient() {
             "destructive",
             async () => {
                 try {
-                    const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
-                    const apiUrl = getApiUrl();
-                    const res = await fetch(`${apiUrl}/v1/logs/archived/${id}`, {
-                        method: 'DELETE',
-                        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-                    });
-                    if (res.ok) {
-                        toast.success(t('audit.record_deleted', "Vaulted record permanently deleted."));
-                        triggerAudit('deleted', `Destroyed vaulted record ID: ${id}`);
-                        queryClient.invalidateQueries({ queryKey: ["logs"] });
-                    }
+                    await api.delete(`/logs/archived/${id}`);
+                    toast.success(t('audit.record_deleted', "Vaulted record permanently deleted."));
+                    triggerAudit('deleted', `Destroyed vaulted record ID: ${id}`);
+                    queryClient.invalidateQueries({ queryKey: ["logs"] });
                 } catch (e) {
                     toast.error(t('global.operation_failed', "Deletion failed."));
                 }
@@ -230,19 +304,11 @@ export function AuditLogsClient() {
             "destructive",
             async () => {
                 try {
-                    const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
-                    const apiUrl = getApiUrl();
-                    const res = await fetch(`${apiUrl}/v1/logs/archived/bulk-delete`, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ids: selectedIds })
-                    });
-                    if (res.ok) {
-                        toast.success(`${selectedIds.length} ${t('audit.records_deleted', 'vaulted records permanently deleted.')}`);
-                        triggerAudit('deleted', `Destroyed ${selectedIds.length} vaulted records in bulk.`);
-                        setSelectedIds([]); 
-                        queryClient.invalidateQueries({ queryKey: ["logs"] });
-                    }
+                    await api.post('/logs/archived/bulk-delete', { ids: selectedIds });
+                    toast.success(`${selectedIds.length} ${t('audit.records_deleted', 'vaulted records permanently deleted.')}`);
+                    triggerAudit('deleted', `Destroyed ${selectedIds.length} vaulted records in bulk.`);
+                    setSelectedIds([]);
+                    queryClient.invalidateQueries({ queryKey: ["logs"] });
                 } catch (e) {
                     toast.error(t('global.operation_failed', "Bulk deletion failed."));
                 }
@@ -250,10 +316,17 @@ export function AuditLogsClient() {
         );
     };
 
-    const handleFilterChange = React.useCallback((type: 'event' | 'node', value: string) => {
-        if (type === 'event') { setEventFilter(value as any); triggerAudit('filtered', `Applied MATRIX filter: ${value.toUpperCase()}`); }
-        if (type === 'node') { setNodeFilter(value as any); triggerAudit('filtered', `Applied NODE filter: ${value.toUpperCase()}`); }
+    const handleEventFilterChange = React.useCallback((value: string) => {
+        setEventFilter(value as any);
         setPage(1);
+        triggerAudit('filtered', `Applied MATRIX filter: ${value.toUpperCase()}`);
+    }, [triggerAudit]);
+
+    const handleNodeScopeChange = React.useCallback((value: string) => {
+        setNodeFilter(value as any);
+        setNodeIdFilter("all");
+        setPage(1);
+        triggerAudit('filtered', `Applied NODE filter: ${value.toUpperCase()}`);
     }, [triggerAudit]);
 
     const applyDatePreset = (days: number) => {
@@ -323,7 +396,7 @@ export function AuditLogsClient() {
                             <Button variant="ghost" size="icon" onClick={() => { setViewLog(row.original); triggerAudit('viewed', `Inspected Log ID: ${row.original.id}`); }}><Eye className="h-4 w-4 text-blue-500" /></Button>
                         </span>
                         
-                        {viewMode === 'archived' && (
+                        {viewMode === 'archived' && canDeleteArchivedLogs && (
                             <span className="tour-audit-action-delete flex">
                                 <Button variant="ghost" size="icon" onClick={() => deleteIndividualLog(row.original.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                             </span>
@@ -358,9 +431,26 @@ export function AuditLogsClient() {
         }
 
         return baseCols;
-    }, [triggerAudit, viewMode, selectedIds, logsData, isTenant, t, getTranslatedEventString]);
+    }, [triggerAudit, viewMode, selectedIds, logsData, isTenant, t, getTranslatedEventString, canDeleteArchivedLogs]);
 
-    const exportUrl = `${getApiUrl()}/v1/logs/export?search=${encodeURIComponent(search || "")}&sortCol=${sortCol || ""}&sortDir=${sortDir || ""}&event=${eventFilter}&node=${nodeFilter}&mode=${viewMode}&start_date=${startDate}&end_date=${endDate}&locale=${locale}`;
+    const exportUrl = React.useMemo(() => {
+        const params = new URLSearchParams({
+            search: search || "",
+            sortCol: sortCol || "",
+            sortDir: sortDir || "",
+            event: eventFilter,
+            node: nodeFilter,
+            mode: viewMode,
+            start_date: startDate,
+            end_date: endDate,
+            locale,
+        });
+        if (moduleFilter !== "all") params.set("module", moduleFilter);
+        if (operatorFilter !== "all") params.set("operator", operatorFilter);
+        if (nodeIdFilter !== "all" && !isTenant) params.set("node_id", nodeIdFilter);
+
+        return `/logs/export?${params.toString()}`;
+    }, [search, sortCol, sortDir, eventFilter, nodeFilter, moduleFilter, operatorFilter, nodeIdFilter, viewMode, startDate, endDate, locale, isTenant]);
 
     return (
         <div className="space-y-4 mt-6">
@@ -384,7 +474,7 @@ export function AuditLogsClient() {
                     )}
                 </div>
 
-                {viewMode === "archived" && selectedIds.length > 0 && (
+                {viewMode === "archived" && canDeleteArchivedLogs && selectedIds.length > 0 && (
                     <div className="flex items-center gap-2">
                         <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])} className="text-muted-foreground">
                             {t('audit.clear_selection', 'Clear Selection')}
@@ -399,72 +489,205 @@ export function AuditLogsClient() {
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-2 bg-card/40 p-4 rounded-2xl border border-border/50 backdrop-blur-md">
                 <div className="flex flex-col xl:flex-row gap-3 w-full">
                     
-                    <div className={cn("flex items-center gap-2 pb-1 flex-1", !isActive && "overflow-x-auto")}>
-                        <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-                        
-                        <div id="tour-audit-filters-event" className="flex items-center gap-2 shrink-0">
-                            <Button variant={eventFilter === "all" ? "default" : "outline"} onClick={() => handleFilterChange('event', 'all')} size="sm" className="h-7 text-xs rounded-full">{t('audit.filter_all', 'All Activity')}</Button>
-                            <Button variant={eventFilter === "crud" ? "default" : "outline"} onClick={() => handleFilterChange('event', 'crud')} size="sm" className="h-7 text-xs rounded-full">{t('audit.filter_crud', 'Modifications')}</Button>
-                            <Button variant={eventFilter === "telemetry" ? "default" : "outline"} onClick={() => handleFilterChange('event', 'telemetry')} size="sm" className="h-7 text-xs rounded-full">{t('audit.filter_telemetry', 'Telemetry')}</Button>
-                            <Button variant={eventFilter === "system" ? "default" : "outline"} onClick={() => handleFilterChange('event', 'system')} size="sm" className="h-7 text-xs rounded-full">{t('audit.filter_system', 'System')}</Button>
+                    <div className={cn("grid w-full gap-3 xl:grid-cols-4", !isActive && "overflow-x-auto")}>
+                        <div id="tour-audit-filters-event" className="rounded-2xl border border-border/50 bg-background/50 p-3 shadow-sm">
+                            <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                <Filter className="h-3.5 w-3.5" />
+                                {t('audit.filter_event_label', 'Event Matrix')}
+                            </div>
+                            <Select value={eventFilter} onValueChange={handleEventFilterChange}>
+                                <SelectTrigger className="h-10 w-full rounded-xl bg-muted/40">
+                                    <SelectValue placeholder={t('audit.filter_all', 'All Activity')} />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl border-border/50">
+                                    {eventOptions.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
-                        
+
+                        <div className="rounded-2xl border border-border/50 bg-background/50 p-3 shadow-sm">
+                            <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                <Shield className="h-3.5 w-3.5" />
+                                {t('audit.filter_module_label', 'Module')}
+                            </div>
+                            <Select
+                                value={moduleFilter}
+                                onValueChange={(value) => {
+                                    setModuleFilter(value);
+                                    setPage(1);
+                                    triggerAudit('filtered', `Applied MODULE filter: ${value.toUpperCase()}`);
+                                }}
+                            >
+                                <SelectTrigger className="h-10 w-full rounded-xl bg-muted/40" disabled={isFilterOptionsFetching}>
+                                    <SelectValue placeholder={t('audit.filter_module_placeholder', 'Choose module')} />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl border-border/50">
+                                    <SelectItem value="all">{t('audit.filter_module_all', 'All Modules')}</SelectItem>
+                                    {moduleOptions.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="rounded-2xl border border-border/50 bg-background/50 p-3 shadow-sm">
+                            <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                <UserIcon className="h-3.5 w-3.5" />
+                                {t('audit.filter_operator', 'Operator')}
+                            </div>
+                            <Select
+                                value={operatorFilter}
+                                onValueChange={(value) => {
+                                    setOperatorFilter(value);
+                                    setPage(1);
+                                    triggerAudit('filtered', `Applied OPERATOR filter: ${value.toUpperCase()}`);
+                                }}
+                            >
+                                <SelectTrigger className="h-10 w-full rounded-xl bg-muted/40" disabled={isFilterOptionsFetching}>
+                                    <SelectValue placeholder={t('audit.filter_operator_placeholder', 'Choose operator')} />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl border-border/50">
+                                    <SelectItem value="all">{t('audit.filter_operator_all', 'All Operators')}</SelectItem>
+                                    {operatorOptions.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         {!isTenant && (
-                            <>
-                                <div className="w-px h-4 bg-border mx-2 shrink-0" />
-                                <Server className="h-4 w-4 text-muted-foreground shrink-0" />
-                                <div id="tour-audit-filters-node" className="flex items-center gap-2 shrink-0">
-                                    <Button variant={nodeFilter === "all" ? "default" : "outline"} onClick={() => handleFilterChange('node', 'all')} size="sm" className="h-7 text-xs rounded-full">{t('audit.node_all', 'All Nodes')}</Button>
-                                    <Button variant={nodeFilter === "central" ? "default" : "outline"} onClick={() => handleFilterChange('node', 'central')} size="sm" className="h-7 text-xs rounded-full">{t('audit.node_central', 'Central')}</Button>
-                                    <Button variant={nodeFilter === "tenant" ? "default" : "outline"} onClick={() => handleFilterChange('node', 'tenant')} size="sm" className="h-7 text-xs rounded-full">{t('audit.node_tenant', 'Tenants')}</Button>
+                            <div id="tour-audit-filters-node" className="rounded-2xl border border-border/50 bg-background/50 p-3 shadow-sm">
+                                <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                    <Server className="h-3.5 w-3.5" />
+                                    {t('audit.filter_scope_label', 'Node Scope')}
                                 </div>
-                            </>
+                                <Select value={nodeFilter} onValueChange={handleNodeScopeChange}>
+                                    <SelectTrigger className="h-10 w-full rounded-xl bg-muted/40">
+                                        <SelectValue placeholder={t('audit.node_all', 'All Nodes')} />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-xl border-border/50">
+                                        {nodeScopeOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         )}
                     </div>
 
-                    <div className={cn("flex items-center gap-2 pb-1 flex-1 xl:justify-end", !isActive && "overflow-x-auto")}>
-                        <div id="tour-audit-filters-date" className="flex items-center gap-2 shrink-0">
-                            <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border border-border/50">
-                                <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => applyDatePreset(0)}>{t('audit.today', 'Today')}</Button>
-                                <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => applyDatePreset(7)}>7D</Button>
-                                <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => applyDatePreset(30)}>30D</Button>
-                                {(startDate || endDate) && (
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => { setStartDate(""); setEndDate(""); setPage(1); triggerAudit('filtered', 'Cleared date filters'); }}>
-                                        <RotateCcw className="w-3 h-3" />
+                    <div className={cn("flex items-center gap-2 pb-1 shrink-0", !isActive && "overflow-x-auto")}>
+                        {(canManageLogSettings || canArchiveLogs) && (
+                            <div id="tour-audit-actions-vault" className="flex items-center gap-2 shrink-0">
+                                {canManageLogSettings && (
+                                    <Button variant="outline" size="sm" onClick={openSettings} className="h-8 rounded-xl shadow-sm text-muted-foreground hover:text-foreground">
+                                        <Settings2 className="h-4 w-4 mr-2" /> {t('audit.policy_settings', 'Policy Settings')}
+                                    </Button>
+                                )}
+                                {canArchiveLogs && (
+                                    <Button onClick={handleTriggerArchive} disabled={isArchiving} variant="destructive" size="sm" className="h-8 shadow-md rounded-xl font-bold tracking-wide">
+                                        <Archive className="h-4 w-4 mr-2" />{isArchiving ? t('audit.archiving', 'Archiving...') : t('audit.trigger_vault', 'Trigger Vault')}
                                     </Button>
                                 )}
                             </div>
-
-                            <div className="flex items-center gap-1.5 bg-background border border-border/50 rounded-xl px-2 h-8">
-                                <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                                <Input 
-                                    type="date" value={startDate} onChange={e => { setStartDate(e.target.value); triggerAudit('filtered', 'Applied start date filter'); }} 
-                                    className="h-6 w-[110px] text-xs border-0 bg-transparent p-0 focus-visible:ring-0" 
-                                />
-                                <span className="text-muted-foreground text-xs">-</span>
-                                <Input 
-                                    type="date" value={endDate} onChange={e => { setEndDate(e.target.value); triggerAudit('filtered', 'Applied end date filter'); }} 
-                                    className="h-6 w-[110px] text-xs border-0 bg-transparent p-0 focus-visible:ring-0" 
-                                />
-                            </div>
-                        </div>
-
-                        <div className="w-px h-4 bg-border mx-1 shrink-0" />
-                        
-                        <div id="tour-audit-actions-vault" className="flex items-center gap-2 shrink-0">
-                            <Button variant="outline" size="sm" onClick={openSettings} className="h-8 rounded-xl shadow-sm text-muted-foreground hover:text-foreground">
-                                <Settings2 className="h-4 w-4 mr-2" /> {t('audit.policy_settings', 'Policy Settings')}
-                            </Button>
-                            <Button onClick={handleTriggerArchive} disabled={isArchiving} variant="destructive" size="sm" className="h-8 shadow-md rounded-xl font-bold tracking-wide">
-                                <Archive className="h-4 w-4 mr-2" />{isArchiving ? t('audit.archiving', 'Archiving...') : t('audit.trigger_vault', 'Trigger Vault')}
-                            </Button>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>
 
+            <div className={cn("grid gap-3 rounded-2xl border border-border/50 bg-card/30 p-4 shadow-sm", !isTenant ? "md:grid-cols-[1fr_1fr_auto]" : "md:grid-cols-[1fr_1fr]")}>
+                {!isTenant && (
+                    <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
+                        <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                            <Server className="h-3.5 w-3.5" />
+                            {t('audit.filter_node_label', 'Specific Node')}
+                        </div>
+                        <Select
+                            value={nodeIdFilter}
+                            onValueChange={(value) => {
+                                setNodeIdFilter(value);
+                                setPage(1);
+                                triggerAudit('filtered', `Applied SPECIFIC NODE filter: ${value.toUpperCase()}`);
+                            }}
+                        >
+                            <SelectTrigger className="h-10 w-full rounded-xl bg-muted/40" disabled={isFilterOptionsFetching}>
+                                <SelectValue placeholder={t('audit.filter_node_placeholder', 'Choose node')} />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl border-border/50">
+                                <SelectItem value="all">{t('audit.filter_node_all', 'All Available Nodes')}</SelectItem>
+                                {nodeOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+
+                <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {t('audit.filter_date_label', 'Date Window')}
+                    </div>
+                    <div id="tour-audit-filters-date" className="space-y-3">
+                        <div className="flex items-center gap-1 rounded-xl border border-border/50 bg-muted/40 p-1">
+                            <Button variant="ghost" size="sm" className="h-7 text-[10px] px-2" onClick={() => applyDatePreset(0)}>{t('audit.today', 'Today')}</Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-[10px] px-2" onClick={() => applyDatePreset(7)}>7D</Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-[10px] px-2" onClick={() => applyDatePreset(30)}>30D</Button>
+                            {(startDate || endDate) && (
+                                <Button variant="ghost" size="icon" className="ml-auto h-7 w-7 text-destructive" onClick={() => { setStartDate(""); setEndDate(""); setPage(1); triggerAudit('filtered', 'Cleared date filters'); }}>
+                                    <RotateCcw className="w-3 h-3" />
+                                </Button>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Input
+                                type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setPage(1); triggerAudit('filtered', 'Applied start date filter'); }}
+                                className="h-10 rounded-xl bg-muted/30"
+                            />
+                            <Input
+                                type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setPage(1); triggerAudit('filtered', 'Applied end date filter'); }}
+                                className="h-10 rounded-xl bg-muted/30"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex items-end justify-end">
+                    <Button
+                        variant="outline"
+                        className="h-10 rounded-xl"
+                        onClick={() => {
+                            setEventFilter("all");
+                            setNodeFilter("all");
+                            setModuleFilter("all");
+                            setOperatorFilter("all");
+                            setNodeIdFilter("all");
+                            setSearch("");
+                            setStartDate("");
+                            setEndDate("");
+                            setPage(1);
+                            triggerAudit('filtered', 'Reset all audit filters');
+                        }}
+                    >
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        {t('audit.reset_filters', 'Reset Filters')}
+                    </Button>
+                </div>
+            </div>
+
             <DataTable
-                key={`${tableKey}-${viewMode}`} 
+                key={viewMode}
                 columns={columns} 
                 data={logsData?.rows || []} 
                 totalEntries={logsData?.total || 0}
@@ -476,19 +699,20 @@ export function AuditLogsClient() {
                     if (q.page) setPage(q.page); 
                     if (q.pageSize) setPageSize(q.pageSize); 
                     if (q.search !== undefined) setSearch(q.search); 
-                    if (q.sortCol) setSortCol(q.sortCol);
-                    if (q.sortDir) setSortDir(q.sortDir);
+                    if (q.sortCol !== undefined) setSortCol(q.sortCol ?? null);
+                    if (q.sortDir !== undefined) setSortDir(q.sortDir ?? null);
                 }}
                 onRefresh={() => queryClient.invalidateQueries({ queryKey: ["logs"] })} 
                 onResetFilters={() => { 
                     setSearch(""); setSortCol("created_at"); setSortDir("desc"); 
                     setEventFilter("all"); setNodeFilter("all"); setPage(1);
+                    setModuleFilter("all"); setOperatorFilter("all"); setNodeIdFilter("all");
                     setStartDate(""); setEndDate(""); 
                 }}
-                onCopy={() => triggerAudit('copied', 'Copied datatable to clipboard')} 
-                onPrint={() => triggerAudit('printed', 'Printed datatable')}
-                onExport={(format) => triggerAudit('exported', `Exported to ${format}`)} 
-                exportEndpoint={exportUrl} 
+                onCopy={canExportLogs ? () => triggerAudit('copied', 'Copied datatable to clipboard') : undefined}
+                onPrint={canExportLogs ? () => triggerAudit('printed', 'Printed datatable') : undefined}
+                onExport={canExportLogs ? (format) => triggerAudit('exported', `Exported to ${format}`) : undefined}
+                exportEndpoint={canExportLogs ? exportUrl : undefined}
                 syncWithUrl={true}
             />
 

@@ -7,6 +7,7 @@ import Providers from "@/components/providers";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import CustomCursor from "@/components/custom-cursor";
+import { PublicBrandSyncProvider } from "@/components/providers/public-brand-sync-provider";
 
 // 🚀 IMPORT OUR NEW GLOBAL SETTINGS PROVIDER
 import { SettingsProvider } from "@/components/providers/settings-provider";
@@ -50,6 +51,7 @@ export default function RootLayout({
               enableSystem
               disableTransitionOnChange
             >
+              <PublicBrandSyncProvider />
               <CustomCursor />
               {children}
               <Toaster />

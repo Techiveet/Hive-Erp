@@ -23,6 +23,8 @@ import { useTranslation } from "@/store/use-translation";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { AlertsFeedSkeleton } from "@/components/ui/loading-states";
+import { usePermissions } from "@/hooks/use-permissions";
 
 // --- API Helper ---
 const getApiUrl = () => {
@@ -65,6 +67,9 @@ interface SystemAlert {
 export default function SystemAlertsPage() {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
+    const { hasPermission, isLoaded } = usePermissions();
+    const canViewAlerts = hasPermission("view_alerts");
+    const canManageAlerts = hasPermission("manage_alerts");
     
     // State for filtering
     const [filter, setFilter] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
@@ -73,6 +78,7 @@ export default function SystemAlertsPage() {
     const { data: alertsData, isLoading } = useQuery({
         queryKey: ['systemAlertsList'],
         queryFn: () => apiFetch('/system/alerts'),
+        enabled: isLoaded && canViewAlerts,
     });
 
     // MUTATION: Dismiss a single alert
@@ -106,6 +112,22 @@ export default function SystemAlertsPage() {
 
     // Filtered list
     const filteredAlerts = alerts.filter(a => filter === 'all' || a.level === filter);
+
+    if (!isLoaded) {
+        return <AlertsFeedSkeleton />;
+    }
+
+    if (!canViewAlerts) {
+        return (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center rounded-[2rem] border border-border/50 bg-card/40 p-8 text-center">
+                <BellRing className="h-10 w-10 text-destructive mb-4" />
+                <h2 className="text-2xl font-black tracking-tight">{t('global.access_denied', 'Access Denied')}</h2>
+                <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                    {t('alerts.denied', 'Your current role does not have permission to view system alerts.')}
+                </p>
+            </div>
+        );
+    }
 
     const getAlertIcon = (level: string) => {
         switch (level) {
@@ -159,7 +181,7 @@ export default function SystemAlertsPage() {
                                     variant="outline" 
                                     size="sm" 
                                     className="rounded-full bg-background/50 backdrop-blur-md text-muted-foreground hover:text-destructive hover:border-destructive/50 transition-colors ml-auto md:ml-0"
-                                    disabled={alerts.length === 0 || dismissAllMut.isPending}
+                                    disabled={alerts.length === 0 || dismissAllMut.isPending || !canManageAlerts}
                                 >
                                     {dismissAllMut.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />} 
                                     Dismiss All
@@ -238,7 +260,7 @@ export default function SystemAlertsPage() {
 
             {/* Alert Feed */}
             {isLoading ? (
-                <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                <AlertsFeedSkeleton />
             ) : (
                 <div className="space-y-3">
                     {filteredAlerts.map((alert) => (
@@ -275,7 +297,7 @@ export default function SystemAlertsPage() {
                                     variant="ghost" 
                                     size="icon" 
                                     onClick={() => dismissMut.mutate(alert.id)}
-                                    disabled={dismissMut.isPending}
+                                    disabled={dismissMut.isPending || !canManageAlerts}
                                     className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive shrink-0"
                                     title="Dismiss Alert"
                                 >

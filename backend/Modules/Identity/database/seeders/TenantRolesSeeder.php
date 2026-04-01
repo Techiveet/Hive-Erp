@@ -16,10 +16,15 @@ class TenantRolesSeeder extends Seeder
         $guard = 'tenant';
 
         $perms = [
+            'view_system_dashboard',
             'view_users', 'create_users', 'edit_users', 'delete_users', 'manage_users',
             'view_roles', 'create_roles', 'edit_roles', 'delete_roles', 'manage_roles',
             'view_permissions',
-            'view_logs', 'export_logs', 'manage_storage',
+            'view_logs', 'export_logs', 'manage_log_settings', 'archive_logs', 'delete_archived_logs',
+            'view_alerts', 'manage_alerts', 'view_backups', 'manage_backups',
+            'manage_system_settings',
+            'manage_storage',
+            'manage_brand_settings', 'manage_general_settings', 'manage_localization',
             'view_invoices', 'manage_invoices',
             'view_inventory', 'manage_inventory',
             'manage_fleet'
@@ -31,10 +36,10 @@ class TenantRolesSeeder extends Seeder
 
         $roles = [
             'Super Admin' => $perms, // 🚀 FIX: Name changed to 'Super Admin' to align with UI creations
-            'HR Manager' => ['view_users', 'create_users', 'edit_users', 'view_roles'],
-            'Finance Controller' => ['view_invoices', 'manage_invoices', 'view_logs'],
-            'Logistics Coordinator' => ['view_inventory', 'manage_inventory', 'manage_fleet'],
-            'Employee' => ['view_users'],
+            'HR Manager' => ['view_system_dashboard', 'view_alerts', 'view_users', 'create_users', 'edit_users', 'view_roles'],
+            'Finance Controller' => ['view_system_dashboard', 'view_alerts', 'view_invoices', 'manage_invoices', 'view_logs', 'export_logs'],
+            'Logistics Coordinator' => ['view_system_dashboard', 'view_alerts', 'view_inventory', 'manage_inventory', 'manage_fleet'],
+            'Employee' => ['view_system_dashboard', 'view_alerts', 'view_users'],
         ];
 
         foreach ($roles as $roleName => $rolePerms) {

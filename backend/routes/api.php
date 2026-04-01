@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ApiDocumentationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -10,11 +11,12 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+Route::get('/docs', [ApiDocumentationController::class, 'index'])->name('api-docs.api-index');
+Route::get('/docs/openapi.json', [ApiDocumentationController::class, 'spec'])->name('api-docs.api-spec');
+
 Route::get('/unauthorized', function () {
     return response()->json(['message' => 'Unauthenticated.'], 401);
 })->name('login');
-
-
 
 Route::get('/test-broadcast', function () {
     $payload = [

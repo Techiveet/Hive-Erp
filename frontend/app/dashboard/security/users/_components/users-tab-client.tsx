@@ -65,6 +65,7 @@ export function UsersTabClient(props: Props) {
   const canCreate = hasAnyPermission(["manage_users", "create_users"]);
   const canEdit = hasAnyPermission(["manage_users", "edit_users"]);
   const canDelete = hasAnyPermission(["manage_users", "delete_users"]);
+  const canImpersonate = hasAnyPermission(["manage_users"]);
 
   const isProtectedUser = React.useCallback((user: any) => {
     if (!user) return false;
@@ -472,7 +473,7 @@ export function UsersTabClient(props: Props) {
         return (
           <div className="flex items-center justify-end gap-1">
 
-            {isCentralAdmin && u.id !== "1" && (
+            {isCentralAdmin && u.id !== "1" && canImpersonate && (
               <span className="tour-users-action-impersonate flex">
                 <Button 
                   variant="ghost" 
@@ -524,7 +525,7 @@ export function UsersTabClient(props: Props) {
         );
       },
     },
-  ], [page, pageSize, handleToggle, toggleMut.isPending, deleteMut, openEdit, isProtectedUser, initials, getPrimaryRoleName, getRoleBadgeVariant, formatDate, canEdit, canDelete, isCentralAdmin, impersonateMut, t]);
+  ], [page, pageSize, handleToggle, toggleMut.isPending, deleteMut, openEdit, isProtectedUser, initials, getPrimaryRoleName, getRoleBadgeVariant, formatDate, canEdit, canDelete, isCentralAdmin, impersonateMut, t, canImpersonate]);
 
   const exportUrl = `${isCentralAdmin ? '' : '/tenant'}/users/export?status=${statusFilter}&role=${roleFilter}&date_from=${dateFrom}&date_to=${dateTo}&search=${search}&sortCol=${sortCol || ""}&sortDir=${sortDir || ""}&locale=${locale}`;
 

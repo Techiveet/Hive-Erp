@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ShieldAlert } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { SystemOffline } from "@/components/auth/system-offline";
-import { clearHiveSession } from "@/lib/auth-sync";
+import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 import { getTenantId } from "@/lib/runtime-context";
 
 // 🚀 Helper to get the correct API URL
@@ -89,25 +89,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...getTenantHeaders() },
             });
 
-            if (res.status === 401) {
-                clearHiveSession();
-                if (!pathname.includes("/sign-in")) {
-                    router.replace("/sign-in");
-                }
-                return { data: null };
-            }
-
-            if (res.status === 403) {
-                let message = "";
-                try {
-                    const payload = await res.json();
-                    message = String(payload?.message || "");
-                } catch {}
-
-                clearHiveSession(message.startsWith("CRITICAL: ") ? message.replace("CRITICAL: ", "") : undefined);
-                if (!pathname.includes("/sign-in")) {
-                    router.replace("/sign-in");
-                }
+            if (await handleAuthFailureResponse(res)) {
                 return { data: null };
             }
 

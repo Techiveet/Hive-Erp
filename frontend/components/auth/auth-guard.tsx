@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSystemSettings } from "@/components/providers/settings-provider";
-import { clearHiveSession } from "@/lib/auth-sync";
+import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 import { getTenantId, isTenantSession } from "@/lib/runtime-context";
+import { FullScreenPlaceholder } from "@/components/ui/loading-states";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -46,34 +47,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           },
         });
 
-        if (response.status === 401) {
-          clearHiveSession();
-
+        if (await handleAuthFailureResponse(response)) {
           if (isMounted) {
             setIsAuthorized(false);
             setCheckingAuth(false);
           }
-
-          router.replace("/sign-in");
-          return;
-        }
-
-        if (response.status === 403) {
-          let message = "";
-
-          try {
-            const payload = await response.json();
-            message = String(payload?.message || "");
-          } catch {}
-
-          clearHiveSession(message.startsWith("CRITICAL: ") ? message.replace("CRITICAL: ", "") : undefined);
-
-          if (isMounted) {
-            setIsAuthorized(false);
-            setCheckingAuth(false);
-          }
-
-          router.replace("/sign-in");
           return;
         }
 
@@ -102,12 +80,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (checkingAuth || settingsLoading) {
     return (
-      <div className="h-screen w-screen bg-background flex flex-col items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
-        <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground animate-pulse">
-          Verifying Session Integrity...
-        </div>
-      </div>
+      <FullScreenPlaceholder
+        label="Verifying session integrity"
+        detail="Checking your token, tenant context, and secure dashboard access."
+      />
     );
   }
 

@@ -51,9 +51,14 @@ class InitializeTenantContext
                 $this->tenancy->end();
             }
 
+            $hasBearerToken = (bool) $request->bearerToken();
+
             return response()->json([
-                'message' => 'Tenant could not be identified for this request.',
-            ], 404);
+                'message' => $hasBearerToken
+                    ? 'Tenant context is no longer available. Please authenticate again.'
+                    : 'Tenant could not be identified for this request.',
+                'code' => $hasBearerToken ? 'TENANT_CONTEXT_INVALID' : 'TENANT_NOT_FOUND',
+            ], $hasBearerToken ? 401 : 404);
         }
 
         // Always initialize the tenant for the current request. Under Octane /

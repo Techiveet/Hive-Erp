@@ -7,6 +7,7 @@ use Illuminate\Database\Seeder;
 use Modules\Identity\Database\Seeders\IdentityDatabaseSeeder;
 use Modules\Tenancy\Database\Seeders\TenancyDatabaseSeeder;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
+use Spatie\Permission\PermissionRegistrar;
 
 class DatabaseSeeder extends Seeder
 {
@@ -27,5 +28,7 @@ class DatabaseSeeder extends Seeder
             // 3. Establish global core settings and languages
             CoreDatabaseSeeder::class,
         ]);
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
     }
 }

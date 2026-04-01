@@ -2,9 +2,9 @@
 
 namespace Modules\Tenancy\Http\Controllers\Export;
 
+use App\Support\ResolvesExportBranding;
 use Modules\Tenancy\Models\Tenant;
 use Modules\Core\Models\Language;
-use Modules\Core\Models\Setting; // 🚀 ADDED: Required for Logo Fetching
 use Modules\Core\Models\Translation;
 use Modules\Tenancy\Exports\TenantsExport;
 use Illuminate\Http\Request;
@@ -18,10 +18,12 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class TenantExportController extends Controller implements HasMiddleware
 {
+    use ResolvesExportBranding;
+
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:view_tenants,sanctum'),
+            new Middleware('permission:view_tenants|manage_tenants,sanctum'),
         ];
     }
 
@@ -53,58 +55,6 @@ class TenantExportController extends Controller implements HasMiddleware
         return $query;
     }
 
-    /**
-     * 🚀 Resolves the physical path for PDF or Base64 for Frontend Print
-     */
-    protected function getResolvedLogo($asBase64 = false): string
-    {
-        $tenantPrefix = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
-        $cacheKey = "export_logo_final_v3_{$tenantPrefix}_" . ($asBase64 ? 'b64' : 'path');
-
-        return Cache::remember($cacheKey, now()->addHour(), function() use ($asBase64) {
-            $logoPath = Setting::where('key', 'logo_dark')->value('value');
-            $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
-
-            if (empty($logoPath)) {
-                return $fallback;
-            }
-
-            // Handle External URLs
-            if (filter_var($logoPath, FILTER_VALIDATE_URL)) {
-                if ($asBase64) {
-                    try {
-                        $data = file_get_contents($logoPath);
-                        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($data) ?: 'image/png';
-                        return 'data:' . $mime . ';base64,' . base64_encode($data);
-                    } catch (\Exception $e) {
-                        return $logoPath;
-                    }
-                }
-                return $logoPath;
-            }
-
-            // Handle Local Storage Paths
-            $cleanPath = ltrim($logoPath, '/');
-            if (!str_starts_with($cleanPath, 'storage/')) {
-                $cleanPath = 'storage/' . $cleanPath;
-            }
-
-            $fullPath = public_path($cleanPath);
-            $realPath = realpath($fullPath);
-
-            if ($realPath && file_exists($realPath)) {
-                if ($asBase64) {
-                    $mime = mime_content_type($realPath);
-                    $data = file_get_contents($realPath);
-                    return 'data:' . $mime . ';base64,' . base64_encode($data);
-                }
-                return 'file://' . $realPath;
-            }
-
-            return $fallback;
-        });
-    }
-
     public function handleExport(Request $request)
     {
         $type = $request->query('type', $request->query('format', 'xlsx'));
@@ -133,6 +83,7 @@ class TenantExportController extends Controller implements HasMiddleware
         };
 
         $filename = 'hive_tenant_registry_' . now()->format('Y-m-d_His');
+        $branding = $this->getExportBranding(true);
 
         activity('Tenant Management')
             ->causedBy(auth()->user())
@@ -152,7 +103,8 @@ class TenantExportController extends Controller implements HasMiddleware
                 'title'   => $t('tenants.title', 'Tenant Node Registry'),
                 'data'    => $data,
                 't'       => $t, // Passed $t for Blade translations
-                'logoUrl' => $this->getResolvedLogo(true), // 🚀 Forced Base64 string for PDF
+                'logoUrl' => $branding['logo_url'],
+                'branding' => $branding,
             ])
             ->setPaper('a4', 'landscape')
             ->setWarnings(false)
@@ -178,7 +130,8 @@ class TenantExportController extends Controller implements HasMiddleware
             });
 
             return response()->json([
-                'logo_url' => $this->getResolvedLogo(true), // 🚀 Send Base64 logo to React Frontend
+                'logo_url' => $branding['logo_url'],
+                'branding' => $branding,
                 'data'     => $tenants
             ]);
         }

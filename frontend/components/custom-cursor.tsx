@@ -8,15 +8,26 @@ export default function CustomCursor() {
 
     if (!cursor) return;
 
-    let mouseX = window.innerWidth / 2;
-    let mouseY = window.innerHeight / 2;
-    let currentX = mouseX;
-    let currentY = mouseY;
     let rafId = 0;
+    let latestX = window.innerWidth / 2;
+    let latestY = window.innerHeight / 2;
+    let frameQueued = false;
+
+    const renderCursor = () => {
+      frameQueued = false;
+      cursor.style.transform = `translate3d(${latestX}px, ${latestY}px, 0)`;
+    };
+
+    const queueRender = () => {
+      if (frameQueued) return;
+      frameQueued = true;
+      rafId = window.requestAnimationFrame(renderCursor);
+    };
 
     const onMouseMove = (e: MouseEvent) => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
+      latestX = e.clientX;
+      latestY = e.clientY;
+      queueRender();
     };
 
     const onMouseOver = (e: MouseEvent) => {
@@ -41,27 +52,17 @@ export default function CustomCursor() {
       document.body.classList.remove("cursor-clicking");
     };
 
-    const render = () => {
-      const dx = mouseX - currentX;
-      const dy = mouseY - currentY;
-
-      currentX += dx * 0.55;
-      currentY += dy * 0.55;
-
-      if (Math.abs(dx) < 0.01) currentX = mouseX;
-      if (Math.abs(dy) < 0.01) currentY = mouseY;
-
-      cursor.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
-
-      rafId = window.requestAnimationFrame(render);
+    const onMouseLeave = () => {
+      document.body.classList.remove("cursor-hovering", "cursor-clicking");
     };
 
-    rafId = window.requestAnimationFrame(render);
+    queueRender();
 
     window.addEventListener("mousemove", onMouseMove, { passive: true });
     window.addEventListener("mouseover", onMouseOver, { passive: true });
     window.addEventListener("mousedown", onMouseDown, { passive: true });
     window.addEventListener("mouseup", onMouseUp, { passive: true });
+    window.addEventListener("mouseleave", onMouseLeave, { passive: true });
 
     return () => {
       window.cancelAnimationFrame(rafId);
@@ -69,6 +70,7 @@ export default function CustomCursor() {
       window.removeEventListener("mouseover", onMouseOver);
       window.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("mouseleave", onMouseLeave);
 
       document.body.classList.remove("cursor-hovering", "cursor-clicking");
     };

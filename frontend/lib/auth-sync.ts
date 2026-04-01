@@ -14,6 +14,40 @@ export const clearHiveSession = (ejectReason?: string) => {
   }
 };
 
+export const handleAuthFailureResponse = async (response: Response): Promise<boolean> => {
+  const isUnauthorized = response.status === 401;
+
+  let payload: any = null;
+
+  try {
+    payload = await response.clone().json();
+  } catch {}
+
+  const message = String(payload?.message || "");
+  const code = String(payload?.code || "");
+  const isEjected = response.status === 403 && message.includes("CRITICAL:");
+  const isTenantContextInvalid = code === "TENANT_CONTEXT_INVALID";
+  const isTenantNotFound = response.status === 404 && code === "TENANT_NOT_FOUND" && isTenantSession();
+
+  if (!isUnauthorized && !isEjected && !isTenantContextInvalid && !isTenantNotFound) {
+    return false;
+  }
+
+  const ejectReason = isEjected
+    ? message.replace("CRITICAL: ", "")
+    : code === "SESSION_EXPIRED" || code === "TENANT_CONTEXT_INVALID"
+      ? message
+      : undefined;
+
+  clearHiveSession(ejectReason);
+
+  if (typeof window !== "undefined" && !window.location.pathname.includes("/sign-in")) {
+    window.location.replace("/sign-in");
+  }
+
+  return true;
+};
+
 export const syncUserSession = async () => {
   try {
     if (typeof window === "undefined") return;
@@ -39,21 +73,7 @@ export const syncUserSession = async () => {
       }
     );
 
-    if (response.status === 401) {
-      clearHiveSession();
-      window.location.href = "/sign-in";
-      return;
-    }
-
-    if (response.status === 403) {
-      let message = "";
-      try {
-        const payload = await response.json();
-        message = String(payload?.message || "");
-      } catch {}
-
-      clearHiveSession(message.startsWith("CRITICAL: ") ? message.replace("CRITICAL: ", "") : undefined);
-      window.location.href = "/sign-in";
+    if (await handleAuthFailureResponse(response)) {
       return;
     }
 

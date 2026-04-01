@@ -25,6 +25,9 @@ import { useTranslation } from "@/store/use-translation";
 import { cn } from '@/lib/utils';
 import { initEcho } from '@/lib/echo';
 import { getTenantId, isTenantSession } from '@/lib/runtime-context';
+import { DashboardOverviewPlaceholder } from "@/components/ui/loading-states";
+import { usePermissions } from "@/hooks/use-permissions";
+import { handleAuthFailureResponse } from "@/lib/auth-sync";
 
 interface DashboardData {
     company: string;
@@ -59,6 +62,7 @@ export default function DashboardHome() {
     const queryClient = useQueryClient();
     const { t } = useTranslation(); 
     const { startTour } = useTour(); 
+    const { hasPermission, hasAnyPermission, isLoaded } = usePermissions();
     
     const [tenantName, setTenantName] = useState<string | null>(null);
     const [isMounted, setIsMounted] = useState(false);
@@ -66,6 +70,11 @@ export default function DashboardHome() {
     const [moduleTab, setModuleTab] = useState<'traffic' | 'latency' | 'errors'>('traffic');
 
     const [isImpersonating, setIsImpersonating] = useState(false);
+    const canViewDashboard = hasPermission("view_system_dashboard");
+    const canProvisionTenants = hasAnyPermission(["manage_tenants", "provision_tenants"]);
+    const canInviteUsers = hasAnyPermission(["manage_users", "create_users"]);
+    const canManageSystemSettings = hasPermission("manage_system_settings");
+    const canManageBackups = hasPermission("manage_backups");
 
     // Central Telemetry State
     const [telemetry, setTelemetry] = useState(Array.from({ length: 10 }).map((_, i) => ({ time: `-${10 - i}s`, requests: Math.floor(Math.random() * 500) + 500 })));
@@ -127,10 +136,13 @@ export default function DashboardHome() {
                     ...(tenantId ? { 'X-Tenant': tenantId } : {}),
                 }
             });
+            if (await handleAuthFailureResponse(res)) {
+                throw new Error('Session invalidated');
+            }
             if (!res.ok) throw new Error(`Node Connection Failed: ${res.status}`);
             return res.json();
         },
-        enabled: isMounted && tenantName !== null,
+        enabled: isMounted && tenantName !== null && isLoaded && canViewDashboard,
         staleTime: Infinity, 
     });
 
@@ -249,6 +261,26 @@ export default function DashboardHome() {
         }
     }, [isMounted, !!data, tenantName, queryClient]);
 
+    if (!isLoaded || !isMounted) {
+        return <DashboardOverviewPlaceholder />;
+    }
+
+    if (!canViewDashboard) {
+        return (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 rounded-[2rem] border border-border/50 bg-card/40 p-8 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10">
+                    <ShieldAlert className="h-8 w-8 text-destructive" />
+                </div>
+                <div className="space-y-2">
+                    <h2 className="text-2xl font-black tracking-tight">{t('global.access_denied', 'Access Denied')}</h2>
+                    <p className="max-w-md text-sm text-muted-foreground">
+                        {t('global.lacks_permission', 'Your current access token lacks the required')} <strong className="text-destructive">view_system_dashboard</strong> {t('global.capability', 'capability.')}
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     if (!isMounted || isLoading || !tenantName) return <DashboardLoader />;
     if (error || !data) return <DashboardError message={(error as Error)?.message} />;
 
@@ -297,21 +329,29 @@ export default function DashboardHome() {
                     <h1 className="text-4xl font-space font-extrabold tracking-tighter">{data.company}</h1>
                     
                     <div className="flex flex-wrap items-center gap-3 mt-6">
-                        {isCentral && (
+                        {isCentral && canProvisionTenants && (
                             <Button onClick={() => router.push('/dashboard/tenants')} size="sm" className="rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50" disabled={isImpersonating}>
                                 <Plus className="w-4 h-4 mr-2" /> Provision Node
                             </Button>
                         )}
-                        <Button onClick={() => router.push('/dashboard/security')} variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-md disabled:opacity-50" disabled={isImpersonating}>
-                            <UserPlus className="w-4 h-4 mr-2 text-emerald-500" /> Invite Operator
-                        </Button>
-                        <div className="h-6 w-px bg-border/50 mx-2 hidden sm:block" />
-                        <Button variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-md text-muted-foreground hover:text-foreground">
-                            <RefreshCw className="w-4 h-4 mr-2" /> Flush Cache
-                        </Button>
-                        <Button variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-md text-muted-foreground hover:text-foreground">
-                            <Database className="w-4 h-4 mr-2" /> Trigger Backup
-                        </Button>
+                        {canInviteUsers && (
+                            <Button onClick={() => router.push('/dashboard/security')} variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-md disabled:opacity-50" disabled={isImpersonating}>
+                                <UserPlus className="w-4 h-4 mr-2 text-emerald-500" /> Invite Operator
+                            </Button>
+                        )}
+                        {((isCentral && canProvisionTenants) || canInviteUsers) && (canManageSystemSettings || canManageBackups) && (
+                            <div className="h-6 w-px bg-border/50 mx-2 hidden sm:block" />
+                        )}
+                        {canManageSystemSettings && (
+                            <Button variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-md text-muted-foreground hover:text-foreground">
+                                <RefreshCw className="w-4 h-4 mr-2" /> Flush Cache
+                            </Button>
+                        )}
+                        {canManageBackups && (
+                            <Button variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-md text-muted-foreground hover:text-foreground">
+                                <Database className="w-4 h-4 mr-2" /> Trigger Backup
+                            </Button>
+                        )}
                     </div>
                 </div>
                 <div className="flex flex-col items-end gap-3">
@@ -690,12 +730,7 @@ function StatCard({ title, value, subtext, icon, bgClass, href, trend }: any) {
 }
 
 function DashboardLoader() {
-    return (
-        <div className="h-[60vh] flex flex-col items-center justify-center space-y-4">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            <span className="font-mono text-xs uppercase animate-pulse">Synchronizing with Node...</span>
-        </div>
-    );
+    return <DashboardOverviewPlaceholder />;
 }
 
 function DashboardError({ message }: { message?: string }) {

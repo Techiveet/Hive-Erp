@@ -3,6 +3,7 @@
 namespace Modules\Identity\Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Spatie\Permission\PermissionRegistrar;
 
 class IdentityDatabaseSeeder extends Seeder
 {
@@ -17,5 +18,7 @@ class IdentityDatabaseSeeder extends Seeder
             // Note: TenantRolesSeeder and TenantUsersSeeder are omitted here
             // because they are triggered internally by the Tenancy module when a node spawns.
         ]);
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
     }
 }

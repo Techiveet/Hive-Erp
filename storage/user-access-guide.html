@@ -1,0 +1,1810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HIVE.OS Complete User Access Guide</title>
+  <style>
+    @page {
+      margin: 16mm 14mm 18mm 14mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: #17324a;
+      font-family: DejaVu Sans, sans-serif;
+      font-size: 11px;
+      line-height: 1.58;
+      background: #edf3f8;
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0 0 8px 0;
+      line-height: 1.22;
+      color: #0f172a;
+    }
+
+    h1 {
+      font-size: 30px;
+      letter-spacing: 0.2px;
+    }
+
+    h2 {
+      margin-top: 28px;
+      padding: 14px 16px;
+      font-size: 18px;
+      border: 1px solid #d4e0eb;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #f8fbfe 0%, #eef5fb 100%);
+    }
+
+    h3 {
+      font-size: 14px;
+      margin-top: 8px;
+    }
+
+    h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #0b6b64;
+      margin-top: 0;
+    }
+
+    p {
+      margin: 0 0 10px 0;
+    }
+
+    ul, ol {
+      margin: 0 0 12px 18px;
+      padding: 0;
+    }
+
+    li {
+      margin: 0 0 5px 0;
+    }
+
+    a {
+      color: #0b7665;
+      text-decoration: none;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 16px 0;
+      table-layout: fixed;
+      background: #ffffff;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    th, td {
+      border: 1px solid #d7e2ec;
+      padding: 8px 9px;
+      vertical-align: top;
+      text-align: left;
+      word-wrap: break-word;
+    }
+
+    th {
+      background: #eef5fb;
+      color: #102033;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.55px;
+    }
+
+    tbody tr:nth-child(even) td {
+      background: #fbfdff;
+    }
+
+    .page-shell {
+      width: 100%;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 18px 0 24px 0;
+    }
+
+    .doc-topbar {
+      margin-bottom: 16px;
+      padding: 15px 18px 13px 18px;
+      border: 1px solid #12253b;
+      border-radius: 22px;
+      background: linear-gradient(135deg, #0f1f33 0%, #163a59 55%, #22526f 100%);
+      color: #ffffff;
+    }
+
+    .topbar-brand,
+    .topbar-meta {
+      display: inline-block;
+      vertical-align: top;
+    }
+
+    .topbar-brand {
+      width: 56%;
+    }
+
+    .topbar-meta {
+      width: 43%;
+      text-align: right;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      color: #dbeeff;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.95px;
+      text-transform: uppercase;
+    }
+
+    .topbar-title {
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 0.2px;
+    }
+
+    .topbar-copy {
+      margin-top: 6px;
+      color: #d7e8f8;
+      font-size: 10px;
+    }
+
+    .top-pill {
+      display: inline-block;
+      margin: 0 0 6px 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.13);
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.55px;
+      text-transform: uppercase;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 18px;
+      padding: 30px 30px 24px 30px;
+      border-radius: 26px;
+      border: 1px solid #d4e0eb;
+      background: linear-gradient(130deg, #10324d 0%, #1f5d77 46%, #f2f8fc 46%, #ffffff 100%);
+    }
+
+    .hero-band {
+      display: inline-block;
+      margin-bottom: 12px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      background: #e5fbf5;
+      color: #0b6b64;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .hero h1 {
+      width: 58%;
+      color: #ffffff;
+    }
+
+    .hero-subtitle {
+      width: 57%;
+      margin-top: 8px;
+      font-size: 14px;
+      color: #d8ebf8;
+    }
+
+    .hero-grid {
+      margin-top: 20px;
+    }
+
+    .hero-card {
+      display: inline-block;
+      width: 31.5%;
+      min-height: 98px;
+      margin-right: 2%;
+      padding: 12px 12px 10px 12px;
+      vertical-align: top;
+      border: 1px solid #d8e3ef;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .hero-card.last {
+      margin-right: 0;
+    }
+
+    .hero-card .label {
+      display: inline-block;
+      margin-bottom: 7px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #ebf7ff;
+      color: #1f4d76;
+      font-size: 9px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .hero-card p {
+      margin: 0;
+      font-size: 10px;
+      color: #486077;
+    }
+
+    .meta-line {
+      margin-top: 14px;
+      color: #daf0fb;
+      font-size: 10px;
+    }
+
+    .callout, .callout-tip, .callout-warn {
+      margin: 12px 0 14px 0;
+      padding: 12px 14px;
+      border-radius: 14px;
+    }
+
+    .callout {
+      background: #f6fbff;
+      border-left: 4px solid #60a5fa;
+      border: 1px solid #dce9f5;
+    }
+
+    .callout-tip {
+      background: #f3fbf7;
+      border-left: 4px solid #34d399;
+      border: 1px solid #d9efe6;
+    }
+
+    .callout-warn {
+      background: #fff8f0;
+      border-left: 4px solid #f59e0b;
+      border: 1px solid #f2e2c8;
+    }
+
+    .docs-nav {
+      margin: 14px 0 20px 0;
+      padding: 18px 18px 12px 18px;
+      border: 1px solid #d7e1eb;
+      border-radius: 22px;
+      background: #ffffff;
+    }
+
+    .docs-nav-title {
+      margin-bottom: 6px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #0f172a;
+    }
+
+    .docs-nav-copy {
+      max-width: 88%;
+      color: #476073;
+      font-size: 11px;
+    }
+
+    .docs-nav-grid {
+      margin-top: 14px;
+      font-size: 0;
+    }
+
+    .nav-card {
+      display: inline-block;
+      width: 48.6%;
+      margin-right: 2.8%;
+      margin-bottom: 12px;
+      padding: 14px 14px 12px 14px;
+      vertical-align: top;
+      border: 1px solid #d7e2ee;
+      border-radius: 16px;
+      background: #f9fbfd;
+      font-size: 11px;
+      page-break-inside: avoid;
+    }
+
+    .nav-card.right {
+      margin-right: 0;
+    }
+
+    .nav-card-label {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #eaf3fb;
+      color: #204467;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.75px;
+      text-transform: uppercase;
+    }
+
+    .nav-card p {
+      margin-bottom: 8px;
+      color: #51697f;
+    }
+
+    .nav-links a {
+      display: block;
+      margin-bottom: 5px;
+      padding: 7px 9px;
+      border-radius: 10px;
+      background: #ffffff;
+      border: 1px solid #d9e4ee;
+      color: #0b6b64;
+      font-weight: bold;
+    }
+
+    .panel {
+      margin-top: 12px;
+      padding: 14px 15px;
+      border: 1px solid #d7e2ee;
+      border-radius: 16px;
+      background: #ffffff;
+    }
+
+    .panel-title {
+      margin-bottom: 7px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #0f5c7a;
+    }
+
+    .two-col {
+      margin-top: 8px;
+      font-size: 0;
+    }
+
+    .two-col .col {
+      display: inline-block;
+      width: 48.6%;
+      margin-right: 2.8%;
+      vertical-align: top;
+      font-size: 11px;
+    }
+
+    .two-col .col.last {
+      margin-right: 0;
+    }
+
+    .pill {
+      display: inline-block;
+      margin: 0 6px 6px 0;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #edf4fb;
+      color: #23415d;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .pill.route {
+      background: #e8fff8;
+      color: #0f6b46;
+    }
+
+    .pill.guard {
+      background: #fff5dc;
+      color: #9a6700;
+    }
+
+    .pill.context {
+      background: #edf0ff;
+      color: #3247a8;
+    }
+
+    .toc-table td:first-child,
+    .toc-table th:first-child {
+      width: 34%;
+    }
+
+    .mini-grid {
+      margin-top: 6px;
+      font-size: 0;
+    }
+
+    .mini-card {
+      display: inline-block;
+      width: 48.6%;
+      margin-right: 2.8%;
+      margin-bottom: 10px;
+      padding: 12px 12px 10px 12px;
+      vertical-align: top;
+      border: 1px solid #d7e2ee;
+      border-radius: 14px;
+      background: #ffffff;
+      font-size: 11px;
+      page-break-inside: avoid;
+    }
+
+    .mini-card.right {
+      margin-right: 0;
+    }
+
+    .mini-card h4 {
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .module {
+      margin-top: 16px;
+      padding: 15px 16px 14px 16px;
+      border: 1px solid #d7e2ee;
+      border-radius: 20px;
+      background: #ffffff;
+      page-break-inside: auto;
+    }
+
+    .module-header {
+      margin: -15px -16px 12px -16px;
+      padding: 16px 16px 12px 16px;
+      border-bottom: 1px solid #e2eaf2;
+      border-radius: 20px 20px 0 0;
+      background: linear-gradient(180deg, #f8fbfe 0%, #f2f7fb 100%);
+    }
+
+    .module-lead {
+      color: #456075;
+      margin-bottom: 8px;
+    }
+
+    .feature-table th:nth-child(1) {
+      width: 24%;
+    }
+
+    .feature-table th:nth-child(2) {
+      width: 36%;
+    }
+
+    .feature-table th:nth-child(3) {
+      width: 18%;
+    }
+
+    .feature-table th:nth-child(4) {
+      width: 22%;
+    }
+
+    .journey {
+      margin-top: 12px;
+      padding: 14px 15px;
+      border: 1px dashed #cbd7e4;
+      border-radius: 16px;
+      background: #fbfdff;
+      page-break-inside: avoid;
+    }
+
+    .journey-step {
+      margin-top: 8px;
+      padding: 9px 10px;
+      border-radius: 12px;
+      background: #ffffff;
+      border: 1px solid #dee7f0;
+    }
+
+    .step-no {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      margin-right: 7px;
+      border-radius: 999px;
+      background: #0f766e;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: bold;
+      line-height: 20px;
+      text-align: center;
+    }
+
+    .route-map td:first-child,
+    .route-map th:first-child {
+      width: 24%;
+    }
+
+    .route-map td:nth-child(2),
+    .route-map th:nth-child(2) {
+      width: 20%;
+    }
+
+    .route-map td:nth-child(3),
+    .route-map th:nth-child(3) {
+      width: 24%;
+    }
+
+    .small {
+      font-size: 10px;
+      color: #60748a;
+    }
+
+    .mono {
+      font-family: DejaVu Sans Mono, monospace;
+      font-size: 10px;
+      color: #1c3851;
+    }
+
+    .footer {
+      margin-top: 24px;
+      padding: 14px 16px;
+      border: 1px solid #d7e2ee;
+      border-radius: 16px;
+      background: #ffffff;
+      font-size: 10px;
+      color: #5d7287;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+  
+    .lang-switch {
+      margin-top: 10px;
+      text-align: right;
+    }
+
+    .action-btn {
+      display: inline-block;
+      margin: 6px 0 0 6px;
+      padding: 7px 11px;
+      border-radius: 12px;
+      border: 1px solid #d7e2ee;
+      background: #ffffff;
+      color: #16324a;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 0.2px;
+    }
+
+    .action-btn.active {
+      border-color: #8fdcc7;
+      background: #e5fbf5;
+      color: #0b6b64;
+    }
+
+    .action-btn.pdf {
+      background: #f5f9fc;
+    }
+
+    @media print {
+      body {
+        background: #edf3f8 !important;
+      }
+
+      .screen-only {
+        display: none !important;
+      }
+
+      .page-shell {
+        max-width: none;
+        padding: 0;
+      }
+
+      .doc-topbar,
+      .hero,
+      .docs-nav,
+      .nav-card,
+      .hero-card,
+      .mini-card,
+      .panel,
+      .module,
+      .journey,
+      .footer {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="doc-topbar">
+      <div class="topbar-brand">
+        <div class="eyebrow">HIVE.OS Documentation</div>
+        <div class="topbar-title">User Manual and Access Guide</div>
+        <div class="topbar-copy">A docs-style reference for login, permissions, modules, workflows, and user actions across the full system.</div>
+      </div>
+      <div class="topbar-meta">
+        <span class="top-pill">Login</span>
+        <span class="top-pill">Modules</span>
+        <span class="top-pill">Permissions</span>
+        <span class="top-pill">Workflows</span>
+        <div class="lang-switch screen-only">
+          <a class="action-btn active" href="user-access-guide.html">English HTML</a>
+          <a class="action-btn" href="user-access-guide-amharic.html">አማርኛ HTML</a>
+          <a class="action-btn pdf" href="HIVE_User_Access_Guide.pdf">English PDF</a>
+          <a class="action-btn pdf" href="HIVE_User_Access_Guide_Amharic.pdf">አማርኛ PDF</a>
+        </div>
+      </div>
+    </div>
+  <div class="hero">
+    <div class="hero-band">Complete User Manual</div>
+    <h1>HIVE.OS User Access and Module Guide</h1>
+    <p class="hero-subtitle">
+      A fuller, more visual playbook for how users sign in, switch between central and tenant workspaces,
+      understand what they can access, and use each visible feature across the system without missing major functionality.
+    </p>
+
+    <div class="hero-grid">
+      <div class="hero-card">
+        <div class="label">Audience</div>
+        <p>Operators, tenant admins, central admins, support teams, auditors, and technical users who need a single source of truth.</p>
+      </div>
+      <div class="hero-card">
+        <div class="label">Coverage</div>
+        <p>Login, 2FA, navigation, dashboard, tenant management, security, audit, storage, settings, alerts, profile, API docs, and tools.</p>
+      </div>
+      <div class="hero-card last">
+        <div class="label">Goal</div>
+        <p>Make the system easier to navigate and explain not only where each module is, but what users can actually do inside it.</p>
+      </div>
+    </div>
+
+    <div class="meta-line">
+      Generated: {{GENERATED_DATE}}<br>
+      Source basis: active frontend and backend code in this repository
+    </div>
+  </div>
+
+  <div class="callout-tip">
+    <strong>How to use this manual:</strong> start with the quick access map if you need orientation fast, then jump to the module section for the area you are working in.
+    This version is intentionally more complete so that shared controls, hidden context rules, and smaller tool features are not left out.
+  </div>
+
+  <div class="docs-nav">
+    <div class="eyebrow" style="background:#eaf3fb;color:#204467;">Documentation Map</div>
+    <div class="docs-nav-title">Navigate the manual by task, not just by page</div>
+    <p class="docs-nav-copy">Borrowing the feel of a product documentation portal, this jump menu groups the guide into onboarding, permissions, core modules, operations, and help so users can find the right section faster.</p>
+
+    <div class="docs-nav-grid">
+      <div class="nav-card">
+        <div class="nav-card-label">Start Here</div>
+        <p>Use these sections first if the reader needs orientation, login help, or a quick system map.</p>
+        <div class="nav-links">
+          <a href="#contents">Contents overview</a>
+          <a href="#quick-map">Quick access map</a>
+          <a href="#getting-started">Sign-in and 2FA</a>
+          <a href="#access-model">Access model</a>
+        </div>
+      </div>
+      <div class="nav-card right">
+        <div class="nav-card-label">Shared Experience</div>
+        <p>These sections explain the common interface and controls users see across the product.</p>
+        <div class="nav-links">
+          <a href="#shared-ui">Shared navigation and controls</a>
+          <a href="#module-dashboard">Dashboard</a>
+          <a href="#module-profile">Profile settings</a>
+          <a href="#module-api-docs">API docs</a>
+        </div>
+      </div>
+      <div class="nav-card">
+        <div class="nav-card-label">Admin Modules</div>
+        <p>Operational areas used by central admins, tenant admins, support, and security-focused users.</p>
+        <div class="nav-links">
+          <a href="#module-tenants">Tenant management</a>
+          <a href="#module-security">Identity and access</a>
+          <a href="#module-audit">Audit logs</a>
+          <a href="#module-settings">Settings</a>
+        </div>
+      </div>
+      <div class="nav-card right">
+        <div class="nav-card-label">Operations and Help</div>
+        <p>Hands-on workflows, troubleshooting notes, and route-level reference for day-to-day system usage.</p>
+        <div class="nav-links">
+          <a href="#module-storage">Storage workspace</a>
+          <a href="#module-converter">Document converter</a>
+          <a href="#workflows">Common workflows</a>
+          <a href="#troubleshooting">Troubleshooting and route matrix</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="contents">1. Contents</h2>
+  <table class="toc-table">
+    <thead>
+      <tr>
+        <th>Section</th>
+        <th>What it covers</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="#quick-map">2. Quick access map</a></td>
+        <td>Where modules live, who usually sees them, and what they are for.</td>
+      </tr>
+      <tr>
+        <td><a href="#getting-started">3. Getting started</a></td>
+        <td>Central login, tenant login, 2FA, and what happens after sign-in.</td>
+      </tr>
+      <tr>
+        <td><a href="#access-model">4. Access model</a></td>
+        <td>Roles, permissions, central vs tenant visibility, and why menus differ between users.</td>
+      </tr>
+      <tr>
+        <td><a href="#shared-ui">5. Shared interface</a></td>
+        <td>Sidebar, mobile navigation, topbar, tours, alerts, theme, language, fullscreen, and profile menu.</td>
+      </tr>
+      <tr>
+        <td><a href="#module-playbook">6. Module playbook</a></td>
+        <td>Detailed usage notes for each module and major page.</td>
+      </tr>
+      <tr>
+        <td><a href="#workflows">7. Common workflows</a></td>
+        <td>Step-by-step examples for the tasks users are most likely to perform.</td>
+      </tr>
+      <tr>
+        <td><a href="#troubleshooting">8. Troubleshooting</a></td>
+        <td>What to check when pages, buttons, or modules do not appear as expected.</td>
+      </tr>
+      <tr>
+        <td><a href="#route-matrix">9. Route and permission matrix</a></td>
+        <td>A final summary of routes, access rules, and notable actions.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="quick-map">2. Quick Access Map</h2>
+  <p>
+    HIVE.OS is a permission-aware, multi-context application. The same user may see a different menu depending on whether they are working in the central platform
+    or inside a tenant node, and the same page may show different actions depending on the role attached to the session.
+  </p>
+
+  <table class="route-map">
+    <thead>
+      <tr>
+        <th>Workspace</th>
+        <th>Main route</th>
+        <th>Who usually sees it</th>
+        <th>What users do there</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Dashboard</td>
+        <td><span class="mono">/dashboard</span></td>
+        <td>Users with dashboard visibility</td>
+        <td>Overview metrics, alerts, live activity, quick actions, and context-sensitive summary cards.</td>
+      </tr>
+      <tr>
+        <td>Tenant Management</td>
+        <td><span class="mono">/dashboard/tenants</span></td>
+        <td>Central tenant administrators</td>
+        <td>Provision, inspect, suspend, reconfigure, and purge tenant nodes.</td>
+      </tr>
+      <tr>
+        <td>Identity &amp; Access</td>
+        <td><span class="mono">/dashboard/security</span></td>
+        <td>Security and operations roles</td>
+        <td>Manage operators, access roles, and the permission dictionary.</td>
+      </tr>
+      <tr>
+        <td>Audit Logs</td>
+        <td><span class="mono">/dashboard/audit-logs</span></td>
+        <td>Auditors, admins, compliance users</td>
+        <td>Search live logs, inspect archived logs, set retention, archive records, and run exports.</td>
+      </tr>
+      <tr>
+        <td>Storage</td>
+        <td><span class="mono">/dashboard/storage</span></td>
+        <td>Users with storage management permission</td>
+        <td>Upload, organize, preview, edit, share, favorite, restore, and permanently delete files.</td>
+      </tr>
+      <tr>
+        <td>Settings</td>
+        <td><span class="mono">/dashboard/settings</span></td>
+        <td>Configuration owners</td>
+        <td>Manage brand, general settings, localization, and backups based on tab-level access.</td>
+      </tr>
+      <tr>
+        <td>System Alerts</td>
+        <td><span class="mono">/dashboard/alerts</span></td>
+        <td>Users who can view alerts</td>
+        <td>Review critical, warning, and info alerts and dismiss them when permitted.</td>
+      </tr>
+      <tr>
+        <td>Profile Settings</td>
+        <td><span class="mono">/dashboard/profile</span></td>
+        <td>Any signed-in user</td>
+        <td>Update personal details, avatar, and two-factor authentication.</td>
+      </tr>
+      <tr>
+        <td>API Docs</td>
+        <td><span class="mono">/dashboard/api-docs</span></td>
+        <td>Technical users</td>
+        <td>Switch between central and tenant API testing modes and use interactive Swagger docs.</td>
+      </tr>
+      <tr>
+        <td>Document Converter</td>
+        <td><span class="mono">/dashboard/tools/converter</span></td>
+        <td>Storage-enabled power users</td>
+        <td>Upload HTML, use IDE mode, attach assets, generate PDFs, and save results back to storage.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="mini-grid">
+    <div class="mini-card">
+      <h4>Central context</h4>
+      <p>Central users can see cross-platform functions such as tenant management, global alerts, central dashboard metrics, and control-plane API testing.</p>
+    </div>
+    <div class="mini-card right">
+      <h4>Tenant context</h4>
+      <p>Tenant users work inside one node. Tenant-specific quick actions stay visible, while central-only modules such as tenant management are hidden.</p>
+    </div>
+    <div class="mini-card">
+      <h4>Why menus differ</h4>
+      <p>The UI checks permissions from the signed-in user object and only renders modules or actions that the current session is allowed to use.</p>
+    </div>
+    <div class="mini-card right">
+      <h4>Full-access shortcut</h4>
+      <p>In the frontend permission helper, the roles <strong>Super Admin</strong> and <strong>Admin</strong> are treated as full-access roles for permission-gated UI.</p>
+    </div>
+  </div>
+
+  <h2 id="getting-started">3. Getting Started</h2>
+
+  <div class="panel">
+    <div class="panel-title">3.1 Central Sign-In</div>
+    <ol>
+      <li>Open the main HIVE.OS address for the environment you are using.</li>
+      <li>Go to <span class="mono">/sign-in</span>.</li>
+      <li>Enter the email address in the <strong>System Identifier</strong> field.</li>
+      <li>Enter the password in the <strong>Encryption Key</strong> field.</li>
+      <li>Select the login button to begin the authenticated session.</li>
+    </ol>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">3.2 Tenant Sign-In</div>
+    <ol>
+      <li>Open the tenant-specific hostname or subdomain.</li>
+      <li>The app automatically detects the tenant host and switches to tenant login mode.</li>
+      <li>Enter email and password as usual.</li>
+      <li>The session is validated against the tenant user endpoint instead of the central one.</li>
+    </ol>
+    <p class="small">Local tenant development is designed around subdomains such as <span class="mono">tenantapple.localhost</span>.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">3.3 Two-Factor Authentication</div>
+    <ul>
+      <li>If 2FA is enabled for the user, the system redirects to the 2FA page after the first login step.</li>
+      <li>The user enters a 6-digit authenticator code.</li>
+      <li>If global 2FA is enforced and the user has not set it up yet, the page shows a QR code and manual secret key first.</li>
+      <li>The same tenant-aware logic applies here, so tenant users confirm their 2FA against tenant verification endpoints.</li>
+      <li>Users can abort the 2FA step and return to sign-in, but they cannot complete login without satisfying the security requirement.</li>
+    </ul>
+  </div>
+
+  <div class="callout-warn">
+    <strong>Important:</strong> a user can authenticate successfully and still have limited access after login.
+    Authentication and authorization are separate: the first proves identity, the second controls what the user can see and do.
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">3.4 What Happens After Sign-In</div>
+    <ul>
+      <li>The app stores the access token, user record, and context information in local storage.</li>
+      <li>The user is redirected to <span class="mono">/dashboard</span>.</li>
+      <li>The dashboard shell periodically re-syncs the user session when navigation changes or the browser tab regains focus.</li>
+      <li>If the token is missing or invalid, the app clears the session and sends the user back to sign-in.</li>
+      <li>If the backend returns a critical access failure, the system can store a message and display it on the sign-in page after logout.</li>
+    </ul>
+  </div>
+
+  <h2 id="access-model">4. Access Model and Visibility Rules</h2>
+  <p>
+    The system decides what to show by combining role data, permission data, and session context. This is why two users looking at the same deployment can have very different navigation.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Rule</th>
+        <th>Practical meaning for the user</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Role and permission based navigation</td>
+        <td>Modules appear only if the current role includes one of the permissions required by that menu item.</td>
+      </tr>
+      <tr>
+        <td>Super Admin and Admin shortcut</td>
+        <td>These roles are treated as fully allowed by the frontend permission helper, so permission-gated controls are visible to them.</td>
+      </tr>
+      <tr>
+        <td>Central vs tenant session</td>
+        <td>The same user may see different modules depending on whether the app is running in central mode or tenant mode.</td>
+      </tr>
+      <tr>
+        <td>Tab-level access inside modules</td>
+        <td>For example, the Security page can show Operators, Roles, and Permissions tabs independently based on separate permissions.</td>
+      </tr>
+      <tr>
+        <td>Action-level access inside pages</td>
+        <td>A user may be allowed to view a table but not create, edit, export, archive, or delete records from it.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="two-col">
+    <div class="col">
+      <div class="panel">
+        <div class="panel-title">Common reasons a module is hidden</div>
+        <ul>
+          <li>The permission required by the navigation item is missing.</li>
+          <li>The user is in tenant context and the module is central-only.</li>
+          <li>The page is available but some inner tabs are restricted.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col last">
+      <div class="panel">
+        <div class="panel-title">Common reasons a button is hidden or disabled</div>
+        <ul>
+          <li>The user has view access but not create, update, or delete access.</li>
+          <li>The record is protected, such as some built-in roles or protected users.</li>
+          <li>The current page mode, such as archived logs or trash, changes which actions are available.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="shared-ui">5. Shared Interface and Common Controls</h2>
+
+  <div class="module">
+    <div class="module-header">
+      <h3>Desktop sidebar</h3>
+      <p class="module-lead">The desktop sidebar is the main module launcher and can be collapsed or expanded.</p>
+    </div>
+    <div class="two-col">
+      <div class="col">
+        <h4>Always important</h4>
+        <ul>
+          <li>Shows the current brand logo or sidebar icon based on theme and collapse state.</li>
+          <li>Supports collapsed and expanded navigation states.</li>
+          <li>Shows primary navigation such as Dashboard, Tenant Management, Identity &amp; Access, and Audit Logs when allowed.</li>
+          <li>Shows secondary navigation such as Storage, Settings, and API Docs when allowed.</li>
+        </ul>
+      </div>
+      <div class="col last">
+        <h4>Additional controls</h4>
+        <ul>
+          <li>Includes an <strong>Apps &amp; Tools</strong> expandable section where the Document Converter appears.</li>
+          <li>Provides a <strong>Disconnect Node</strong> action for logout.</li>
+          <li>Includes a theme switcher inside the sidebar itself.</li>
+          <li>Participates in the guided tour flow.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="module-header">
+      <h3>Mobile navigation</h3>
+      <p class="module-lead">On small screens, users open navigation through the mobile sidebar sheet.</p>
+    </div>
+    <ul>
+      <li>Search the menu directly from the mobile sidebar.</li>
+      <li>See only the modules permitted for the session.</li>
+      <li>Hide central-only Tenant Management automatically when the user is on a tenant node.</li>
+      <li>Use disconnect and theme controls without leaving the menu.</li>
+    </ul>
+  </div>
+
+  <div class="module">
+    <div class="module-header">
+      <h3>Topbar controls</h3>
+      <p class="module-lead">The topbar gives users fast access to system-wide helpers no matter which module they are in.</p>
+    </div>
+    <div class="mini-grid">
+      <div class="mini-card">
+        <h4>Global Search</h4>
+        <p>Search the ecosystem for users, nodes, settings, or logs without manually opening each page.</p>
+      </div>
+      <div class="mini-card right">
+        <h4>Language Switcher</h4>
+        <p>Switch the interface language using the current localization data published in the system.</p>
+      </div>
+      <div class="mini-card">
+        <h4>Theme Toggle</h4>
+        <p>Switch visual theme behavior directly from the topbar.</p>
+      </div>
+      <div class="mini-card right">
+        <h4>Fullscreen / Focus Mode</h4>
+        <p>Expand the dashboard into fullscreen mode for concentrated work.</p>
+      </div>
+      <div class="mini-card">
+        <h4>Notifications and Alerts</h4>
+        <p>Open current system alerts and task notifications from the alert bell.</p>
+      </div>
+      <div class="mini-card right">
+        <h4>Profile Menu</h4>
+        <p>Jump to Profile Settings or disconnect from the system.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Guided tours:</strong> major pages such as Dashboard, Tenant Management, Security, and Settings include manual tour buttons,
+    and some tours auto-start on first visit to help new users learn the interface.
+  </div>
+
+  <h2 id="module-playbook">6. Module Playbook</h2>
+
+  <div class="module" id="dashboard-module">
+    <div class="module-header">
+      <div class="pill route">Route /dashboard</div>
+      <div class="pill guard">Permission view_system_dashboard</div>
+      <div class="pill context">Central and tenant</div>
+      <h3 id="module-dashboard">6.1 Dashboard</h3>
+      <p class="module-lead">The dashboard is the launch point after login. It changes shape depending on whether the user is central or tenant-side.</p>
+    </div>
+
+    <div class="two-col">
+      <div class="col">
+        <h4>What all dashboard users can do</h4>
+        <ul>
+          <li>See the current company or node label.</li>
+          <li>Use the system tour button.</li>
+          <li>Open stat cards that link deeper into security, tenants, and logs.</li>
+          <li>Review the live audit panel.</li>
+          <li>Use quick actions when the underlying permissions are present.</li>
+        </ul>
+      </div>
+      <div class="col last">
+        <h4>Context-sensitive behavior</h4>
+        <ul>
+          <li>Central users see node counts, revenue intel, cluster health, traffic origins, and richer platform telemetry.</li>
+          <li>Tenant users see tenant activity trends and tenant quick actions.</li>
+          <li>If impersonation is active, the page shows a warning banner and a <strong>Return to Admin</strong> action.</li>
+        </ul>
+      </div>
+    </div>
+
+    <table class="feature-table">
+      <thead>
+        <tr>
+          <th>Dashboard area</th>
+          <th>What users can do</th>
+          <th>Who sees it</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Stat cards</td>
+          <td>Open linked modules such as Tenant Management, Security, and Audit Logs from high-level metrics.</td>
+          <td>All dashboard users</td>
+          <td>Cards reflect the active context and permissions.</td>
+        </tr>
+        <tr>
+          <td>Quick actions</td>
+          <td>Provision a node, invite an operator, open settings, or manage backups when the role allows it.</td>
+          <td>Permission-dependent</td>
+          <td>Buttons appear only when the associated permission is available.</td>
+        </tr>
+        <tr>
+          <td>Telemetry and module analytics</td>
+          <td>Review live telemetry and module views such as traffic, latency, or errors.</td>
+          <td>Mainly central users</td>
+          <td>The page maintains live visual telemetry state.</td>
+        </tr>
+        <tr>
+          <td>Revenue and cluster panels</td>
+          <td>Read MRR, plan mix, data size, Redis hit rate, and active websocket connections.</td>
+          <td>Central users</td>
+          <td>Used for platform-level oversight.</td>
+        </tr>
+        <tr>
+          <td>Traffic origins</td>
+          <td>See top origin locations and open a deeper analytics view when available.</td>
+          <td>Central users</td>
+          <td>Shows summarized location insight.</td>
+        </tr>
+        <tr>
+          <td>Alerts panel</td>
+          <td>Review current alerts and jump to the dedicated System Alerts page.</td>
+          <td>Central dashboard users</td>
+          <td>The dashboard shows a compact alert feed; the full page gives filtering and dismissal controls.</td>
+        </tr>
+        <tr>
+          <td>Tenant quick actions</td>
+          <td>Jump directly to invite operators or configure roles.</td>
+          <td>Tenant users</td>
+          <td>Designed to reduce navigation for common tenant tasks.</td>
+        </tr>
+        <tr>
+          <td>Live audit feed</td>
+          <td>See recent actions and open the complete audit log workspace.</td>
+          <td>All dashboard users</td>
+          <td>Central view can label the node that produced the event.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="module" id="tenants-module">
+    <div class="module-header">
+      <div class="pill route">Route /dashboard/tenants</div>
+      <div class="pill guard">Permissions manage_tenants or view_tenants</div>
+      <div class="pill context">Central only</div>
+      <h3 id="module-tenants">6.2 Tenant Management</h3>
+      <p class="module-lead">This is the central control workspace for provisioning and operating tenant nodes. It is intentionally blocked in tenant context.</p>
+    </div>
+
+    <ul>
+      <li>Search the tenant matrix by ID or organization name.</li>
+      <li>Copy, export, print, or refresh the tenant table.</li>
+      <li>Open tenant details to review node status, plan, domain, and Super Admin contact information.</li>
+      <li>Provision a new tenant with name, plan, routing address, and Super Admin credentials.</li>
+      <li>Toggle tenant network status between online and suspended when allowed.</li>
+      <li>Enable or disable Super Admin login for the tenant.</li>
+      <li>Reconfigure existing nodes.</li>
+      <li>Purge tenant records and associated data when allowed.</li>
+    </ul>
+
+    <div class="callout-warn">
+      <strong>High-impact actions:</strong> suspend, Super Admin access toggle, and purge are powerful operations.
+      They should be limited to trusted administrators because they directly affect tenant availability and access.
+    </div>
+  </div>
+
+  <div class="module" id="security-module">
+    <div class="module-header">
+      <div class="pill route">Route /dashboard/security</div>
+      <div class="pill context">Central and tenant</div>
+      <h3 id="module-security">6.3 Identity &amp; Access</h3>
+      <p class="module-lead">This page is tabbed. The available tabs are determined independently, so a user may see one, two, or all three tabs.</p>
+    </div>
+
+    <table class="feature-table">
+      <thead>
+        <tr>
+          <th>Tab</th>
+          <th>Main functions</th>
+          <th>Visibility rule</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Operators</td>
+          <td>Search, filter by status and role, filter by date range, create user, view details, edit, lock or unlock, impersonate, delete, export, print, copy, refresh.</td>
+          <td><span class="mono">manage_users</span> or <span class="mono">view_users</span></td>
+          <td>Central admins can impersonate users. Status toggle and purge actions depend on edit/delete permissions.</td>
+        </tr>
+        <tr>
+          <td>Access Roles</td>
+          <td>Create roles, edit capabilities, inspect details, search roles, export, print, copy, refresh.</td>
+          <td><span class="mono">manage_roles</span> or <span class="mono">view_roles</span></td>
+          <td>Core roles are protected; some built-in roles cannot be fully modified or deleted.</td>
+        </tr>
+        <tr>
+          <td>Permissions</td>
+          <td>Review permission codes, descriptions, scope, search the dictionary, export, print, copy, refresh.</td>
+          <td><span class="mono">view_permissions</span></td>
+          <td>This tab is a read-only capability dictionary.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="two-col">
+      <div class="col">
+        <div class="panel">
+          <div class="panel-title">Operators tab details</div>
+          <ul>
+            <li>Create or edit operator identities.</li>
+            <li>Assign roles from the available role set.</li>
+            <li>Filter by active or locked status.</li>
+            <li>Filter by role and by date range.</li>
+            <li>Inspect user details from the row action menu.</li>
+            <li>Impersonate users when central permissions allow it.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col last">
+        <div class="panel">
+          <div class="panel-title">Roles tab details</div>
+          <ul>
+            <li>Create new clearance levels.</li>
+            <li>Search permissions while editing a role.</li>
+            <li>Switch the permission picker between all, active, and available capabilities.</li>
+            <li>Review capability counts and inspect saved role details.</li>
+            <li>Protect high-risk roles such as Super Admin from normal modification.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module" id="audit-module">
+    <div class="module-header">
+      <div class="pill route">Route /dashboard/audit-logs</div>
+      <div class="pill guard">Permission view_logs</div>
+      <div class="pill context">Central and tenant</div>
+      <h3 id="module-audit">6.4 Audit Logs</h3>
+      <p class="module-lead">The audit workspace is split into active logs and archived logs, with additional permissions controlling export, archive, and archived-record deletion.</p>
+    </div>
+
+    <table class="feature-table">
+      <thead>
+        <tr>
+          <th>Area</th>
+          <th>What the user can do</th>
+          <th>Extra permission</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Active Live Logs</td>
+          <td>Review current event records, filter results, inspect a record, and export current views when allowed.</td>
+          <td>Base page permission is enough to view</td>
+          <td>Designed for active operational visibility.</td>
+        </tr>
+        <tr>
+          <td>Cold Storage Vault</td>
+          <td>Review archived records and inspect their payloads.</td>
+          <td>Base page permission is enough to view archived results</td>
+          <td>Deleting archived records is separately protected.</td>
+        </tr>
+        <tr>
+          <td>Exports</td>
+          <td>Copy, print, and export the current table view.</td>
+          <td><span class="mono">export_logs</span></td>
+          <td>The export endpoint respects active filters and date ranges.</td>
+        </tr>
+        <tr>
+          <td>Archive controls</td>
+          <td>Set retention days and manually trigger the archive engine.</td>
+          <td><span class="mono">archive_logs</span></td>
+          <td>Moves eligible live logs to the vault.</td>
+        </tr>
+        <tr>
+          <td>Archive deletion</td>
+          <td>Delete one or many vaulted records.</td>
+          <td><span class="mono">delete_archived_logs</span></td>
+          <td>High-risk compliance-sensitive operation.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="panel">
+      <div class="panel-title">Filtering and forensic review</div>
+      <ul>
+        <li>Search by description, module, or operator.</li>
+        <li>Filter by event type, module, operator, node scope, and node identifier.</li>
+        <li>Use quick date presets or manual start and end dates.</li>
+        <li>Open a record to inspect the raw JSON payload block and metadata.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="module" id="storage-module">
+    <div class="module-header">
+      <div class="pill route">Route /dashboard/storage</div>
+      <div class="pill guard">Permission manage_storage</div>
+      <div class="pill context">Central and tenant</div>
+      <h3 id="module-storage">6.5 Storage and Media Workspace</h3>
+      <p class="module-lead">Storage is more than a file list. It is a tenant-aware media workspace with upload, organization, preview, editing, sharing, favorites, and trash recovery features.</p>
+    </div>
+
+    <div class="two-col">
+      <div class="col">
+        <h4>Navigation and organization</h4>
+        <ul>
+          <li>Search files and folders from a single search box.</li>
+          <li>Switch between grid and list layouts.</li>
+          <li>Browse <strong>All</strong>, <strong>Favorites</strong>, <strong>Recent</strong>, and <strong>Trash</strong>.</li>
+          <li>Use type filters for images, videos, documents, audio, archives, and other file types.</li>
+          <li>Review storage usage and category metrics.</li>
+        </ul>
+      </div>
+      <div class="col last">
+        <h4>Folder and file actions</h4>
+        <ul>
+          <li>Create folders.</li>
+          <li>Rename files and folders.</li>
+          <li>Move items between folders.</li>
+          <li>Send items to trash, restore them, empty trash, or permanently delete them.</li>
+          <li>Mark files as favorites and generate share links.</li>
+        </ul>
+      </div>
+    </div>
+
+    <table class="feature-table">
+      <thead>
+        <tr>
+          <th>Feature area</th>
+          <th>User-facing functions</th>
+          <th>Why it matters</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Upload flow</td>
+          <td>Drag and drop files, choose upload folder, apply a base name, and optionally add a custom thumbnail for non-image files.</td>
+          <td>Supports controlled content ingestion.</td>
+          <td>The upload path uses chunked uploads for larger files.</td>
+        </tr>
+        <tr>
+          <td>Image preview and editing</td>
+          <td>Crop, resize, rotate, flip horizontally or vertically, adjust brightness, contrast, saturation, and hue, apply presets, remove background, remove logo background, reset edits, download, and save edited output.</td>
+          <td>Lets users improve images without leaving HIVE.OS.</td>
+          <td>Saved edits can be written back into the file system.</td>
+        </tr>
+        <tr>
+          <td>Video preview</td>
+          <td>Play video, navigate to next or previous video, use subtitles, and switch video versions when available.</td>
+          <td>Supports media review inside the system.</td>
+          <td>HLS playlists and poster thumbnails are supported.</td>
+        </tr>
+        <tr>
+          <td>Audio preview</td>
+          <td>Play audio, navigate through a playlist, and continue playback with the floating player.</td>
+          <td>Useful for media libraries and long-running listening sessions.</td>
+          <td>Audio integrates with the global audio provider.</td>
+        </tr>
+        <tr>
+          <td>PDF preview</td>
+          <td>Open PDF files directly in the built-in viewer.</td>
+          <td>Keeps document review inside the dashboard.</td>
+          <td>Useful for generated reports and uploaded documents.</td>
+        </tr>
+        <tr>
+          <td>Subtitle management</td>
+          <td>Attach .vtt subtitle files, assign language code and label, and delete subtitle tracks.</td>
+          <td>Improves video accessibility and localization.</td>
+          <td>Appears when working with video files.</td>
+        </tr>
+        <tr>
+          <td>Trash and recovery</td>
+          <td>Restore single items, restore multiple items, empty trash, or permanently delete items.</td>
+          <td>Supports recovery workflows and final clean-up.</td>
+          <td>The trash view has its own action set and messaging.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout-tip">
+      <strong>Good to know:</strong> the storage workspace also powers asset selection in other places such as brand settings and the converter,
+      so users can reuse files already stored inside HIVE.OS instead of uploading them again.
+    </div>
+  </div>
+
+  <div class="module" id="settings-module">
+    <div class="module-header">
+      <div class="pill route">Route /dashboard/settings</div>
+      <div class="pill context">Tab-level permissions</div>
+      <h3 id="module-settings">6.6 Settings</h3>
+      <p class="module-lead">Settings is a tabbed workspace. The system shows only the tabs the current user can access.</p>
+    </div>
+
+    <table class="feature-table">
+      <thead>
+        <tr>
+          <th>Tab</th>
+          <th>Main functions</th>
+          <th>Typical permission</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Brand Settings</td>
+          <td>Manage light and dark logos, favicon, sidebar icon, app title, footer text, primary color, typography, login background, auth welcome message, PDF logo, company tax ID, PDF header color, metadata, OG image, and watermark behavior.</td>
+          <td><span class="mono">manage_brand_settings</span></td>
+          <td>Users can upload new assets or choose existing ones from storage.</td>
+        </tr>
+        <tr>
+          <td>General</td>
+          <td>Manage sender name, sender address, support email, support phone, timezone, currency, date format, time format, registration policy, global 2FA, maintenance mode, max upload size, session timeout, and live maintenance ticker message.</td>
+          <td><span class="mono">manage_general_settings</span></td>
+          <td>Maintenance ticker messaging is especially important for central lockout scenarios.</td>
+        </tr>
+        <tr>
+          <td>Localization</td>
+          <td>Add languages, set the default language, open translation files, edit source and target translations, add system keys, delete keys, delete languages, and publish the project.</td>
+          <td><span class="mono">manage_localization</span></td>
+          <td>Supports multi-file translation groups and live publishing.</td>
+        </tr>
+        <tr>
+          <td>System Backups</td>
+          <td>Review backup archive, schedule automated backups, trigger manual snapshots for database, files, or full system, download backups, and delete them.</td>
+          <td><span class="mono">view_backups</span> or <span class="mono">manage_backups</span></td>
+          <td>View and manage capabilities are separated.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="two-col">
+      <div class="col">
+        <div class="panel">
+          <div class="panel-title">Brand tab highlights</div>
+          <ul>
+            <li>Visual identity for light mode and dark mode.</li>
+            <li>Dedicated sidebar icon support.</li>
+            <li>Login background and welcome message for the authentication portal.</li>
+            <li>Document branding fields for exported PDFs and printed records.</li>
+            <li>Metadata controls for white-label and sharing behavior.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col last">
+        <div class="panel">
+          <div class="panel-title">Backups tab highlights</div>
+          <ul>
+            <li>Daily, weekly, or monthly backup schedule options.</li>
+            <li>Day-of-week or day-of-month control depending on frequency.</li>
+            <li>Manual trigger buttons for database only, files only, or full system snapshots.</li>
+            <li>Archive list showing automated vs manual backups.</li>
+            <li>Download and delete controls for archived snapshots.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module" id="alerts-module">
+    <div class="module-header">
+      <div class="pill route">Route /dashboard/alerts</div>
+      <div class="pill guard">View: view_alerts / Manage: manage_alerts</div>
+      <div class="pill context">Central-focused operations</div>
+      <h3 id="module-alerts">6.7 System Alerts</h3>
+      <p class="module-lead">The alerts page gives a cleaner operational view than the compact dashboard alert card.</p>
+    </div>
+
+    <ul>
+      <li>Filter alerts by <strong>All Events</strong>, <strong>Critical</strong>, <strong>Warnings</strong>, and <strong>Info</strong>.</li>
+      <li>Review title, description, severity styling, and relative time for each alert.</li>
+      <li>Dismiss single alerts when management permission is available.</li>
+      <li>Dismiss all alerts from one confirmation action when the user has alert management permission.</li>
+      <li>Use the page as the operational follow-up point for alert counts seen on the dashboard and in the topbar.</li>
+    </ul>
+  </div>
+
+  <div class="module" id="profile-module">
+    <div class="module-header">
+      <div class="pill route">Route /dashboard/profile</div>
+      <div class="pill context">Any authenticated user</div>
+      <h3 id="module-profile">6.8 Profile Settings</h3>
+      <p class="module-lead">Profile Settings is the personal account workspace for the current operator.</p>
+    </div>
+
+    <div class="two-col">
+      <div class="col">
+        <h4>Account tab</h4>
+        <ul>
+          <li>Upload or replace the avatar.</li>
+          <li>Choose an avatar using the embedded file manager picker.</li>
+          <li>Update full name and email address.</li>
+          <li>Save account changes.</li>
+        </ul>
+      </div>
+      <div class="col last">
+        <h4>Security tab</h4>
+        <ul>
+          <li>Enable 2FA after confirming the current password.</li>
+          <li>Scan the generated QR code.</li>
+          <li>Confirm the 6-digit verification code.</li>
+          <li>Receive recovery codes and copy them to the clipboard.</li>
+          <li>Disable 2FA later with password confirmation.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout-warn">
+      <strong>Recovery code reminder:</strong> recovery codes are shown only at the moment setup finishes.
+      Users should save them immediately because they are part of the account recovery path.
+    </div>
+  </div>
+
+  <div class="module" id="api-docs-module">
+    <div class="module-header">
+      <div class="pill route">Route /dashboard/api-docs</div>
+      <div class="pill context">Technical workspace</div>
+      <h3 id="module-api-docs">6.9 API Docs</h3>
+      <p class="module-lead">This is an interactive Swagger workspace designed for technical users who need to test both central and tenant APIs from one place.</p>
+    </div>
+
+    <ul>
+      <li>Switch between <strong>Central mode</strong> and <strong>Tenant mode</strong>.</li>
+      <li>Auto-fill the bearer token from local storage or paste a token manually.</li>
+      <li>Set the tenant identifier used in <span class="mono">X-Tenant</span> when tenant mode is active.</li>
+      <li>See a status message that confirms which mode and tenant value are currently active.</li>
+      <li>Use interactive Swagger actions without leaving the dashboard.</li>
+      <li>Open backend docs directly at <span class="mono">/api/docs</span>.</li>
+      <li>Open the raw OpenAPI spec JSON from a quick link.</li>
+    </ul>
+  </div>
+
+  <div class="module" id="converter-module">
+    <div class="module-header">
+      <div class="pill route">Route /dashboard/tools/converter</div>
+      <div class="pill guard">Permission manage_storage</div>
+      <div class="pill context">Apps and Tools</div>
+      <h3 id="module-converter">6.10 Document Converter</h3>
+      <p class="module-lead">The converter turns HTML and related assets into PDF output and then lets the user save the generated document back to storage.</p>
+    </div>
+
+    <table class="feature-table">
+      <thead>
+        <tr>
+          <th>Step</th>
+          <th>What users can do</th>
+          <th>Why it matters</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Main document</td>
+          <td>Upload a local HTML file, select an HTML file from storage, or switch to IDE mode and author the document directly.</td>
+          <td>Supports both non-technical and technical users.</td>
+          <td>IDE mode starts with an editable <span class="mono">index.html</span>.</td>
+        </tr>
+        <tr>
+          <td>Extra assets</td>
+          <td>Upload supporting assets or pick them from storage.</td>
+          <td>Lets HTML documents reference local images, CSS, and similar files.</td>
+          <td>Useful for branded templates and richer layouts.</td>
+        </tr>
+        <tr>
+          <td>Engine settings</td>
+          <td>Choose paper size, orientation, print-background behavior, and margins.</td>
+          <td>Controls how the output PDF is rendered.</td>
+          <td>Supports common paper sizes such as A4, Letter, and Legal.</td>
+        </tr>
+        <tr>
+          <td>Generate and review</td>
+          <td>Create the PDF and inspect it inside the built-in PDF viewer.</td>
+          <td>Keeps the generate-and-check loop inside HIVE.OS.</td>
+          <td>The page supports a tour and a final review state.</td>
+        </tr>
+        <tr>
+          <td>Save to Cloud</td>
+          <td>Save the generated PDF into the storage workspace.</td>
+          <td>Turns generated output into a managed system file.</td>
+          <td>Ideal for reusable reports or converted documents.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-break"></div>
+
+  <h2 id="workflows">7. Common User Workflows</h2>
+
+  <div class="journey">
+    <h3>Workflow A. Sign in and complete 2FA</h3>
+    <div class="journey-step"><span class="step-no">1</span>Open the correct central or tenant sign-in page.</div>
+    <div class="journey-step"><span class="step-no">2</span>Enter email and password, then submit the login form.</div>
+    <div class="journey-step"><span class="step-no">3</span>If prompted, open the authenticator app and enter the 6-digit code.</div>
+    <div class="journey-step"><span class="step-no">4</span>If forced setup appears, scan the QR code first and then confirm the first code.</div>
+    <div class="journey-step"><span class="step-no">5</span>After success, continue to the dashboard.</div>
+  </div>
+
+  <div class="journey">
+    <h3>Workflow B. Invite a new operator</h3>
+    <div class="journey-step"><span class="step-no">1</span>Open <span class="mono">/dashboard/security</span> and stay on the Operators tab.</div>
+    <div class="journey-step"><span class="step-no">2</span>Select the new operator button if it is visible for the role.</div>
+    <div class="journey-step"><span class="step-no">3</span>Enter identity details and assign the correct role.</div>
+    <div class="journey-step"><span class="step-no">4</span>Save the operator and verify they appear in the table.</div>
+  </div>
+
+  <div class="journey">
+    <h3>Workflow C. Provision a tenant node</h3>
+    <div class="journey-step"><span class="step-no">1</span>Open Tenant Management from the sidebar.</div>
+    <div class="journey-step"><span class="step-no">2</span>Select <strong>Provision Node</strong>.</div>
+    <div class="journey-step"><span class="step-no">3</span>Enter organization name, capacity plan, routing address, and Super Admin credentials.</div>
+    <div class="journey-step"><span class="step-no">4</span>Submit the form and confirm the node appears in the matrix.</div>
+  </div>
+
+  <div class="journey">
+    <h3>Workflow D. Upload and manage a file</h3>
+    <div class="journey-step"><span class="step-no">1</span>Open Storage.</div>
+    <div class="journey-step"><span class="step-no">2</span>Select the upload action or drag a file into the upload zone.</div>
+    <div class="journey-step"><span class="step-no">3</span>Choose the destination folder and optionally set a base name or custom thumbnail.</div>
+    <div class="journey-step"><span class="step-no">4</span>After upload, preview, rename, favorite, share, move, or trash the file as needed.</div>
+  </div>
+
+  <div class="journey">
+    <h3>Workflow E. Enable 2FA from Profile Settings</h3>
+    <div class="journey-step"><span class="step-no">1</span>Open Profile Settings from the topbar profile menu.</div>
+    <div class="journey-step"><span class="step-no">2</span>Switch to the Security tab.</div>
+    <div class="journey-step"><span class="step-no">3</span>Enter the current password to begin 2FA setup.</div>
+    <div class="journey-step"><span class="step-no">4</span>Scan the QR code and enter the verification code.</div>
+    <div class="journey-step"><span class="step-no">5</span>Copy and securely store the recovery codes.</div>
+  </div>
+
+  <div class="journey">
+    <h3>Workflow F. Generate a PDF from the converter</h3>
+    <div class="journey-step"><span class="step-no">1</span>Open the converter from <strong>Apps &amp; Tools</strong>.</div>
+    <div class="journey-step"><span class="step-no">2</span>Load an HTML file, choose IDE mode, or select a cloud HTML document.</div>
+    <div class="journey-step"><span class="step-no">3</span>Add supporting assets if the HTML refers to local files.</div>
+    <div class="journey-step"><span class="step-no">4</span>Choose paper size, orientation, background printing, and margins.</div>
+    <div class="journey-step"><span class="step-no">5</span>Generate the PDF, review it, and save it to the storage workspace.</div>
+  </div>
+
+  <h2 id="troubleshooting">8. Troubleshooting</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>What the user sees</th>
+        <th>Most likely explanation</th>
+        <th>What to check</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>A module is missing from the sidebar</td>
+        <td>The role lacks the required permission, or the user is in tenant context where the module is intentionally hidden.</td>
+        <td>Confirm the user role and whether the session is central or tenant.</td>
+      </tr>
+      <tr>
+        <td>The user lands back on sign-in</td>
+        <td>The token is missing, expired, or blocked.</td>
+        <td>Sign in again and verify the account is still active.</td>
+      </tr>
+      <tr>
+        <td>The 2FA page appears after entering password</td>
+        <td>The account requires 2FA, or global 2FA is enforced.</td>
+        <td>Complete the 2FA step or finish the first-time setup.</td>
+      </tr>
+      <tr>
+        <td>A page opens but some buttons are missing</td>
+        <td>The user has page visibility but not action-level permission.</td>
+        <td>Check whether create, edit, delete, export, archive, or manage permissions are assigned.</td>
+      </tr>
+      <tr>
+        <td>Settings shows only one tab</td>
+        <td>Settings access is tab-specific.</td>
+        <td>Verify which of the brand, general, localization, or backup permissions are assigned.</td>
+      </tr>
+      <tr>
+        <td>Tenant Management redirects away</td>
+        <td>The user is in tenant context or lacks tenant management rights.</td>
+        <td>Use a central session and verify <span class="mono">view_tenants</span> or tenant management permissions.</td>
+      </tr>
+      <tr>
+        <td>Storage actions are unavailable</td>
+        <td>The user is missing the storage permission.</td>
+        <td>Verify <span class="mono">manage_storage</span>.</td>
+      </tr>
+      <tr>
+        <td>Alert dismissal buttons are disabled</td>
+        <td>The user can view alerts but cannot manage them.</td>
+        <td>Verify <span class="mono">manage_alerts</span>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="route-matrix">9. Route and Permission Matrix</h2>
+  <table class="route-map">
+    <thead>
+      <tr>
+        <th>Page or tool</th>
+        <th>Route</th>
+        <th>Main visibility rule</th>
+        <th>Notable actions behind extra permissions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Dashboard</td>
+        <td><span class="mono">/dashboard</span></td>
+        <td><span class="mono">view_system_dashboard</span></td>
+        <td>Quick actions depend on tenant, user, settings, and backup permissions.</td>
+      </tr>
+      <tr>
+        <td>Tenant Management</td>
+        <td><span class="mono">/dashboard/tenants</span></td>
+        <td><span class="mono">manage_tenants</span> or <span class="mono">view_tenants</span></td>
+        <td>Create, edit, suspend, Super Admin toggle, and delete all depend on finer tenant permissions.</td>
+      </tr>
+      <tr>
+        <td>Security - Operators</td>
+        <td><span class="mono">/dashboard/security?tab=users</span></td>
+        <td><span class="mono">manage_users</span> or <span class="mono">view_users</span></td>
+        <td>Create, edit, delete, status toggle, and impersonation are action-specific.</td>
+      </tr>
+      <tr>
+        <td>Security - Roles</td>
+        <td><span class="mono">/dashboard/security?tab=roles</span></td>
+        <td><span class="mono">manage_roles</span> or <span class="mono">view_roles</span></td>
+        <td>Create, edit, and delete require role management rights.</td>
+      </tr>
+      <tr>
+        <td>Security - Permissions</td>
+        <td><span class="mono">/dashboard/security?tab=permissions</span></td>
+        <td><span class="mono">view_permissions</span></td>
+        <td>Mainly read-only, plus table tools.</td>
+      </tr>
+      <tr>
+        <td>Audit Logs</td>
+        <td><span class="mono">/dashboard/audit-logs</span></td>
+        <td><span class="mono">view_logs</span></td>
+        <td>Export, archive, and archived deletion each require additional permissions.</td>
+      </tr>
+      <tr>
+        <td>Storage</td>
+        <td><span class="mono">/dashboard/storage</span></td>
+        <td><span class="mono">manage_storage</span></td>
+        <td>Also unlocks converter access and storage-backed asset pickers.</td>
+      </tr>
+      <tr>
+        <td>Settings - Brand</td>
+        <td><span class="mono">/dashboard/settings?tab=brand</span></td>
+        <td><span class="mono">manage_brand_settings</span></td>
+        <td>Asset management flows rely on storage-backed selection helpers.</td>
+      </tr>
+      <tr>
+        <td>Settings - General</td>
+        <td><span class="mono">/dashboard/settings?tab=general</span></td>
+        <td><span class="mono">manage_general_settings</span></td>
+        <td>Controls registration, 2FA policy, maintenance mode, and session timeout.</td>
+      </tr>
+      <tr>
+        <td>Settings - Localization</td>
+        <td><span class="mono">/dashboard/settings?tab=localization</span></td>
+        <td><span class="mono">manage_localization</span></td>
+        <td>Language creation, deletion, publishing, and key maintenance happen here.</td>
+      </tr>
+      <tr>
+        <td>Settings - Backups</td>
+        <td><span class="mono">/dashboard/settings?tab=backup</span></td>
+        <td><span class="mono">view_backups</span> or <span class="mono">manage_backups</span></td>
+        <td>Triggering, scheduling, and deleting backups require management rights.</td>
+      </tr>
+      <tr>
+        <td>System Alerts</td>
+        <td><span class="mono">/dashboard/alerts</span></td>
+        <td><span class="mono">view_alerts</span></td>
+        <td>Dismissing one or all alerts requires <span class="mono">manage_alerts</span>.</td>
+      </tr>
+      <tr>
+        <td>Profile Settings</td>
+        <td><span class="mono">/dashboard/profile</span></td>
+        <td>Authenticated session</td>
+        <td>2FA enable and disable require password confirmation.</td>
+      </tr>
+      <tr>
+        <td>API Docs</td>
+        <td><span class="mono">/dashboard/api-docs</span></td>
+        <td>Available in dashboard navigation</td>
+        <td>Swagger actions depend on a valid bearer token and optional tenant header.</td>
+      </tr>
+      <tr>
+        <td>Document Converter</td>
+        <td><span class="mono">/dashboard/tools/converter</span></td>
+        <td><span class="mono">manage_storage</span></td>
+        <td>Save-to-cloud depends on successful PDF generation and storage upload.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    This manual was generated from the current repository structure and active UI logic on {{GENERATED_DATE}}.
+    It is designed as a fuller operational guide so that major user-facing functionality is documented in one place.
+  </div>
+  </div>
+</body>
+</html>

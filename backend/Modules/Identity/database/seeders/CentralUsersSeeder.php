@@ -3,6 +3,7 @@
 namespace Modules\Identity\Database\Seeders;
 
 use Modules\Identity\Models\User;
+use Modules\Identity\Models\Permission;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -23,11 +24,17 @@ class CentralUsersSeeder extends Seeder
                 'name' => 'Hive Overlord',
                 'password' => Hash::make('password'),
                 'email_verified_at' => now(),
+                'is_active' => true,
+                'two_factor_secret' => null,
+                'two_factor_recovery_codes' => null,
             ]
         );
 
         if (Role::where('name', 'Super Admin')->where('guard_name', $guard)->exists()) {
-            $superAdmin->assignRole('Super Admin');
+            $superAdmin->syncRoles(['Super Admin']);
+            $superAdmin->syncPermissions(
+                Permission::where('guard_name', $guard)->pluck('name')->all()
+            );
         }
 
         if (DB::getDriverName() === 'pgsql') {
@@ -50,17 +57,24 @@ class CentralUsersSeeder extends Seeder
             foreach ($testAccounts as $acc) {
                 $u = User::updateOrCreate(
                     ['email' => $acc['email']],
-                    ['name' => $acc['name'], 'password' => Hash::make('password'), 'email_verified_at' => now()]
+                    [
+                        'name' => $acc['name'],
+                        'password' => Hash::make('password'),
+                        'email_verified_at' => now(),
+                        'is_active' => true,
+                    ]
                 );
                 if (in_array($acc['role'], $existingRoles)) {
-                    $u->assignRole($acc['role']);
+                    $u->syncRoles([$acc['role']]);
                 }
             }
 
             User::factory(8)->create(['password' => Hash::make('password')])->each(function ($user) use ($existingRoles) {
-                $user->assignRole($existingRoles[array_rand($existingRoles)]);
+                $user->syncRoles([$existingRoles[array_rand($existingRoles)]]);
             });
         }
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         $this->command->info("✅ Central Hive users & operational staff initialized.");
     }

@@ -16,17 +16,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { cn } from "@/lib/utils";
-import { getTenantId, isTenantSession } from "@/lib/runtime-context";
-
-const getApiUrl = () => {
-  if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-  return `http://${window.location.hostname}:8085/api/v1`;
-};
-
-const getTenantHeaders = () => {
-  const tenantId = getTenantId();
-  return tenantId ? { "X-Tenant": tenantId } : {};
-};
+import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, isTenantSession } from "@/lib/runtime-context";
+import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 
 // 🚀 SECURE BRAND LOGO FOR MOBILE SIDEBAR
 const SecureMobileLogo = ({ path, fallbackTitle }: { path?: string, fallbackTitle?: string }) => {
@@ -36,13 +27,19 @@ const SecureMobileLogo = ({ path, fallbackTitle }: { path?: string, fallbackTitl
         if (!path) { setBlobUrl(null); return; }
         
         let isMounted = true;
-        const fullUrl = path.startsWith('http') 
-            ? path : `http://${window.location.hostname}:8085${path.startsWith('/') ? '' : '/'}${path}`;
+        const fullUrl = getBackendStorageUrl(path);
+
+        if (!fullUrl) {
+            setBlobUrl(null);
+            return;
+        }
 
         const fetchLogo = async () => {
             try {
-                const token = localStorage.getItem('hive_token');
-                const res = await fetch(fullUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+                const res = await fetch(fullUrl, { headers: getAuthHeaders() });
+                if (await handleAuthFailureResponse(res)) {
+                    return;
+                }
                 if (!res.ok) throw new Error("Fetch blocked");
                 const blob = await res.blob();
                 if (isMounted) setBlobUrl(URL.createObjectURL(blob));
@@ -87,10 +84,12 @@ export function MobileSidebar() {
   const { data: brandData } = useQuery({
     queryKey: ['brandSettings'],
     queryFn: async () => {
-        const token = localStorage.getItem('hive_token');
-        const res = await fetch(`${getApiUrl()}/settings/brand`, {
-            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }
+        const res = await fetch(`${getBackendApiRoot()}/settings/brand`, {
+            headers: getAuthHeaders(),
         });
+        if (await handleAuthFailureResponse(res)) {
+            return null;
+        }
         return res.json();
     },
     enabled: isMounted
@@ -100,9 +99,7 @@ export function MobileSidebar() {
   const logoPath = resolvedTheme === 'dark' ? brandSettings?.logo_dark : brandSettings?.logo_light;
 
   const handleLogout = () => {
-    localStorage.removeItem("hive_token");
-    localStorage.removeItem("hive_user");
-    localStorage.removeItem("hive_context");
+    clearHiveSession();
     router.push("/sign-in");
   };
 

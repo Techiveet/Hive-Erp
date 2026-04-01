@@ -12,6 +12,8 @@ class CoreDatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            CentralGeneralSettingsSeeder::class,
+            CentralBrandSettingsSeeder::class,
             LanguageSeeder::class,
         ]);
     }

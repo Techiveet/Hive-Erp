@@ -40,45 +40,45 @@ foreach ($centralDomains as $domain) {
 
         Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
             Broadcast::routes();
-            Route::post('/central/users/{id}/impersonate', [UserController::class, 'impersonate']);
-            Route::get('/dashboard', [DashboardController::class, 'index']);
-            Route::get('/central/dashboard', [DashboardController::class, 'index']);
-            Route::get('/search', [GlobalSearchController::class, 'search']);
+            Route::post('/central/users/{id}/impersonate', [UserController::class, 'impersonate'])->middleware('permission:manage_users,sanctum');
+            Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('permission:view_system_dashboard,sanctum');
+            Route::get('/central/dashboard', [DashboardController::class, 'index'])->middleware('permission:view_system_dashboard,sanctum');
+            Route::get('/search', [GlobalSearchController::class, 'search'])->middleware('permission:view_system_dashboard,sanctum');
 
             Route::prefix('system')->group(function () {
-                Route::post('/flush-cache', [SystemOperationsController::class, 'flushCache']);
-                Route::post('/trigger-backup', [SystemOperationsController::class, 'triggerBackup']);
-                Route::post('/backup/schedule', [SystemOperationsController::class, 'updateSchedule']);
-                Route::get('/backups', [SystemOperationsController::class, 'getBackups']);
-                Route::delete('/backups/{id}', [SystemOperationsController::class, 'deleteBackup']);
-                Route::get('/alerts', [SystemAlertController::class, 'index']);
-                Route::delete('/alerts/{id}', [SystemAlertController::class, 'destroy']);
-                Route::post('/alerts/clear-all', [SystemAlertController::class, 'clearAll']);
+                Route::post('/flush-cache', [SystemOperationsController::class, 'flushCache'])->middleware('permission:manage_system_settings,sanctum');
+                Route::post('/trigger-backup', [SystemOperationsController::class, 'triggerBackup'])->middleware('permission:manage_backups,sanctum');
+                Route::post('/backup/schedule', [SystemOperationsController::class, 'updateSchedule'])->middleware('permission:manage_backups,sanctum');
+                Route::get('/backups', [SystemOperationsController::class, 'getBackups'])->middleware('permission:view_backups,sanctum');
+                Route::delete('/backups/{id}', [SystemOperationsController::class, 'deleteBackup'])->middleware('permission:manage_backups,sanctum');
+                Route::get('/alerts', [SystemAlertController::class, 'index'])->middleware('permission:view_alerts,sanctum');
+                Route::delete('/alerts/{id}', [SystemAlertController::class, 'destroy'])->middleware('permission:manage_alerts,sanctum');
+                Route::post('/alerts/clear-all', [SystemAlertController::class, 'clearAll'])->middleware('permission:manage_alerts,sanctum');
             });
 
             // 🔄 FILE CONVERTER ENGINE (Central)
-            Route::prefix('convert')->group(function () {
+            Route::prefix('convert')->middleware('permission:manage_storage,sanctum')->group(function () {
                 Route::post('/html-to-pdf', [FileConverterController::class, 'htmlToPdf']);
             });
 
             Route::prefix('settings')->group(function () {
                 Route::get('/brand', [BrandSettingsController::class, 'getBrandSettings']);
-                Route::post('/brand', [BrandSettingsController::class, 'updateBrandSettings']);
+                Route::post('/brand', [BrandSettingsController::class, 'updateBrandSettings'])->middleware('permission:manage_brand_settings,sanctum');
                 Route::get('/general', [GeneralSettingsController::class, 'index']);
-                Route::post('/general', [GeneralSettingsController::class, 'store']);
+                Route::post('/general', [GeneralSettingsController::class, 'store'])->middleware('permission:manage_general_settings,sanctum');
             });
 
             Route::prefix('localization')->group(function () {
-                Route::get('/languages', [LocalizationController::class, 'getLanguages']);
-                Route::post('/languages', [LocalizationController::class, 'addLanguage']);
-                Route::post('/languages/default', [LocalizationController::class, 'setDefaultLanguage']);
-                Route::delete('/languages/{code}', [LocalizationController::class, 'destroyLanguage']);
-                Route::get('/languages/{code}/translations', [LocalizationController::class, 'getTranslations']);
-                Route::post('/translations/source', [LocalizationController::class, 'addSourceKey']);
-                Route::post('/translations/source/delete', [LocalizationController::class, 'destroySourceKey']);
-                Route::post('/translations/update', [LocalizationController::class, 'updateTranslation']);
-                Route::post('/translations/delete', [LocalizationController::class, 'deleteTranslation']);
-                Route::post('/publish', [LocalizationController::class, 'publishTranslations']);
+                Route::get('/languages', [LocalizationController::class, 'getLanguages'])->middleware('permission:manage_localization,sanctum');
+                Route::post('/languages', [LocalizationController::class, 'addLanguage'])->middleware('permission:manage_localization,sanctum');
+                Route::post('/languages/default', [LocalizationController::class, 'setDefaultLanguage'])->middleware('permission:manage_localization,sanctum');
+                Route::delete('/languages/{code}', [LocalizationController::class, 'destroyLanguage'])->middleware('permission:manage_localization,sanctum');
+                Route::get('/languages/{code}/translations', [LocalizationController::class, 'getTranslations'])->middleware('permission:manage_localization,sanctum');
+                Route::post('/translations/source', [LocalizationController::class, 'addSourceKey'])->middleware('permission:manage_localization,sanctum');
+                Route::post('/translations/source/delete', [LocalizationController::class, 'destroySourceKey'])->middleware('permission:manage_localization,sanctum');
+                Route::post('/translations/update', [LocalizationController::class, 'updateTranslation'])->middleware('permission:manage_localization,sanctum');
+                Route::post('/translations/delete', [LocalizationController::class, 'deleteTranslation'])->middleware('permission:manage_localization,sanctum');
+                Route::post('/publish', [LocalizationController::class, 'publishTranslations'])->middleware('permission:manage_localization,sanctum');
             });
 
             Route::prefix('files')->group(function () {
@@ -104,15 +104,16 @@ foreach ($centralDomains as $domain) {
             });
 
             Route::prefix('logs')->group(function () {
-                Route::get('/export', [ActivityLogExportController::class, 'handleExport']);
+                Route::get('/export', [ActivityLogExportController::class, 'handleExport'])->middleware('permission:export_logs,sanctum');
+                Route::get('/filter-options', [ActivityLogController::class, 'filterOptions'])->middleware('permission:view_logs,sanctum');
                 Route::post('/client-action', [ActivityLogController::class, 'logClientAction']);
-                Route::get('/archived', [ActivityLogController::class, 'archivedIndex']);
-                Route::delete('/archived/{id}', [ActivityLogController::class, 'destroyArchived']);
-                Route::post('/archived/bulk-delete', [ActivityLogController::class, 'bulkDestroyArchived']);
-                Route::get('/settings', [ActivityLogController::class, 'getSettings']);
-                Route::post('/settings', [ActivityLogController::class, 'updateSettings']);
-                Route::post('/archive', [ActivityLogController::class, 'archiveOldLogs']);
-                Route::get('/', [ActivityLogController::class, 'index']);
+                Route::get('/archived', [ActivityLogController::class, 'archivedIndex'])->middleware('permission:view_logs,sanctum');
+                Route::delete('/archived/{id}', [ActivityLogController::class, 'destroyArchived'])->middleware('permission:delete_archived_logs,sanctum');
+                Route::post('/archived/bulk-delete', [ActivityLogController::class, 'bulkDestroyArchived'])->middleware('permission:delete_archived_logs,sanctum');
+                Route::get('/settings', [ActivityLogController::class, 'getSettings'])->middleware('permission:manage_log_settings,sanctum');
+                Route::post('/settings', [ActivityLogController::class, 'updateSettings'])->middleware('permission:manage_log_settings,sanctum');
+                Route::post('/archive', [ActivityLogController::class, 'archiveOldLogs'])->middleware('permission:archive_logs,sanctum');
+                Route::get('/', [ActivityLogController::class, 'index'])->middleware('permission:view_logs,sanctum');
             });
         });
     });
@@ -122,7 +123,7 @@ foreach ($centralDomains as $domain) {
 // These are not bound to a specific central domain, so central API calls still
 // work when the app is reached through a container hostname or reverse proxy.
 Route::prefix('v1')->middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
-    Route::get('/central/dashboard', [DashboardController::class, 'index']);
+    Route::get('/central/dashboard', [DashboardController::class, 'index'])->middleware('permission:view_system_dashboard,sanctum');
 });
 
 // =========================================================================
@@ -149,45 +150,45 @@ Route::middleware([
 
     Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
         Broadcast::routes();
-        Route::post('/users/{id}/impersonate', [UserController::class, 'impersonate']);
-        Route::get('/dashboard', [DashboardController::class, 'index']);
-        Route::get('/tenant/dashboard', [DashboardController::class, 'index']);
-        Route::get('/search', [GlobalSearchController::class, 'search']);
+        Route::post('/users/{id}/impersonate', [UserController::class, 'impersonate'])->middleware('permission:manage_users,sanctum');
+        Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('permission:view_system_dashboard,sanctum');
+        Route::get('/tenant/dashboard', [DashboardController::class, 'index'])->middleware('permission:view_system_dashboard,sanctum');
+        Route::get('/search', [GlobalSearchController::class, 'search'])->middleware('permission:view_system_dashboard,sanctum');
 
         Route::prefix('system')->group(function () {
-            Route::post('/flush-cache', [SystemOperationsController::class, 'flushCache']);
-            Route::post('/trigger-backup', [SystemOperationsController::class, 'triggerBackup']);
-            Route::post('/backup/schedule', [SystemOperationsController::class, 'updateSchedule']);
-            Route::get('/backups', [SystemOperationsController::class, 'getBackups']);
-            Route::delete('/backups/{id}', [SystemOperationsController::class, 'deleteBackup']);
-            Route::get('/alerts', [SystemAlertController::class, 'index']);
-            Route::delete('/alerts/{id}', [SystemAlertController::class, 'destroy']);
-            Route::post('/alerts/clear-all', [SystemAlertController::class, 'clearAll']);
+            Route::post('/flush-cache', [SystemOperationsController::class, 'flushCache'])->middleware('permission:manage_system_settings,sanctum');
+            Route::post('/trigger-backup', [SystemOperationsController::class, 'triggerBackup'])->middleware('permission:manage_backups,sanctum');
+            Route::post('/backup/schedule', [SystemOperationsController::class, 'updateSchedule'])->middleware('permission:manage_backups,sanctum');
+            Route::get('/backups', [SystemOperationsController::class, 'getBackups'])->middleware('permission:view_backups,sanctum');
+            Route::delete('/backups/{id}', [SystemOperationsController::class, 'deleteBackup'])->middleware('permission:manage_backups,sanctum');
+            Route::get('/alerts', [SystemAlertController::class, 'index'])->middleware('permission:view_alerts,sanctum');
+            Route::delete('/alerts/{id}', [SystemAlertController::class, 'destroy'])->middleware('permission:manage_alerts,sanctum');
+            Route::post('/alerts/clear-all', [SystemAlertController::class, 'clearAll'])->middleware('permission:manage_alerts,sanctum');
         });
 
         // 🔄 FILE CONVERTER ENGINE (Tenant)
-        Route::prefix('convert')->group(function () {
+        Route::prefix('convert')->middleware('permission:manage_storage,sanctum')->group(function () {
             Route::post('/html-to-pdf', [FileConverterController::class, 'htmlToPdf']);
         });
 
         Route::prefix('settings')->group(function () {
             Route::get('/brand', [BrandSettingsController::class, 'getBrandSettings']);
-            Route::post('/brand', [BrandSettingsController::class, 'updateBrandSettings']);
+            Route::post('/brand', [BrandSettingsController::class, 'updateBrandSettings'])->middleware('permission:manage_brand_settings,sanctum');
             Route::get('/general', [GeneralSettingsController::class, 'index']);
-            Route::post('/general', [GeneralSettingsController::class, 'store']);
+            Route::post('/general', [GeneralSettingsController::class, 'store'])->middleware('permission:manage_general_settings,sanctum');
         });
 
         Route::prefix('localization')->group(function () {
-            Route::get('/languages', [LocalizationController::class, 'getLanguages']);
-            Route::post('/languages', [LocalizationController::class, 'addLanguage']);
-            Route::post('/languages/default', [LocalizationController::class, 'setDefaultLanguage']);
-            Route::delete('/languages/{code}', [LocalizationController::class, 'destroyLanguage']);
-            Route::get('/languages/{code}/translations', [LocalizationController::class, 'getTranslations']);
-            Route::post('/translations/source', [LocalizationController::class, 'addSourceKey']);
-            Route::post('/translations/source/delete', [LocalizationController::class, 'destroySourceKey']);
-            Route::post('/translations/update', [LocalizationController::class, 'updateTranslation']);
-            Route::post('/translations/delete', [LocalizationController::class, 'deleteTranslation']);
-            Route::post('/publish', [LocalizationController::class, 'publishTranslations']);
+            Route::get('/languages', [LocalizationController::class, 'getLanguages'])->middleware('permission:manage_localization,sanctum');
+            Route::post('/languages', [LocalizationController::class, 'addLanguage'])->middleware('permission:manage_localization,sanctum');
+            Route::post('/languages/default', [LocalizationController::class, 'setDefaultLanguage'])->middleware('permission:manage_localization,sanctum');
+            Route::delete('/languages/{code}', [LocalizationController::class, 'destroyLanguage'])->middleware('permission:manage_localization,sanctum');
+            Route::get('/languages/{code}/translations', [LocalizationController::class, 'getTranslations'])->middleware('permission:manage_localization,sanctum');
+            Route::post('/translations/source', [LocalizationController::class, 'addSourceKey'])->middleware('permission:manage_localization,sanctum');
+            Route::post('/translations/source/delete', [LocalizationController::class, 'destroySourceKey'])->middleware('permission:manage_localization,sanctum');
+            Route::post('/translations/update', [LocalizationController::class, 'updateTranslation'])->middleware('permission:manage_localization,sanctum');
+            Route::post('/translations/delete', [LocalizationController::class, 'deleteTranslation'])->middleware('permission:manage_localization,sanctum');
+            Route::post('/publish', [LocalizationController::class, 'publishTranslations'])->middleware('permission:manage_localization,sanctum');
         });
 
         Route::prefix('files')->group(function () {
@@ -213,15 +214,16 @@ Route::middleware([
         });
 
         Route::prefix('logs')->group(function () {
-            Route::get('/export', [ActivityLogExportController::class, 'handleExport']);
+            Route::get('/export', [ActivityLogExportController::class, 'handleExport'])->middleware('permission:export_logs,sanctum');
+            Route::get('/filter-options', [ActivityLogController::class, 'filterOptions'])->middleware('permission:view_logs,sanctum');
             Route::post('/client-action', [ActivityLogController::class, 'logClientAction']);
-            Route::get('/archived', [ActivityLogController::class, 'archivedIndex']);
-            Route::delete('/archived/{id}', [ActivityLogController::class, 'destroyArchived']);
-            Route::post('/archived/bulk-delete', [ActivityLogController::class, 'bulkDestroyArchived']);
-            Route::get('/settings', [ActivityLogController::class, 'getSettings']);
-            Route::post('/settings', [ActivityLogController::class, 'updateSettings']);
-            Route::post('/archive', [ActivityLogController::class, 'archiveOldLogs']);
-            Route::get('/', [ActivityLogController::class, 'index']);
+            Route::get('/archived', [ActivityLogController::class, 'archivedIndex'])->middleware('permission:view_logs,sanctum');
+            Route::delete('/archived/{id}', [ActivityLogController::class, 'destroyArchived'])->middleware('permission:delete_archived_logs,sanctum');
+            Route::post('/archived/bulk-delete', [ActivityLogController::class, 'bulkDestroyArchived'])->middleware('permission:delete_archived_logs,sanctum');
+            Route::get('/settings', [ActivityLogController::class, 'getSettings'])->middleware('permission:manage_log_settings,sanctum');
+            Route::post('/settings', [ActivityLogController::class, 'updateSettings'])->middleware('permission:manage_log_settings,sanctum');
+            Route::post('/archive', [ActivityLogController::class, 'archiveOldLogs'])->middleware('permission:archive_logs,sanctum');
+            Route::get('/', [ActivityLogController::class, 'index'])->middleware('permission:view_logs,sanctum');
         });
     });
 });

@@ -3,10 +3,9 @@
 namespace Modules\Core\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Modules\Core\Models\Activity;
+use App\Support\AuditLogQuery;
 use Modules\Core\Models\ActivityArchive;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Carbon;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -57,50 +56,84 @@ class ActivityLogController extends Controller implements HasMiddleware
         return $this->processSmartSearch(true, $request);
     }
 
+    public function filterOptions(Request $request)
+    {
+        $this->authorizeViewLogs();
+
+        $isArchived = $request->input('mode', 'active') === 'archived';
+        $baseQuery = AuditLogQuery::filtered($request, $isArchived);
+
+        $modules = (clone $baseQuery)
+            ->whereNotNull('log_name')
+            ->where('log_name', '!=', '')
+            ->select('log_name')
+            ->distinct()
+            ->pluck('log_name')
+            ->unique(fn ($value) => strtolower((string) $value))
+            ->sortBy(fn ($value) => strtolower((string) $value))
+            ->values()
+            ->map(fn ($value) => [
+                'value' => (string) $value,
+                'label' => (string) $value,
+            ]);
+
+        $operators = (clone $baseQuery)
+            ->selectRaw("COALESCE(properties->>'causer_name', 'System') as operator_name")
+            ->distinct()
+            ->pluck('operator_name')
+            ->filter(fn ($value) => filled($value))
+            ->unique(fn ($value) => strtolower((string) $value))
+            ->sortBy(fn ($value) => strtolower((string) $value))
+            ->values()
+            ->map(fn ($value) => [
+                'value' => (string) $value,
+                'label' => (string) $value,
+            ]);
+
+        $nodes = collect();
+        if (!AuditLogQuery::inTenantContext()) {
+            $nodes = (clone $baseQuery)
+                ->selectRaw("COALESCE(tenant_id, 'central') as node_key")
+                ->distinct()
+                ->pluck('node_key')
+                ->filter(fn ($value) => filled($value))
+                ->unique(fn ($value) => strtolower((string) $value))
+                ->sortBy(fn ($value) => strtolower((string) $value))
+                ->values()
+                ->map(fn ($value) => [
+                    'value' => (string) $value,
+                    'label' => strtolower((string) $value) === 'central' ? 'Central Command' : strtoupper((string) $value),
+                ]);
+        }
+
+        return response()->json([
+            'modules' => $modules->values(),
+            'operators' => $operators->values(),
+            'nodes' => $nodes->values(),
+        ]);
+    }
+
     /**
      * 🚀 SMART SEARCH ROUTER
      */
     private function processSmartSearch(bool $isArchived, Request $request)
     {
-        $isTenant = function_exists('tenant') && tenant('id');
-        $tenantId = $isTenant ? tenant('id') : null;
-        $modelClass = $isArchived ? ActivityArchive::class : Activity::class;
-        $tableName = (new $modelClass)->getTable();
+        $search = trim((string) $request->input('search', ''));
 
-        $search = $request->input('search', '');
-        $nodeFilter = $request->input('node', 'all');
+        if (AuditLogQuery::shouldUseScout($request)) {
+            $modelClass = AuditLogQuery::modelClass($isArchived);
+            $scout = $modelClass::search($search)->within(AuditLogQuery::scoutIndexName($isArchived));
 
-        $canUseMeilisearch = $isTenant || $nodeFilter === 'central';
-
-        if ($canUseMeilisearch && !empty($search)) {
-            $indexName = $isTenant ? "tenant_{$tenantId}_{$tableName}" : "central_{$tableName}";
-            $scout = $modelClass::search($search)->within($indexName);
-
-            $scout->query(function ($query) use ($request, $isTenant, $tenantId) {
-                $this->applyDatabaseFilters($query, $request, $isTenant, $tenantId);
+            $scout->query(function ($query) use ($request) {
+                AuditLogQuery::applyScopeAndFilters($query, $request);
+                AuditLogQuery::applySorting($query, $request);
             });
 
             $logs = $scout->paginate($request->input('pageSize', 15));
             $engine = 'meilisearch';
         } else {
-            $query = $modelClass::query();
-            $this->applyDatabaseFilters($query, $request, $isTenant, $tenantId);
-
-            if (!empty($search)) {
-                $searchStr = strtolower($search);
-                $query->where(function ($subQ) use ($searchStr) {
-                    if (is_numeric($searchStr)) $subQ->orWhere('id', $searchStr);
-                    $subQ->orWhereRaw('LOWER(description) LIKE ?', ["%{$searchStr}%"])
-                         ->orWhereRaw('LOWER(event) LIKE ?', ["%{$searchStr}%"])
-                         ->orWhereRaw('LOWER(log_name) LIKE ?', ["%{$searchStr}%"])
-                         ->orWhereRaw("LOWER(properties->>'causer_name') LIKE ?", ["%{$searchStr}%"]);
-                });
-            }
-
-            $sortCol = $request->input('sort_by', 'created_at');
-            $sortDir = $request->input('sort_direction', 'desc');
-
-            $logs = $query->orderBy($sortCol, $sortDir)->paginate($request->input('pageSize', 15));
+            $query = AuditLogQuery::build($request, $isArchived);
+            $logs = $query->paginate($request->input('pageSize', 15));
             $engine = 'database';
         }
 
@@ -122,39 +155,6 @@ class ActivityLogController extends Controller implements HasMiddleware
                 'engine'       => $engine
             ]
         ], 200);
-    }
-
-    private function applyDatabaseFilters($query, Request $request, $isTenant, $tenantId)
-    {
-        if ($isTenant) {
-            $query->where('tenant_id', $tenantId);
-        } else {
-            if ($request->filled('node') && $request->node !== 'all') {
-                if ($request->node === 'central') {
-                    $query->where(fn($sub) => $sub->whereNull('tenant_id')->orWhere('tenant_id', 'central'));
-                } elseif ($request->node === 'tenant') {
-                    $query->whereNotNull('tenant_id')->where('tenant_id', '!=', 'central');
-                }
-            }
-        }
-
-        if ($request->filled('event') && $request->event !== 'all') {
-            $evt = strtolower($request->event);
-            if ($evt === 'crud') {
-                $query->whereIn(DB::raw('LOWER(event)'), ['created', 'updated', 'deleted']);
-            } elseif ($evt === 'telemetry') {
-                $query->whereIn(DB::raw('LOWER(event)'), ['viewed', 'exported', 'copied', 'printed', 'filtered', 'archived']);
-            } elseif ($evt === 'system') {
-                $query->whereNotIn(DB::raw('LOWER(event)'), ['created', 'updated', 'deleted', 'viewed', 'exported', 'copied', 'printed', 'filtered', 'archived']);
-            }
-        }
-
-        if ($request->filled('start_date') && $request->filled('end_date')) {
-            $query->whereBetween('created_at', [
-                Carbon::parse($request->start_date)->startOfDay(),
-                Carbon::parse($request->end_date)->endOfDay()
-            ]);
-        }
     }
 
     public function logClientAction(Request $request)

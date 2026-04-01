@@ -2,9 +2,9 @@
 
 namespace Modules\Identity\Http\Controllers\Export;
 
+use App\Support\ResolvesExportBranding;
 use Modules\Identity\Models\Role;
 use Modules\Core\Models\Language;
-use Modules\Core\Models\Setting; // 🚀 ADDED: Required for Logo Fetching
 use Modules\Identity\Exports\RolesExport;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
@@ -15,6 +15,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class RoleExportController extends Controller
 {
+    use ResolvesExportBranding;
+
     private function getGuard(): string
     {
         return (function_exists('tenancy') && tenancy()->initialized) ? 'tenant' : 'web';
@@ -49,58 +51,6 @@ class RoleExportController extends Controller
         return $query;
     }
 
-    /**
-     * 🚀 Resolves the physical path for PDF or Base64 for Frontend Print
-     */
-    protected function getResolvedLogo($asBase64 = false): string
-    {
-        $tenantPrefix = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
-        $cacheKey = "export_logo_final_v3_{$tenantPrefix}_" . ($asBase64 ? 'b64' : 'path');
-
-        return Cache::remember($cacheKey, now()->addHour(), function() use ($asBase64) {
-            $logoPath = Setting::where('key', 'logo_dark')->value('value');
-            $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
-
-            if (empty($logoPath)) {
-                return $fallback;
-            }
-
-            // Handle External URLs
-            if (filter_var($logoPath, FILTER_VALIDATE_URL)) {
-                if ($asBase64) {
-                    try {
-                        $data = file_get_contents($logoPath);
-                        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($data) ?: 'image/png';
-                        return 'data:' . $mime . ';base64,' . base64_encode($data);
-                    } catch (\Exception $e) {
-                        return $logoPath;
-                    }
-                }
-                return $logoPath;
-            }
-
-            // Handle Local Storage Paths
-            $cleanPath = ltrim($logoPath, '/');
-            if (!str_starts_with($cleanPath, 'storage/')) {
-                $cleanPath = 'storage/' . $cleanPath;
-            }
-
-            $fullPath = public_path($cleanPath);
-            $realPath = realpath($fullPath);
-
-            if ($realPath && file_exists($realPath)) {
-                if ($asBase64) {
-                    $mime = mime_content_type($realPath);
-                    $data = file_get_contents($realPath);
-                    return 'data:' . $mime . ';base64,' . base64_encode($data);
-                }
-                return 'file://' . $realPath;
-            }
-
-            return $fallback;
-        });
-    }
-
     public function handleExport(Request $request)
     {
         $type = $request->query('type', $request->query('format', 'xlsx'));
@@ -118,6 +68,7 @@ class RoleExportController extends Controller
         $t = function($key, $default) use ($dictionary) { return $dictionary[$key] ?? $default; };
 
         $filename = 'hive_roles_matrix_' . now()->format('Y-m-d_His');
+        $branding = $this->getExportBranding(true);
 
         if (in_array($type, ['csv', 'excel', 'xlsx'])) {
             $format = ($type === 'csv') ? \Maatwebsite\Excel\Excel::CSV : \Maatwebsite\Excel\Excel::XLSX;
@@ -131,7 +82,8 @@ class RoleExportController extends Controller
                 'title'   => $t('roles.title', 'Hive Security: Access Control Matrix'),
                 'data'    => $roles,
                 't'       => $t,
-                'logoUrl' => $this->getResolvedLogo(true), // 🚀 Forced Base64 string for PDF
+                'logoUrl' => $branding['logo_url'],
+                'branding' => $branding,
             ])
             ->setPaper('a4', 'landscape')
             ->setWarnings(false)
@@ -155,7 +107,8 @@ class RoleExportController extends Controller
             });
 
             return response()->json([
-                'logo_url' => $this->getResolvedLogo(true), // 🚀 Send Base64 logo to React Frontend
+                'logo_url' => $branding['logo_url'],
+                'branding' => $branding,
                 'data'     => $roles
             ]);
         }

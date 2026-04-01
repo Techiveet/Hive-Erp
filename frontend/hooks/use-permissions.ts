@@ -1,5 +1,5 @@
 // frontend/hooks/use-permissions.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 export function usePermissions() {
   const [permissions, setPermissions] = useState<string[]>([]);
@@ -8,14 +8,21 @@ export function usePermissions() {
 
   const loadFromStorage = useCallback(() => {
     const userStr = localStorage.getItem("hive_user");
-    if (userStr) {
-      try {
-        const parsed = JSON.parse(userStr);
-        setPermissions(parsed.permissions || []);
-        setRoles(parsed.roles || []);
-      } catch (e) {
-        console.error("Failed to parse hive_user context", e);
-      }
+    if (!userStr) {
+      setPermissions([]);
+      setRoles([]);
+      setIsLoaded(true);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(userStr);
+      setPermissions(parsed.permissions || []);
+      setRoles(parsed.roles || []);
+    } catch (e) {
+      console.error("Failed to parse hive_user context", e);
+      setPermissions([]);
+      setRoles([]);
     }
     setIsLoaded(true);
   }, []);
@@ -27,22 +34,22 @@ export function usePermissions() {
     return () => window.removeEventListener("hive_security_cleared", loadFromStorage);
   }, [loadFromStorage]);
 
-  const isSuperAdmin = roles.includes('Super Admin') || roles.includes('Admin');
+  const isSuperAdmin = useMemo(() => roles.includes('Super Admin') || roles.includes('Admin'), [roles]);
 
-  const hasPermission = (permission: string) => {
+  const hasPermission = useCallback((permission: string) => {
     if (isSuperAdmin) return true;
     return permissions.includes(permission);
-  };
+  }, [isSuperAdmin, permissions]);
 
-  const hasAnyPermission = (perms: string[]) => {
+  const hasAnyPermission = useCallback((perms: string[]) => {
     if (isSuperAdmin) return true;
     return perms.some(p => permissions.includes(p));
-  };
+  }, [isSuperAdmin, permissions]);
 
-  const hasRole = (role: string) => {
+  const hasRole = useCallback((role: string) => {
     if (isSuperAdmin) return true;
     return roles.includes(role);
-  };
+  }, [isSuperAdmin, roles]);
 
   return { permissions, roles, hasPermission, hasAnyPermission, hasRole, isLoaded, isSuperAdmin };
 }

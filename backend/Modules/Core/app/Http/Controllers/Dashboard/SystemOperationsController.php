@@ -10,6 +10,19 @@ use Modules\Core\Jobs\RunSystemBackup;
 
 class SystemOperationsController extends Controller
 {
+    private function userHasPermission($user, string $permission): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $user->loadMissing(['permissions', 'roles.permissions']);
+
+        return $user->permissions->contains('name', $permission)
+            || $user->roles->flatMap->permissions->contains('name', $permission)
+            || $user->roles->contains('name', 'Super Admin');
+    }
+
     public function flushCache(Request $request)
     {
         Artisan::call('optimize:clear');
@@ -112,6 +125,11 @@ class SystemOperationsController extends Controller
         }
 
         $user = $token->tokenable;
+
+        if (!$this->userHasPermission($user, 'view_backups')) {
+            return response()->json(['error' => 'Forbidden. Missing backup access permission.'], 403);
+        }
+
         $path = base64_decode($id);
         $disk = Storage::disk(config('backup.backup.destination.disks')[0] ?? 'local');
 

@@ -38,12 +38,11 @@ class ActivityLogExport implements FromQuery, WithHeadings, WithMapping, WithSty
             ? $this->t("global.{$rawEvent}", $rawEvent) : $rawEvent;
 
         return [
-            $log->id,
             $log->created_at ? $log->created_at->format('Y-m-d H:i:s') : 'N/A',
             strtoupper($translatedEvent),
             $log->log_name ?? 'N/A',
             $log->description ?? 'N/A',
-            $log->causer ? $log->causer->name : 'System Process',
+            $log->properties['causer_name'] ?? 'System Process',
             strtoupper($log->tenant_id ?? $this->t('audit.node_central', 'CENTRAL')),
         ];
     }

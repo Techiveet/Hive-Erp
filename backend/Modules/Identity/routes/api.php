@@ -52,17 +52,40 @@ foreach ($centralDomains as $domain) {
             });
 
             Route::prefix('roles')->group(function() {
-                Route::get('/export', [RoleExportController::class, 'handleExport']);
+                Route::get('/export', [RoleExportController::class, 'handleExport'])->middleware('permission:view_roles|manage_roles,sanctum');
             });
-            Route::get('/permissions/export', [PermissionExportController::class, 'handleExport']);
-            Route::get('/permissions', [RoleController::class, 'permissions']);
-            Route::apiResource('roles', RoleController::class);
+            Route::get('/permissions/export', [PermissionExportController::class, 'handleExport'])->middleware('permission:view_permissions,sanctum');
+            Route::get('/permissions', [RoleController::class, 'permissions'])->middleware('permission:view_permissions,sanctum');
+
+            Route::apiResource('roles', RoleController::class)
+                ->only(['index', 'show'])
+                ->middleware('permission:view_roles|manage_roles,sanctum');
+            Route::apiResource('roles', RoleController::class)
+                ->only(['store'])
+                ->middleware('permission:create_roles|manage_roles,sanctum');
+            Route::apiResource('roles', RoleController::class)
+                ->only(['update'])
+                ->middleware('permission:edit_roles|manage_roles,sanctum');
+            Route::apiResource('roles', RoleController::class)
+                ->only(['destroy'])
+                ->middleware('permission:delete_roles|manage_roles,sanctum');
 
             Route::prefix('users')->group(function() {
-                Route::get('/export', [UserExportController::class, 'handleExport']);
-                Route::post('/{user}/toggle-status', [UserController::class, 'toggleStatus']);
+                Route::get('/export', [UserExportController::class, 'handleExport'])->middleware('permission:view_users|manage_users,sanctum');
+                Route::post('/{user}/toggle-status', [UserController::class, 'toggleStatus'])->middleware('permission:edit_users|manage_users,sanctum');
             });
-            Route::apiResource('users', UserController::class);
+            Route::apiResource('users', UserController::class)
+                ->only(['index', 'show'])
+                ->middleware('permission:view_users|manage_users,sanctum');
+            Route::apiResource('users', UserController::class)
+                ->only(['store'])
+                ->middleware('permission:create_users|manage_users,sanctum');
+            Route::apiResource('users', UserController::class)
+                ->only(['update'])
+                ->middleware('permission:edit_users|manage_users,sanctum');
+            Route::apiResource('users', UserController::class)
+                ->only(['destroy'])
+                ->middleware('permission:delete_users|manage_users,sanctum');
         });
     });
 }
@@ -125,29 +148,75 @@ Route::middleware([
             });
 
             Route::prefix('roles')->group(function() {
-                Route::get('/export', [RoleExportController::class, 'handleExport']);
+                Route::get('/export', [RoleExportController::class, 'handleExport'])->middleware('permission:view_roles|manage_roles,sanctum');
             });
-            Route::get('/permissions', [RoleController::class, 'permissions']);
-            Route::apiResource('roles', RoleController::class);
+            Route::get('/permissions/export', [PermissionExportController::class, 'handleExport'])->middleware('permission:view_permissions,sanctum');
+            Route::get('/permissions', [RoleController::class, 'permissions'])->middleware('permission:view_permissions,sanctum');
+            Route::apiResource('roles', RoleController::class)
+                ->only(['index', 'show'])
+                ->middleware('permission:view_roles|manage_roles,sanctum');
+            Route::apiResource('roles', RoleController::class)
+                ->only(['store'])
+                ->middleware('permission:create_roles|manage_roles,sanctum');
+            Route::apiResource('roles', RoleController::class)
+                ->only(['update'])
+                ->middleware('permission:edit_roles|manage_roles,sanctum');
+            Route::apiResource('roles', RoleController::class)
+                ->only(['destroy'])
+                ->middleware('permission:delete_roles|manage_roles,sanctum');
 
             Route::prefix('users')->group(function() {
-                Route::get('/export', [UserExportController::class, 'handleExport']);
-                Route::post('/{user}/toggle-status', [UserController::class, 'toggleStatus']);
+                Route::get('/export', [UserExportController::class, 'handleExport'])->middleware('permission:view_users|manage_users,sanctum');
+                Route::post('/{user}/toggle-status', [UserController::class, 'toggleStatus'])->middleware('permission:edit_users|manage_users,sanctum');
             });
-            Route::apiResource('users', UserController::class);
+            Route::apiResource('users', UserController::class)
+                ->only(['index', 'show'])
+                ->middleware('permission:view_users|manage_users,sanctum');
+            Route::apiResource('users', UserController::class)
+                ->only(['store'])
+                ->middleware('permission:create_users|manage_users,sanctum');
+            Route::apiResource('users', UserController::class)
+                ->only(['update'])
+                ->middleware('permission:edit_users|manage_users,sanctum');
+            Route::apiResource('users', UserController::class)
+                ->only(['destroy'])
+                ->middleware('permission:delete_users|manage_users,sanctum');
         });
 
         // FALLBACK: Keep the standard paths just in case other parts of your app use them
         Route::prefix('roles')->group(function() {
-            Route::get('/export', [RoleExportController::class, 'handleExport']);
+            Route::get('/export', [RoleExportController::class, 'handleExport'])->middleware('permission:view_roles|manage_roles,sanctum');
         });
-        Route::get('/permissions', [RoleController::class, 'permissions']);
-        Route::apiResource('roles', RoleController::class);
+        Route::get('/permissions/export', [PermissionExportController::class, 'handleExport'])->middleware('permission:view_permissions,sanctum');
+        Route::get('/permissions', [RoleController::class, 'permissions'])->middleware('permission:view_permissions,sanctum');
+        Route::apiResource('roles', RoleController::class)
+            ->only(['index', 'show'])
+            ->middleware('permission:view_roles|manage_roles,sanctum');
+        Route::apiResource('roles', RoleController::class)
+            ->only(['store'])
+            ->middleware('permission:create_roles|manage_roles,sanctum');
+        Route::apiResource('roles', RoleController::class)
+            ->only(['update'])
+            ->middleware('permission:edit_roles|manage_roles,sanctum');
+        Route::apiResource('roles', RoleController::class)
+            ->only(['destroy'])
+            ->middleware('permission:delete_roles|manage_roles,sanctum');
 
         Route::prefix('users')->group(function() {
-            Route::get('/export', [UserExportController::class, 'handleExport']);
-            Route::post('/{user}/toggle-status', [UserController::class, 'toggleStatus']);
+            Route::get('/export', [UserExportController::class, 'handleExport'])->middleware('permission:view_users|manage_users,sanctum');
+            Route::post('/{user}/toggle-status', [UserController::class, 'toggleStatus'])->middleware('permission:edit_users|manage_users,sanctum');
         });
-        Route::apiResource('users', UserController::class);
+        Route::apiResource('users', UserController::class)
+            ->only(['index', 'show'])
+            ->middleware('permission:view_users|manage_users,sanctum');
+        Route::apiResource('users', UserController::class)
+            ->only(['store'])
+            ->middleware('permission:create_users|manage_users,sanctum');
+        Route::apiResource('users', UserController::class)
+            ->only(['update'])
+            ->middleware('permission:edit_users|manage_users,sanctum');
+        Route::apiResource('users', UserController::class)
+            ->only(['destroy'])
+            ->middleware('permission:delete_users|manage_users,sanctum');
     });
 });

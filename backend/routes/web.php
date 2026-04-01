@@ -1,6 +1,11 @@
 <?php
 
+use App\Http\Controllers\ApiDocumentationController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/api-docs', [ApiDocumentationController::class, 'index'])->name('api-docs.index');
+Route::get('/docs', [ApiDocumentationController::class, 'index'])->name('api-docs.web-alias');
+Route::get('/api-docs/openapi.json', [ApiDocumentationController::class, 'spec'])->name('api-docs.spec');
 
 // Loop through your central domains (e.g., 'localhost', '127.0.0.1')
 foreach (config('tenancy.central_domains') as $domain) {
@@ -59,3 +64,4 @@ Route::get('/test-export-logo', function () {
 
     });
 }
+

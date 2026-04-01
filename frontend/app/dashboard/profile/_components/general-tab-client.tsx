@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { logFrontendAction } from "@/lib/api"; 
 import { FileManagerClient } from "@/components/dashboard/file-manager-client"; 
 import { cn } from "@/lib/utils";
+import { ProfileWorkspaceSkeleton } from "@/components/ui/loading-states";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const getApiUrl = () => {
   if (typeof window === "undefined") return "http://localhost:8085/api/v1";
@@ -88,8 +90,8 @@ const SecureBlobAvatar = ({ user, previewUrl, lastSaved, className }: any) => {
 
     if (isFetching && !blobUrl) {
         return (
-            <div className={cn("flex items-center justify-center bg-muted/50", className)}>
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className={cn("bg-muted/50", className)}>
+                <Skeleton className="h-full w-full rounded-full bg-muted/70" />
             </div>
         );
     }
@@ -186,7 +188,7 @@ export function GeneralTabClient() {
   };
 
   if (isFetchingUser) {
-      return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+      return <ProfileWorkspaceSkeleton />;
   }
 
   return (
@@ -253,7 +255,7 @@ export function GeneralTabClient() {
               </div>
 
               <div className="pt-4 flex justify-end border-t border-border/40">
-                <Button type="submit" disabled={updateProfileMut.isPending} className="rounded-xl px-8 h-12 font-bold shadow-[0_0_20px_rgba(var(--primary),0.3)] bg-primary text-primary-foreground hover:bg-primary/90 transition-all hover:scale-[1.02]">
+                <Button type="submit" disabled={updateProfileMut.isPending} className="rounded-xl px-8 h-12 font-bold shadow-[0_0_20px_hsl(var(--primary)_/_0.3)] bg-primary text-primary-foreground hover:bg-primary/90 transition-all hover:scale-[1.02]">
                   {updateProfileMut.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Shield className="mr-2 h-5 w-5" />}
                   Save Protocol
                 </Button>

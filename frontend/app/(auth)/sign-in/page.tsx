@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge"; 
+import { useQuery } from "@tanstack/react-query";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { logFrontendAction } from "@/lib/api"; 
 import { clearHiveSession } from "@/lib/auth-sync";
-import { isTenantHost } from "@/lib/runtime-context";
+import { getBackendApiRoot, getBackendStorageUrl, isTenantHost } from "@/lib/runtime-context";
 import { initializeSessionActivity } from "@/lib/session-activity";
 
 export default function LoginPage() {
@@ -29,6 +30,22 @@ export default function LoginPage() {
   const [isTenant, setIsTenant] = useState(false);
 
   const viewLogged = useRef(false);
+
+  const { data: brandData } = useQuery({
+    queryKey: ["publicBrandSettings"],
+    queryFn: async () => {
+      const res = await fetch(`${getBackendApiRoot()}/settings/brand/public`);
+      if (!res.ok) throw new Error("Failed to fetch public brand settings");
+      return res.json();
+    },
+    staleTime: 600000,
+    retry: 1,
+  });
+
+  const brandSettings = brandData?.data;
+  const authBackgroundUrl = getBackendStorageUrl(brandSettings?.auth_background_image);
+  const displayPortalName = brandSettings?.app_title || portalName;
+  const authWelcomeMessage = brandSettings?.auth_welcome_message || "Authenticate your identity to decrypt your management workspace.";
 
   useEffect(() => {
     if (!viewLogged.current) {
@@ -131,7 +148,7 @@ export default function LoginPage() {
             <div className="absolute inset-0 bg-primary blur-lg opacity-20 group-hover:opacity-50 transition-opacity" />
           </div>
           <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent uppercase tracking-tighter">
-            {portalName}
+            {displayPortalName}
           </span>
         </Link>
 
@@ -139,7 +156,7 @@ export default function LoginPage() {
           <div className="space-y-3">
             <Badge variant="outline" className="font-mono text-[10px] tracking-widest border-primary/30 text-primary bg-primary/5 px-3">ESTABLISHING UPLINK...</Badge>
             <h1 className="text-4xl font-space font-black tracking-tighter sm:text-5xl">Command <span className="text-primary">Access</span></h1>
-            <p className="text-muted-foreground font-inter text-sm max-w-[280px]">Authenticate your identity to decrypt your management workspace.</p>
+            <p className="text-muted-foreground text-sm max-w-[320px]">{authWelcomeMessage}</p>
           </div>
 
           {error && (
@@ -189,13 +206,20 @@ export default function LoginPage() {
       </div>
 
       <div className="relative hidden lg:flex flex-col justify-between p-12 bg-muted/5 border-l border-border overflow-hidden">
+        {authBackgroundUrl && (
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-20"
+            style={{ backgroundImage: `url(${authBackgroundUrl})` }}
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/75 to-background/95" />
         <div className="tech-grid absolute inset-0 z-0 opacity-30" />
         <div className="relative z-10 m-auto w-full max-w-sm">
            <div className="absolute inset-[-40px] bg-primary/10 blur-[100px] rounded-full animate-pulse" />
            <div className="relative bg-card/40 backdrop-blur-xl border border-primary/20 p-1 rounded-3xl shadow-2xl overflow-hidden group">
               <div className="bg-background/80 rounded-[22px] p-8 border border-border/50 flex flex-col items-center text-center">
                 <h3 className="font-space font-bold text-xl tracking-tight mb-2 uppercase">{isTenant ? "Tenant Node Gateway" : "Master Cluster Gateway"}</h3>
-                <p className="text-xs text-muted-foreground font-mono">Secure Access Protocol V3</p>
+                <p className="text-xs text-muted-foreground font-mono">{displayPortalName}</p>
               </div>
            </div>
         </div>

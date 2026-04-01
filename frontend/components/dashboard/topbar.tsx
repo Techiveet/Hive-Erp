@@ -17,6 +17,7 @@ import { useTour } from "@/components/providers/tour-provider";
 import { useTranslation } from "@/store/use-translation";
 import { GlobalSearch } from "./global-search";
 import { getTenantId, isTenantSession } from "@/lib/runtime-context";
+import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 
 const getApiUrl = () => {
   if (typeof window === "undefined") return "http://localhost:8085/api/v1";
@@ -55,6 +56,10 @@ const SecureTopbarAvatar = ({ user, fallbackInitials }: { user: any, fallbackIni
                 const res = await fetch(`${getTenantAwareEndpoint('/profile/avatar')}?cb=${Date.now()}`, {
                     headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }
                 });
+
+                if (await handleAuthFailureResponse(res)) {
+                    return;
+                }
 
                 if (!res.ok) throw new Error("No avatar found");
                 
@@ -102,6 +107,9 @@ export function DashboardTopbar() {
           const res = await fetch(getTenantAwareEndpoint('/user'), {
               headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }
           });
+          if (await handleAuthFailureResponse(res)) {
+              throw new Error("Session invalidated");
+          }
           if (!res.ok) throw new Error("Failed to fetch user data");
           return res.json();
       },
@@ -123,9 +131,7 @@ export function DashboardTopbar() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("hive_token");
-    localStorage.removeItem("hive_user");
-    localStorage.removeItem("hive_context");
+    clearHiveSession();
     queryClient.clear(); 
     router.push("/sign-in");
   };

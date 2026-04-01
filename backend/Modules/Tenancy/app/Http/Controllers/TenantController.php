@@ -3,6 +3,7 @@
 namespace Modules\Tenancy\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Support\ResolvesExportBranding;
 use Modules\Tenancy\Models\Tenant;
 use Modules\Identity\Models\User;
 use Illuminate\Http\Request;
@@ -17,7 +18,6 @@ use Modules\Tenancy\Mail\TenantStatusChanged;
 use Modules\Tenancy\Mail\AdminStatusChanged;
 use Modules\Tenancy\Mail\AdminCredentialsUpdated;
 use Modules\Tenancy\Mail\TenantCreated; // 🚀 Using our new Mailable
-use Modules\Core\Models\Setting;
 use Barryvdh\DomPDF\Facade\Pdf; // 🚀 Required for PDF generation
 
 use Stancl\Tenancy\Jobs\CreateDatabase;
@@ -25,15 +25,17 @@ use Stancl\Tenancy\Jobs\MigrateDatabase;
 
 class TenantController extends Controller implements HasMiddleware
 {
+    use ResolvesExportBranding;
+
     public static function middleware(): array
     {
         return [
             // 🚀 Added 'exportPdf' to the view permissions
-            new Middleware('permission:view_tenants,sanctum', only: ['index', 'show', 'exportPdf']),
-            new Middleware('permission:provision_tenants,sanctum', only: ['store']),
-            new Middleware('permission:edit_tenants,sanctum', only: ['update']),
-            new Middleware('permission:suspend_tenants,sanctum', only: ['toggleStatus', 'toggleAdminStatus']),
-            new Middleware('permission:delete_tenants,sanctum', only: ['destroy']),
+            new Middleware('permission:view_tenants|manage_tenants,sanctum', only: ['index', 'show', 'exportPdf']),
+            new Middleware('permission:provision_tenants|manage_tenants,sanctum', only: ['store']),
+            new Middleware('permission:edit_tenants|manage_tenants,sanctum', only: ['update']),
+            new Middleware('permission:suspend_tenants|manage_tenants,sanctum', only: ['toggleStatus', 'toggleAdminStatus']),
+            new Middleware('permission:delete_tenants|manage_tenants,sanctum', only: ['destroy']),
         ];
     }
 
@@ -113,14 +115,13 @@ class TenantController extends Controller implements HasMiddleware
         // Get all matching records (no pagination for reports)
         $tenants = $query->get();
 
-        // Resolve Branding Logo
-        $logoPath = Setting::where('key', 'logo_dark')->value('value');
-        $logoUrl = $logoPath ? asset(ltrim($logoPath, '/')) : 'https://techiveet.com/frontend/images/resources/logo1.png';
+        $branding = $this->getExportBranding(true);
 
         $pdf = Pdf::loadView('tenancy::exports.tenants-pdf', [
             'title'   => 'Tenant Nodes Directory',
             'data'    => $tenants,
-            'logoUrl' => $logoUrl
+            'logoUrl' => $branding['logo_url'],
+            'branding' => $branding,
         ]);
 
         // Log the export action to the audit log

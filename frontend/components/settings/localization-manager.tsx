@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { SettingsPanelSkeleton } from "@/components/ui/loading-states";
 
 import {
   AlertDialog,
@@ -203,6 +204,10 @@ export function LocalizationManager() {
   // VIEW 1: LANGUAGE LIST
   // ==========================================
   if (view === 'list') {
+    if (isLoading && safeLanguages.length === 0) {
+      return <SettingsPanelSkeleton />;
+    }
+
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
         <div className="flex justify-between items-center">
@@ -220,9 +225,7 @@ export function LocalizationManager() {
             <div className="col-span-6 text-right pr-4">{t('global.actions', 'Actions')}</div>
           </div>
           <div className="divide-y divide-border/50">
-            {isLoading && safeLanguages.length === 0 ? (
-              <div className="p-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-            ) : (
+            {(
               safeLanguages.map((lang: any) => (
                 <div key={lang.code} className="grid grid-cols-12 items-center p-5 hover:bg-muted/5 transition-all">
                   <div className="col-span-6 flex items-center gap-4 pl-4">

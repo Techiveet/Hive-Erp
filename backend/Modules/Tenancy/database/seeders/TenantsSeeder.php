@@ -11,6 +11,8 @@ use Stancl\Tenancy\Jobs\MigrateDatabase;
 // 🚀 IMPORT seeders from the Identity Module
 use Modules\Identity\Database\Seeders\TenantRolesSeeder;
 use Modules\Identity\Database\Seeders\TenantUsersSeeder;
+use Modules\Core\Database\Seeders\TenantBrandSettingsSeeder;
+use Modules\Core\Database\Seeders\TenantGeneralSettingsSeeder;
 
 class TenantsSeeder extends Seeder
 {
@@ -64,6 +66,9 @@ class TenantsSeeder extends Seeder
                 // 🚀 Calling seeders that live in Modules/Identity
                 $this->call(TenantRolesSeeder::class);
                 $this->call(TenantUsersSeeder::class);
+                $this->call(TenantGeneralSettingsSeeder::class);
+                $this->call(TenantBrandSettingsSeeder::class);
+                app()[PermissionRegistrar::class]->forgetCachedPermissions();
             });
 
             $this->command->info("✅ Node " . $data['id'] . " is online.");
