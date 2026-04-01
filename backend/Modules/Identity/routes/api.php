@@ -42,13 +42,13 @@ foreach ($centralDomains as $domain) {
 
             Route::get('/user', [AuthController::class, 'user']);
             Route::post('/logout', [AuthController::class, 'logout']);
-            Route::post('/profile/update', [ProfileController::class, 'updateProfile']);
+            Route::post('/profile/update', [ProfileController::class, 'updateProfile'])->middleware('permission:edit_profile,sanctum');
             Route::get('/profile/avatar', [ProfileController::class, 'getAvatar']);
 
             Route::prefix('2fa')->group(function () {
-                Route::post('/enable', [TwoFactorController::class, 'enable']);
-                Route::post('/confirm', [TwoFactorController::class, 'confirm']);
-                Route::post('/disable', [TwoFactorController::class, 'destroy']);
+                Route::post('/enable', [TwoFactorController::class, 'enable'])->middleware('permission:edit_profile,sanctum');
+                Route::post('/confirm', [TwoFactorController::class, 'confirm'])->middleware('permission:edit_profile,sanctum');
+                Route::post('/disable', [TwoFactorController::class, 'destroy'])->middleware('permission:edit_profile,sanctum');
             });
 
             Route::prefix('roles')->group(function() {
@@ -126,15 +126,15 @@ Route::middleware([
         Route::get('/tenant/user', [AuthController::class, 'user']);
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/tenant/logout', [AuthController::class, 'logout']);
-        Route::post('/profile/update', [ProfileController::class, 'updateProfile']);
-        Route::post('/tenant/profile/update', [ProfileController::class, 'updateProfile']);
+        Route::post('/profile/update', [ProfileController::class, 'updateProfile'])->middleware('permission:edit_profile,sanctum');
+        Route::post('/tenant/profile/update', [ProfileController::class, 'updateProfile'])->middleware('permission:edit_profile,sanctum');
         Route::get('/profile/avatar', [ProfileController::class, 'getAvatar']);
         Route::get('/tenant/profile/avatar', [ProfileController::class, 'getAvatar']);
 
         Route::prefix('2fa')->group(function () {
-            Route::post('/enable', [TwoFactorController::class, 'enable']);
-            Route::post('/confirm', [TwoFactorController::class, 'confirm']);
-            Route::post('/disable', [TwoFactorController::class, 'destroy']);
+            Route::post('/enable', [TwoFactorController::class, 'enable'])->middleware('permission:edit_profile,sanctum');
+            Route::post('/confirm', [TwoFactorController::class, 'confirm'])->middleware('permission:edit_profile,sanctum');
+            Route::post('/disable', [TwoFactorController::class, 'destroy'])->middleware('permission:edit_profile,sanctum');
         });
 
         // THE FIX: If your frontend uses /tenant/ prefix, we define it here:

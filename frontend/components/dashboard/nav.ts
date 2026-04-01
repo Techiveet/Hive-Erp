@@ -20,5 +20,5 @@ export const DASHBOARD_NAV: NavItem[] = [
 export const DASHBOARD_SECONDARY: NavItem[] = [
   { translationKey: "nav.storage", fallbackLabel: "Storage", href: "/dashboard/storage", icon: HardDrive, permissions: ["manage_storage"], tourId: "tour-nav-storage" },
   { translationKey: "nav.settings", fallbackLabel: "Settings", href: "/dashboard/settings", icon: Settings, permissions: ["manage_brand_settings", "manage_general_settings", "manage_localization", "view_backups", "manage_backups"], tourId: "tour-nav-settings" },
-  { translationKey: "nav.api_docs", fallbackLabel: "API Docs", href: "/dashboard/api-docs", icon: Code2, tourId: "tour-nav-api-docs" },
+  { translationKey: "nav.api_docs", fallbackLabel: "API Docs", href: "/dashboard/api-docs", icon: Code2, permissions: ["view_api_docs"], tourId: "tour-nav-api-docs" },
 ];

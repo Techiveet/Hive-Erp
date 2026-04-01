@@ -79,6 +79,10 @@ interface DataTableProps<TData, TValue> {
   onExport?: (format: string) => void;
   companySettings?: CompanySettingsInfo;
   brandingSettings?: BrandingSettingsInfo;
+  canCopy?: boolean;
+  canExport?: boolean;
+  canPrint?: boolean;
+  canRefresh?: boolean;
 }
 
 /* -------------------- Helper Functions -------------------- */
@@ -379,7 +383,7 @@ function DataTableInner<TData, TValue>({
   columns, data = [], totalEntries = 0, loading = false, pageIndex = 1, pageSize = 10, pageSizeOptions = [10, 25, 50, 100],
   onQueryChange, title, description, searchPlaceholder = "Search...", serverSearchDebounceMs = 400, className,
   enableRowSelection = false, getRowId, selectedRowIds, onSelectionChange, onDeleteRows, onRefresh, onResetFilters, exportEndpoint, resourceName = "records", syncWithUrl = true,
-  onCopy, onPrint, onExport, companySettings, brandingSettings
+  onCopy, onPrint, onExport, companySettings, brandingSettings, canCopy = false, canExport = false, canPrint = false, canRefresh = false
 }: DataTableProps<TData, TValue>) {
   
   const router = useRouter();
@@ -474,6 +478,10 @@ function DataTableInner<TData, TValue>({
   };
 
   const handleExportAPI = async (type: string, fromSelection = false) => {
+    if (type === "copy" && !canCopy) return;
+    if (type === "print" && !canPrint) return;
+    if (["csv", "xlsx", "pdf"].includes(type) && !canExport) return;
+
     if (!exportEndpoint) {
       toast.error("Export endpoint is not configured.");
       return;
@@ -574,32 +582,40 @@ function DataTableInner<TData, TValue>({
           <div className="flex items-center gap-2">
             {!hasSelection && exportEndpoint && (
               <>
-                <Button id="tour-datatable-copy" variant="outline" size="icon" className="h-9 w-9 rounded-lg" onClick={() => handleExportAPI("copy")} disabled={loading || busy}>
-                  <Copy className="h-4 w-4" />
-                </Button>
-                
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button id="tour-datatable-export" variant="outline" size="icon" className="h-9 w-9 rounded-lg" disabled={loading || busy}>
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="rounded-xl shadow-xl border-border/50 bg-background/95 backdrop-blur-md z-[100000]">
-                    <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("csv")}><FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export to CSV</DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("xlsx")}><FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" /> Export to Excel</DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("pdf")}><FileText className="mr-2 h-4 w-4 text-red-600" /> Export to PDF</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {canCopy && (
+                  <Button id="tour-datatable-copy" variant="outline" size="icon" className="h-9 w-9 rounded-lg" onClick={() => handleExportAPI("copy")} disabled={loading || busy}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                )}
 
-                <Button id="tour-datatable-print" variant="outline" size="icon" className="h-9 w-9 rounded-lg" onClick={() => handleExportAPI("print")} disabled={loading || busy}>
-                  <Printer className="h-4 w-4" />
-                </Button>
+                {canExport && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button id="tour-datatable-export" variant="outline" size="icon" className="h-9 w-9 rounded-lg" disabled={loading || busy}>
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="rounded-xl shadow-xl border-border/50 bg-background/95 backdrop-blur-md z-[100000]">
+                      <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("csv")}><FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export to CSV</DropdownMenuItem>
+                      <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("xlsx")}><FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" /> Export to Excel</DropdownMenuItem>
+                      <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("pdf")}><FileText className="mr-2 h-4 w-4 text-red-600" /> Export to PDF</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+
+                {canPrint && (
+                  <Button id="tour-datatable-print" variant="outline" size="icon" className="h-9 w-9 rounded-lg" onClick={() => handleExportAPI("print")} disabled={loading || busy}>
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                )}
               </>
             )}
 
-            <Button id="tour-datatable-refresh" variant="outline" size="icon" className="h-9 w-9 border-dashed rounded-lg" onClick={handleResetAndReload} disabled={loading || busy}>
-              <RotateCcw className={cn("h-4 w-4", (loading || busy) && "animate-spin")} />
-            </Button>
+            {canRefresh && (
+              <Button id="tour-datatable-refresh" variant="outline" size="icon" className="h-9 w-9 border-dashed rounded-lg" onClick={handleResetAndReload} disabled={loading || busy}>
+                <RotateCcw className={cn("h-4 w-4", (loading || busy) && "animate-spin")} />
+              </Button>
+            )}
           </div>
         </div>
 

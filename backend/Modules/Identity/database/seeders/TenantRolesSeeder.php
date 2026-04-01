@@ -17,6 +17,7 @@ class TenantRolesSeeder extends Seeder
 
         $perms = [
             'view_system_dashboard',
+            'view_profile', 'edit_profile',
             'view_users', 'create_users', 'edit_users', 'delete_users', 'manage_users',
             'view_roles', 'create_roles', 'edit_roles', 'delete_roles', 'manage_roles',
             'view_permissions',
@@ -24,7 +25,7 @@ class TenantRolesSeeder extends Seeder
             'view_alerts', 'manage_alerts', 'view_backups', 'manage_backups',
             'manage_system_settings',
             'manage_storage',
-            'manage_brand_settings', 'manage_general_settings', 'manage_localization',
+            'manage_brand_settings', 'manage_general_settings', 'manage_localization', 'view_api_docs',
             'view_invoices', 'manage_invoices',
             'view_inventory', 'manage_inventory',
             'manage_fleet'
@@ -36,10 +37,10 @@ class TenantRolesSeeder extends Seeder
 
         $roles = [
             'Super Admin' => $perms, // 🚀 FIX: Name changed to 'Super Admin' to align with UI creations
-            'HR Manager' => ['view_system_dashboard', 'view_alerts', 'view_users', 'create_users', 'edit_users', 'view_roles'],
-            'Finance Controller' => ['view_system_dashboard', 'view_alerts', 'view_invoices', 'manage_invoices', 'view_logs', 'export_logs'],
-            'Logistics Coordinator' => ['view_system_dashboard', 'view_alerts', 'view_inventory', 'manage_inventory', 'manage_fleet'],
-            'Employee' => ['view_system_dashboard', 'view_alerts', 'view_users'],
+            'HR Manager' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_users', 'create_users', 'edit_users', 'view_roles'],
+            'Finance Controller' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_invoices', 'manage_invoices', 'view_logs', 'export_logs'],
+            'Logistics Coordinator' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_inventory', 'manage_inventory', 'manage_fleet'],
+            'Employee' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_users'],
         ];
 
         foreach ($roles as $roleName => $rolePerms) {
