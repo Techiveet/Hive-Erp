@@ -1,6 +1,9 @@
+import { isTenantSession } from "@/lib/runtime-context";
+
 export const PROFILE_ROUTE_PERMISSIONS = ["view_profile", "edit_profile"] as const;
 export const SECURITY_ROUTE_PERMISSIONS = ["view_users", "manage_users", "view_roles", "manage_roles", "view_permissions"] as const;
 export const TENANTS_ROUTE_PERMISSIONS = ["view_tenants", "manage_tenants"] as const;
+export const SUBSCRIPTIONS_ROUTE_PERMISSIONS = ["view_module_subscriptions", "manage_module_subscriptions"] as const;
 export const STORAGE_ROUTE_PERMISSIONS = ["view_storage", "manage_storage"] as const;
 export const SETTINGS_ROUTE_PERMISSIONS = ["manage_brand_settings", "manage_general_settings", "manage_localization", "view_backups", "manage_backups"] as const;
 export const ALERTS_ROUTE_PERMISSIONS = ["view_alerts"] as const;
@@ -43,6 +46,10 @@ export function canAccessDashboardRoute(rawPath: string, access: RoutePermission
     return access.hasAnyPermission([...TENANTS_ROUTE_PERMISSIONS]);
   }
 
+  if (matchesPrefix(path, "/dashboard/subscriptions")) {
+    return access.hasAnyPermission([...SUBSCRIPTIONS_ROUTE_PERMISSIONS]);
+  }
+
   if (matchesPrefix(path, "/dashboard/audit-logs")) {
     return access.hasPermission("view_logs");
   }
@@ -56,7 +63,14 @@ export function canAccessDashboardRoute(rawPath: string, access: RoutePermission
   }
 
   if (matchesPrefix(path, "/dashboard/settings")) {
-    return access.hasAnyPermission([...SETTINGS_ROUTE_PERMISSIONS]);
+    const canAccessCoreSettings = access.hasAnyPermission([
+      "manage_brand_settings",
+      "manage_general_settings",
+      "manage_localization",
+    ]);
+    const canAccessBackupSettings = !isTenantSession() && access.hasAnyPermission(["view_backups", "manage_backups"]);
+
+    return canAccessCoreSettings || canAccessBackupSettings;
   }
 
   if (matchesPrefix(path, "/dashboard/api-docs")) {

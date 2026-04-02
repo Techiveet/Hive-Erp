@@ -2,27 +2,50 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Layers, LockKeyhole } from "lucide-react";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Home } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { FileManagerClient } from "@/components/dashboard/file-manager-client";
 import { useTranslation } from "@/store/use-translation";
 import { usePermissions } from "@/hooks/use-permissions";
 import { ModulePageSkeleton } from "@/components/ui/loading-states";
 import { getTenantId } from "@/lib/runtime-context";
+import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
+import { fetchCurrentTenantSubscriptions } from "@/modules/tenancy/api";
+import { ModuleSubscriptionCheckoutDialog } from "@/modules/tenancy/components/module-subscription-checkout-dialog";
 
 export default function StoragePage() {
   const { t } = useTranslation();
   const [tenantName, setTenantName] = useState<string>("Central Command");
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const { hasPermission, hasAnyPermission, isLoaded } = usePermissions();
+  const { hasModule } = useTenantModuleAccess();
   const canManageStorage = hasPermission("manage_storage");
   const canAccessStorage = hasAnyPermission(["view_storage", "manage_storage"]);
+  const tenantId = getTenantId();
+  const isTenantWorkspace = Boolean(tenantId);
+  const hasMediaLibrary = !isTenantWorkspace || hasModule("media_library");
 
   useEffect(() => {
-    const tenantId = getTenantId();
     if (tenantId) {
       setTenantName(tenantId);
     }
-  }, []);
+  }, [tenantId]);
+
+  const { data: subscriptionData } = useQuery({
+    queryKey: ["tenant-current-subscriptions", "storage"],
+    queryFn: fetchCurrentTenantSubscriptions,
+    enabled: isTenantWorkspace && canAccessStorage,
+    staleTime: 300_000,
+  });
+
+  const mediaLibraryModule =
+    subscriptionData?.data?.module_subscriptions?.catalog_modules?.find(
+      (module: any) => module.slug === "media_library"
+    ) ?? null;
+  const paymentMethods = subscriptionData?.data?.payment_methods ?? [];
 
   if (!isLoaded) {
     return <ModulePageSkeleton titleWidth="w-48" subtitleWidth="w-80" rows={6} cols={5} />;
@@ -36,6 +59,53 @@ export default function StoragePage() {
           {t('storage.denied', 'Your current role does not have permission to access the storage workspace.')}
         </p>
       </div>
+    );
+  }
+
+  if (!hasMediaLibrary) {
+    return (
+      <>
+        <div className="space-y-2">
+          <div className="mb-2 flex w-full justify-end">
+            <Breadcrumbs
+              items={[
+                { label: "Hive.OS", href: "/dashboard", icon: <Home className="h-4 w-4" /> },
+                { label: t("nav.storage", "Storage") },
+              ]}
+            />
+          </div>
+
+          <div className="flex min-h-[65vh] flex-col items-center justify-center rounded-[2rem] border border-border/50 bg-card/40 p-8 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-[1.75rem] border border-primary/20 bg-primary/10">
+              <LockKeyhole className="h-9 w-9 text-primary" />
+            </div>
+            <h2 className="mt-6 text-3xl font-black tracking-tight text-foreground">
+              Media Library Subscription Required
+            </h2>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
+              This tenant can only open the storage workspace after the `media_library`
+              module is activated. Subscribe once and the file manager, uploads, and shared
+              media hub will unlock immediately after payment confirmation.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Button onClick={() => setCheckoutOpen(true)} className="rounded-xl px-6 font-semibold">
+                <Layers className="mr-2 h-4 w-4" /> Subscribe with ArifPay
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {mediaLibraryModule ? (
+          <ModuleSubscriptionCheckoutDialog
+            open={checkoutOpen}
+            onOpenChange={setCheckoutOpen}
+            modules={[mediaLibraryModule]}
+            paymentMethods={paymentMethods}
+            title="Unlock the Media Library"
+            description="Activate Hive storage for this tenant and ArifPay will take care of the checkout."
+          />
+        ) : null}
+      </>
     );
   }
 

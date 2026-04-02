@@ -360,8 +360,13 @@ export default function DashboardHome() {
                                 <RefreshCw className="w-4 h-4 mr-2" /> Flush Cache
                             </Button>
                         )}
-                        {canManageBackups && (
-                            <Button variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-md text-muted-foreground hover:text-foreground">
+                        {isCentral && canManageBackups && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-full bg-background/50 backdrop-blur-md text-muted-foreground hover:text-foreground"
+                                onClick={() => router.push('/dashboard/settings?tab=backup')}
+                            >
                                 <Database className="w-4 h-4 mr-2" /> Trigger Backup
                             </Button>
                         )}

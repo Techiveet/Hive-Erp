@@ -16,6 +16,7 @@ import {
   toggleTenantStatus,
   updateTenant,
 } from "@/modules/tenancy/api";
+import type { TenantModuleSubscriptionPayload } from "@/modules/tenancy/types";
 
 const tenantInvalidationKeys: QueryKey[] = [["tenants"]];
 const userInvalidationKeys: QueryKey[] = [["users"]];
@@ -44,6 +45,7 @@ export type TenantCreateOfflinePayload = {
   admin_name: string;
   admin_email: string;
   admin_password: string;
+  module_subscriptions?: TenantModuleSubscriptionPayload;
 };
 
 export type TenantUpdateOfflinePayload = {
@@ -54,6 +56,7 @@ export type TenantUpdateOfflinePayload = {
     admin_name: string;
     admin_email: string;
     admin_password: string;
+    module_subscriptions?: TenantModuleSubscriptionPayload;
   };
 };
 

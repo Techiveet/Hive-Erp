@@ -641,11 +641,13 @@ function SettingsTabs({
     canManageGeneral,
     canManageLocalization,
     canAccessBackups,
+    isCentralNode,
 }: {
     canManageBrand: boolean;
     canManageGeneral: boolean;
     canManageLocalization: boolean;
     canAccessBackups: boolean;
+    isCentralNode: boolean;
 }) {
     const { t } = useTranslation();
     const router = useRouter();
@@ -724,7 +726,7 @@ function SettingsTabs({
                 )}
                 {canAccessBackups && activeTab === 'backup' && (
                     <div id="tour-settings-backup" className="transition-all animate-in fade-in slide-in-from-bottom-2">
-                        <BackupSettings />
+                        <BackupSettings isCentralNode={isCentralNode} />
                     </div>
                 )}
             </div>
@@ -735,14 +737,19 @@ function SettingsTabs({
 export default function SettingsClient() {
     const { t } = useTranslation();
     const { hasPermission, hasAnyPermission, isLoaded } = usePermissions();
+    const [isCentralNode, setIsCentralNode] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        setIsCentralNode(!isTenantSession());
+    }, []);
 
     const canManageBrand = hasPermission("manage_brand_settings");
     const canManageGeneral = hasPermission("manage_general_settings");
     const canManageLocalization = hasPermission("manage_localization");
-    const canAccessBackups = hasAnyPermission(["view_backups", "manage_backups"]);
+    const canAccessBackups = isCentralNode === true && hasAnyPermission(["view_backups", "manage_backups"]);
     const hasAnySettingsAccess = canManageBrand || canManageGeneral || canManageLocalization || canAccessBackups;
 
-    if (!isLoaded) {
+    if (!isLoaded || isCentralNode === null) {
         return <SettingsWorkspaceSkeleton />;
     }
 
@@ -771,6 +778,7 @@ export default function SettingsClient() {
                     canManageGeneral={canManageGeneral}
                     canManageLocalization={canManageLocalization}
                     canAccessBackups={canAccessBackups}
+                    isCentralNode={isCentralNode}
                 />
             </Suspense>
         </div>

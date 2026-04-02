@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'active_status' => \App\Http\Middleware\EnsureActiveStatus::class,
             'dynamic_timeout' => \Modules\Core\Http\Middleware\EnforceDynamicSessionTimeout::class,
+            'tenant_module' => \Modules\Tenancy\Http\Middleware\EnsureTenantModuleEnabled::class,
         ]);
 
         // 2. Bypass CSRF for API requests

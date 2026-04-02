@@ -3,16 +3,20 @@
 namespace Modules\Core\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\PersonalAccessToken;
 use Modules\Core\Jobs\RunSystemBackup;
+use Modules\Core\Models\Setting;
+use Modules\Core\Support\SystemBackupCatalog;
 
 class SystemOperationsController extends Controller
 {
     private function userHasPermission($user, string $permission): bool
     {
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -23,140 +27,178 @@ class SystemOperationsController extends Controller
             || $user->roles->contains('name', 'Super Admin');
     }
 
-    public function flushCache(Request $request)
+    public function flushCache(Request $request): JsonResponse
     {
         Artisan::call('optimize:clear');
         $currentTenant = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
 
         activity('System Operations')
             ->causedBy(auth()->user())
-            ->tap(function($activity) use ($currentTenant) { $activity->tenant_id = $currentTenant; })
+            ->tap(function ($activity) use ($currentTenant) {
+                $activity->tenant_id = $currentTenant;
+            })
             ->log('Flushed all system caches and optimized memory.');
 
         return response()->json(['message' => 'System cache successfully purged.']);
     }
 
-    public function triggerBackup(Request $request)
+    public function getBackupSettings(): JsonResponse
     {
-        $request->validate(['type' => 'required|in:db,files,all']);
-        $currentTenant = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
-
-        RunSystemBackup::dispatch(auth()->user(), $currentTenant, $request->type);
-
-        activity('System Operations')
-            ->causedBy(auth()->user())
-            ->tap(function($activity) use ($currentTenant) { $activity->tenant_id = $currentTenant; })
-            ->log("Manual {$request->type} backup job dispatched to Horizon workers.");
-
-        return response()->json(['message' => 'Backup initiated. Monitor the audit log for completion.']);
-    }
-
-    public function updateSchedule(Request $request)
-    {
-        $request->validate([
-            'frequency' => 'required|in:daily,weekly,monthly',
-            'time' => 'required|string',
-            'day' => 'required|integer|min:1|max:31'
-        ]);
-
-        set_system_setting('backup_frequency', $request->frequency);
-        set_system_setting('backup_time', $request->time);
-        set_system_setting('backup_day', $request->day);
-
-        activity('System Operations')
-            ->causedBy(auth()->user())
-            ->log("Automated backup schedule updated to {$request->frequency} at {$request->time}.");
-
-        return response()->json(['message' => 'Automated backup schedule updated successfully.']);
-    }
-
-    public function getBackups(Request $request)
-    {
-        $isTenant = function_exists('tenant') && tenant('id');
-        $currentTenant = $isTenant ? tenant('id') : env('APP_NAME', 'Laravel');
-
-        $disk = Storage::disk(config('backup.backup.destination.disks')[0] ?? 'local');
-
-        $directories = [
-            'HiveErp',
-            'private/HiveErp',
-            $currentTenant,
-            config('backup.backup.name', 'Laravel'),
-            env('APP_NAME', 'Laravel'),
-            'Hive',
-            'backups',
-            ''
-        ];
-
-        $files = [];
-
-        foreach (array_unique($directories) as $dir) {
-            $contents = $dir === '' ? $disk->files() : ($disk->exists($dir) ? $disk->allFiles($dir) : []);
-
-            foreach ($contents as $file) {
-                if (pathinfo($file, PATHINFO_EXTENSION) === 'zip') {
-                    $files[] = [
-                        'id' => base64_encode($file),
-                        'name' => basename($file),
-                        'type' => str_contains(basename($file), 'db') ? 'db' : (str_contains(basename($file), 'files') ? 'files' : 'all'),
-                        'trigger' => 'manual',
-                        'size' => round($disk->size($file) / 1048576, 2) . ' MB',
-                        'created_at' => \Carbon\Carbon::createFromTimestamp($disk->lastModified($file))->toIso8601String(),
-                    ];
-                }
-            }
+        if ($response = $this->ensureCentralBackupWorkspace()) {
+            return $response;
         }
 
-        $files = collect($files)->unique('id')->values()->toArray();
-        usort($files, fn($a, $b) => strtotime($b['created_at']) - strtotime($a['created_at']));
-
-        return response()->json(['data' => $files]);
+        return response()->json([
+            'data' => [
+                'backup_frequency' => get_system_setting('backup_frequency', 'daily'),
+                'backup_time' => get_system_setting('backup_time', '02:00'),
+                'backup_day' => (int) get_system_setting('backup_day', 1),
+            ],
+        ]);
     }
 
-    // 🚀 Download large files safely using Token Auth
-    public function downloadBackup(Request $request, $id)
+    public function triggerBackup(Request $request): JsonResponse
     {
-        $tokenStr = $request->query('token');
-        $tokenStr = str_replace('Bearer ', '', $tokenStr); // Safety cleanup
-        $token = \Laravel\Sanctum\PersonalAccessToken::findToken($tokenStr);
+        if ($response = $this->ensureCentralBackupWorkspace()) {
+            return $response;
+        }
 
-        if (!$token || !$token->tokenable) {
+        $request->validate([
+            'type' => 'required|in:db,files,all',
+        ]);
+
+        RunSystemBackup::dispatch(auth()->user(), 'central', $request->string('type')->value(), 'manual');
+
+        activity('System Operations')
+            ->causedBy(auth()->user())
+            ->tap(function ($activity) {
+                $activity->tenant_id = 'central';
+            })
+            ->log("Manual {$request->type} backup job dispatched to Horizon workers.");
+
+        return response()->json([
+            'message' => 'Backup initiated. Monitor the system alerts for completion.',
+        ]);
+    }
+
+    public function updateSchedule(Request $request): JsonResponse
+    {
+        if ($response = $this->ensureCentralBackupWorkspace()) {
+            return $response;
+        }
+
+        $request->validate([
+            'frequency' => 'required|in:daily,weekly,monthly',
+            'time' => 'required|date_format:H:i',
+            'day' => 'required|integer|min:1|max:31',
+        ]);
+
+        if ($request->frequency === 'weekly' && $request->integer('day') > 7) {
+            return response()->json([
+                'message' => 'Weekly backups require a day value between 1 and 7.',
+            ], 422);
+        }
+
+        foreach ([
+            'backup_frequency' => $request->frequency,
+            'backup_time' => $request->time,
+            'backup_day' => (string) $request->day,
+        ] as $key => $value) {
+            Setting::updateOrCreate(['key' => $key], ['value' => $value]);
+        }
+        clear_system_settings_cache();
+
+        activity('System Operations')
+            ->causedBy(auth()->user())
+            ->tap(function ($activity) {
+                $activity->tenant_id = 'central';
+            })
+            ->log("Automated backup schedule updated to {$request->frequency} at {$request->time}.");
+
+        return response()->json([
+            'message' => 'Automated backup schedule updated successfully.',
+        ]);
+    }
+
+    public function getBackups(Request $request): JsonResponse
+    {
+        if ($response = $this->ensureCentralBackupWorkspace()) {
+            return $response;
+        }
+
+        $disk = $this->backupDisk();
+
+        return response()->json([
+            'data' => SystemBackupCatalog::list($disk),
+        ]);
+    }
+
+    public function downloadBackup(Request $request, string $id): JsonResponse|\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        if ($response = $this->ensureCentralBackupWorkspace()) {
+            return $response;
+        }
+
+        $tokenStr = str_replace('Bearer ', '', (string) $request->query('token'));
+        $token = PersonalAccessToken::findToken($tokenStr);
+
+        if (! $token || ! $token->tokenable) {
             return response()->json(['error' => 'Unauthorized or expired token.'], 401);
         }
 
         $user = $token->tokenable;
 
-        if (!$this->userHasPermission($user, 'view_backups')) {
+        if (! $this->userHasPermission($user, 'view_backups') && ! $this->userHasPermission($user, 'manage_backups')) {
             return response()->json(['error' => 'Forbidden. Missing backup access permission.'], 403);
         }
 
-        $path = base64_decode($id);
-        $disk = Storage::disk(config('backup.backup.destination.disks')[0] ?? 'local');
+        $path = $this->resolveBackupPath($id);
 
-        if (!$disk->exists($path)) {
+        if (! $path) {
+            return response()->json(['error' => 'Invalid backup archive reference.'], 404);
+        }
+
+        $disk = $this->backupDisk();
+
+        if (! $disk->exists($path)) {
             return response()->json(['error' => 'Backup file not found on disk.'], 404);
         }
 
         activity('System Operations')
             ->causedBy($user)
-            ->log("Downloaded system backup archive: " . basename($path));
+            ->tap(function ($activity) {
+                $activity->tenant_id = 'central';
+            })
+            ->log('Downloaded system backup archive: '.basename($path));
 
         return response()->streamDownload(function () use ($disk, $path) {
             $stream = $disk->readStream($path);
-            fpassthru($stream);
-            if (is_resource($stream)) {
-                fclose($stream);
+
+            if (! is_resource($stream)) {
+                return;
             }
+
+            fpassthru($stream);
+            fclose($stream);
         }, basename($path), [
-            'Content-Type' => $disk->mimeType($path),
+            'Content-Type' => $disk->mimeType($path) ?: 'application/zip',
             'Content-Length' => $disk->size($path),
         ]);
     }
 
-    public function deleteBackup(Request $request, $id)
+    public function deleteBackup(Request $request, string $id): JsonResponse
     {
-        $path = base64_decode($id);
-        $disk = Storage::disk(config('backup.backup.destination.disks')[0] ?? 'local');
+        if ($response = $this->ensureCentralBackupWorkspace()) {
+            return $response;
+        }
+
+        $path = $this->resolveBackupPath($id);
+
+        if (! $path) {
+            return response()->json(['message' => 'Invalid backup archive reference.'], 404);
+        }
+
+        $disk = $this->backupDisk();
 
         if ($disk->exists($path)) {
             $disk->delete($path);
@@ -164,8 +206,40 @@ class SystemOperationsController extends Controller
 
         activity('System Operations')
             ->causedBy(auth()->user())
-            ->log("Deleted system backup archive: " . basename($path));
+            ->tap(function ($activity) {
+                $activity->tenant_id = 'central';
+            })
+            ->log('Deleted system backup archive: '.basename($path));
 
         return response()->json(['message' => 'Backup deleted successfully.']);
+    }
+
+    private function backupDisk()
+    {
+        return Storage::disk(config('backup.backup.destination.disks')[0] ?? 'local');
+    }
+
+    private function ensureCentralBackupWorkspace(): ?JsonResponse
+    {
+        if (function_exists('tenant') && tenant('id')) {
+            return response()->json([
+                'message' => 'System backups are only available from the central admin workspace.',
+            ], 403);
+        }
+
+        return null;
+    }
+
+    private function resolveBackupPath(string $id): ?string
+    {
+        $path = base64_decode($id, true);
+
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        $normalizedPath = trim(str_replace('\\', '/', $path), '/');
+
+        return SystemBackupCatalog::isAllowedPath($normalizedPath) ? $normalizedPath : null;
     }
 }

@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useQuery } from "@tanstack/react-query";
 import { 
     FileText, FileType, UploadCloud, Loader2, Download, 
     ArrowRight, CheckCircle2, FileCode2, Settings, 
-    Image as ImageIcon, X, FolderSearch, Eye, HelpCircle, Save, Code2
+    Image as ImageIcon, X, FolderSearch, Eye, HelpCircle, Save, Code2, Layers, LockKeyhole
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,10 @@ import { useTour } from "@/components/providers/tour-provider";
 import { PdfViewer } from '@/components/ui/pdf-viewer'; 
 import { CodeEditor, type VirtualFile } from '@/components/ui/code-editor';
 import { usePermissions } from "@/hooks/use-permissions";
+import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
+import { fetchCurrentTenantSubscriptions } from "@/modules/tenancy/api";
+import { ModuleSubscriptionCheckoutDialog } from "@/modules/tenancy/components/module-subscription-checkout-dialog";
+import { getTenantId } from "@/lib/runtime-context";
 
 const getApiUrl = () => {
     if (typeof window === "undefined") return "http://localhost:8085/api/v1";
@@ -66,7 +71,24 @@ export default function FileConverterPage() {
     const { t } = useTranslation();
     const { startTour } = useTour();
     const { hasPermission, isLoaded } = usePermissions();
+    const { hasModule } = useTenantModuleAccess();
+    const [checkoutOpen, setCheckoutOpen] = useState(false);
     const canManageStorage = hasPermission("manage_storage");
+    const tenantId = getTenantId();
+    const isTenantWorkspace = Boolean(tenantId);
+    const hasDocumentConverter = !isTenantWorkspace || hasModule("document_converter");
+
+    const { data: subscriptionData } = useQuery({
+        queryKey: ["tenant-current-subscriptions", "converter"],
+        queryFn: fetchCurrentTenantSubscriptions,
+        enabled: isTenantWorkspace && canManageStorage,
+        staleTime: 300_000,
+    });
+    const converterModule =
+        subscriptionData?.data?.module_subscriptions?.catalog_modules?.find(
+            (module: any) => module.slug === "document_converter"
+        ) ?? null;
+    const paymentMethods = subscriptionData?.data?.payment_methods ?? [];
     
     const [inputMethod, setInputMethod] = useState<'upload' | 'code'>('upload');
     const [showCodePreview, setShowCodePreview] = useState(false);
@@ -149,6 +171,42 @@ export default function FileConverterPage() {
                     </p>
                 </div>
             </div>
+        );
+    }
+
+    if (!hasDocumentConverter) {
+        return (
+            <>
+                <div className="flex min-h-[65vh] flex-col items-center justify-center gap-5 rounded-[2rem] border border-border/50 bg-card/40 p-8 text-center">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-[1.75rem] border border-primary/20 bg-primary/10">
+                        <LockKeyhole className="h-9 w-9 text-primary" />
+                    </div>
+                    <div className="space-y-2">
+                        <h2 className="text-3xl font-black tracking-tight text-foreground">
+                            Document Converter Locked
+                        </h2>
+                        <p className="mx-auto max-w-xl text-sm leading-relaxed text-muted-foreground">
+                            This tenant can only use the Universal Converter after the
+                            `document_converter` module is activated. Subscribe here and the
+                            workspace will unlock right after payment confirmation.
+                        </p>
+                    </div>
+                    <Button onClick={() => setCheckoutOpen(true)} className="rounded-xl px-6 font-semibold">
+                        <Layers className="mr-2 h-4 w-4" /> Subscribe with ArifPay
+                    </Button>
+                </div>
+
+                {converterModule ? (
+                    <ModuleSubscriptionCheckoutDialog
+                        open={checkoutOpen}
+                        onOpenChange={setCheckoutOpen}
+                        modules={[converterModule]}
+                        paymentMethods={paymentMethods}
+                        title="Activate the Document Converter"
+                        description="Complete the module checkout with ArifPay to unlock the HTML-to-PDF workspace for this tenant."
+                    />
+                ) : null}
+            </>
         );
     }
 

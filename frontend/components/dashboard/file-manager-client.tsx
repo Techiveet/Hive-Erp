@@ -10,7 +10,7 @@ import {
   File as FileIcon, Loader2, Download, Copy, CalendarDays, HardDrive, 
   ImagePlus, Type, Subtitles, ExternalLink, X, Info, Archive, ChevronDown, ChevronUp,
   LayoutGrid, List, SortAsc, MoreVertical, Edit, FolderInput, RefreshCcw, AlertTriangle, Link as LinkIcon,
-  Eraser, Wand2, Crop, Square, Monitor, FileImage, Sun, Contrast, Droplets, Palette, Save, RotateCw, FlipHorizontal, FlipVertical, ZoomOut, ZoomIn, Maximize, Minimize, Edit2, RotateCcw, DownloadCloud, Unlink
+  Eraser, Wand2, Crop, Square, Monitor, FileImage, Sun, Contrast, Droplets, Palette, Save, RotateCw, FlipHorizontal, FlipVertical, ZoomOut, ZoomIn, Maximize, Minimize, Edit2, RotateCcw, DownloadCloud, Unlink, LockKeyhole, Layers
 } from "lucide-react";
 import {
   AlertDialog,
@@ -30,9 +30,12 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl } from "@/lib/runtime-context";
+import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, getTenantId } from "@/lib/runtime-context";
 import { useTranslation } from "@/store/use-translation";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
+import { fetchCurrentTenantSubscriptions } from "@/modules/tenancy/api";
+import { ModuleSubscriptionCheckoutDialog } from "@/modules/tenancy/components/module-subscription-checkout-dialog";
 
 // Reusable Viewer Components
 import { VideoPlayer } from "@/components/ui/video-player";
@@ -176,7 +179,7 @@ const TransformButton = ({ icon: Icon, label, onClick, style, active }: any) => 
   </Button>
 );
 
-export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, onSaveEdited }: any) {
+export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, onSaveEdited, onUpgradeRequested }: any) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const imageRef = React.useRef<HTMLImageElement>(null);
   const cropWrapperRef = React.useRef<HTMLDivElement>(null);
@@ -633,7 +636,12 @@ export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, o
               <Button variant="ghost" size="icon" onClick={() => setZoom(z => Math.min(3, z + 0.25))} className="h-10 w-10 text-muted-foreground hover:text-yellow-500 hidden sm:flex"><ZoomIn className="h-4 w-4" /></Button>
               <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="h-10 w-10 text-muted-foreground hover:text-yellow-500">{isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}</Button>
               <div className="w-px h-6 bg-border/50 mx-2 hidden sm:block"></div>
-{onSaveEdited && <Button variant="outline" onClick={() => setIsEditing(true)} className="h-10 rounded-xl border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10 transition-colors font-bold px-6"><Edit2 className="h-4 w-4 mr-2" /> Edit Image</Button>}
+              {onSaveEdited ? (
+                <Button variant="outline" onClick={() => setIsEditing(true)} className="h-10 rounded-xl border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10 transition-colors font-bold px-6"><Edit2 className="h-4 w-4 mr-2" /> Edit Image</Button>
+              ) : null}
+              {!onSaveEdited && onUpgradeRequested ? (
+                <Button variant="outline" onClick={onUpgradeRequested} className="h-10 rounded-xl border-primary/30 text-primary hover:bg-primary/10 transition-colors font-bold px-6"><LockKeyhole className="h-4 w-4 mr-2" /> Subscribe to Edit</Button>
+              ) : null}
             </>
           ) : (
             <>
@@ -843,8 +851,27 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   const queryClient = useQueryClient();
   const { playTrack } = useGlobalAudio(); 
   const { hasPermission, hasAnyPermission } = usePermissions();
+  const { hasModule } = useTenantModuleAccess();
   const canRead = access?.canRead ?? hasAnyPermission(["view_storage", "manage_storage"]);
   const canManage = access?.canManage ?? hasPermission("manage_storage");
+  const tenantId = getTenantId();
+  const isTenantWorkspace = Boolean(tenantId);
+  const hasImageEditor = !isTenantWorkspace || hasModule("image_editor");
+  const hasVideoPlayer = !isTenantWorkspace || hasModule("video_player");
+  const [checkoutModuleSlug, setCheckoutModuleSlug] = React.useState<"image_editor" | "video_player" | null>(null);
+
+  const { data: subscriptionData } = useQuery({
+    queryKey: ["tenant-current-subscriptions", "file-manager"],
+    queryFn: fetchCurrentTenantSubscriptions,
+    enabled: isTenantWorkspace && canRead,
+    staleTime: 300_000,
+  });
+  const paymentMethods = subscriptionData?.data?.payment_methods ?? [];
+  const lockedModule = checkoutModuleSlug
+    ? subscriptionData?.data?.module_subscriptions?.catalog_modules?.find(
+        (module: any) => module.slug === checkoutModuleSlug
+      ) ?? null
+    : null;
 
   // --- Core State ---
   const [activeFilter, setActiveFilter] = React.useState<"all" | "favorites" | "trash" | "recent">("all");
@@ -884,6 +911,13 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     setSubtitleFile(null);
     setIsSubtitleModalOpen(false);
   }, [canManage]);
+
+  React.useEffect(() => {
+    if (!hasVideoPlayer) {
+      setIsSubtitleModalOpen(false);
+      setSubtitleFile(null);
+    }
+  }, [hasVideoPlayer]);
 
   // --- Creation & Upload States ---
   const [isCreateFolderOpen, setIsCreateFolderOpen] = React.useState(false);
@@ -1019,10 +1053,26 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       const res = await fetch(`${getBackendApiRoot()}/files/save-edited`, {
         method: 'POST', headers: getAuthHeaders(), body: formData
       });
-      if (!res.ok) throw new Error("Failed to save edited image");
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        if (res.status === 402 && payload?.module?.slug === "image_editor") {
+          throw Object.assign(new Error(payload?.message || "Image Editor requires a subscription."), {
+            module: "image_editor",
+          });
+        }
+        throw new Error(payload?.message || "Failed to save edited image");
+      }
       return res.json();
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["files"] }); toast.success("Edited image saved successfully!"); setSelectedFile(null); },
+    onError: (error: any) => {
+      if (error?.module === "image_editor") {
+        setCheckoutModuleSlug("image_editor");
+        return;
+      }
+
+      toast.error(error?.message || "Failed to save edited image");
+    },
   });
 
   const deleteMut = useMutation({
@@ -1112,10 +1162,26 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       const res = await fetch(`${getBackendApiRoot()}/files/upload-subtitle/${fileId}`, {
         method: 'POST', headers: getAuthHeaders(), body: formData
       });
-      if (!res.ok) throw new Error("Failed to upload subtitle");
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        if (res.status === 402 && payload?.module?.slug === "video_player") {
+          throw Object.assign(new Error(payload?.message || "Video Player requires a subscription."), {
+            module: "video_player",
+          });
+        }
+        throw new Error(payload?.message || "Failed to upload subtitle");
+      }
       return res.json();
     },
-    onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["files"] }); toast.success("Subtitle track added successfully!"); setSelectedFile(data.file); setIsSubtitleModalOpen(false); setSubtitleFile(null); }
+    onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["files"] }); toast.success("Subtitle track added successfully!"); setSelectedFile(data.file); setIsSubtitleModalOpen(false); setSubtitleFile(null); },
+    onError: (error: any) => {
+      if (error?.module === "video_player") {
+        setCheckoutModuleSlug("video_player");
+        return;
+      }
+
+      toast.error(error?.message || "Failed to upload subtitle");
+    },
   });
 
   const deleteSubtitleMut = useMutation({
@@ -1137,7 +1203,16 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   const handleCreateFolder = (e: React.FormEvent) => { e.preventDefault(); if (!canManage || !folderName.trim()) return; createFolderMut.mutate(folderName); };
   const handleUploadFile = (e: React.FormEvent) => { e.preventDefault(); if (!canManage) return; if (!uploadFile) return toast.error("Please select a file"); uploadFileMut.mutate(); };
   const handleFileDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); if (!canManage) return; if (e.dataTransfer.files && e.dataTransfer.files[0]) setUploadFile(e.dataTransfer.files[0]); };
-  const handleSubtitleSelect = (e: React.ChangeEvent<HTMLInputElement>) => { if (!canManage) return; if (e.target.files && e.target.files[0]) { setSubtitleFile(e.target.files[0]); setIsSubtitleModalOpen(true); } if (subtitleInputRef.current) subtitleInputRef.current.value = ''; };
+  const handleSubtitleSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canManage) return;
+    if (!hasVideoPlayer) {
+      setCheckoutModuleSlug("video_player");
+      if (subtitleInputRef.current) subtitleInputRef.current.value = '';
+      return;
+    }
+    if (e.target.files && e.target.files[0]) { setSubtitleFile(e.target.files[0]); setIsSubtitleModalOpen(true); }
+    if (subtitleInputRef.current) subtitleInputRef.current.value = '';
+  };
   const submitSubtitle = () => { if (!canManage || !subtitleFile || !selectedFile) return; uploadSubtitleMut.mutate({ fileId: selectedFile.id, file: subtitleFile, lang: subtitleLang, label: subtitleLabel }); };
 
   const toggleSelection = (type: 'file' | 'folder', id: number) => {
@@ -1237,7 +1312,13 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     if (mime.startsWith('image/')) {
       return (
         <div className="w-full h-full flex flex-col rounded-2xl overflow-hidden min-h-[50vh]">
-           <ImageViewer src={safeUrl} fetchUrl={`${getBackendApiRoot()}/files/${file.id}/download`} alt={media.name} onSaveEdited={canManage ? (f: any) => saveEditedImageMut.mutate({ file: f, originalId: file.id }) : undefined} />
+           <ImageViewer
+             src={safeUrl}
+             fetchUrl={`${getBackendApiRoot()}/files/${file.id}/download`}
+             alt={media.name}
+             onSaveEdited={canManage && hasImageEditor ? (f: any) => saveEditedImageMut.mutate({ file: f, originalId: file.id }) : undefined}
+             onUpgradeRequested={canManage && !hasImageEditor ? () => setCheckoutModuleSlug("image_editor") : undefined}
+           />
         </div>
       );
     }
@@ -1249,6 +1330,25 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       const handlePrev = () => { if (currentIndex > 0) setSelectedFile(videoFiles[currentIndex - 1]); };
       const formattedSubtitles = (media.subtitles || []).map((sub: any) => ({ ...sub, src: sub.uuid ? `${getBackendApiRoot()}/files/subtitle/${sub.uuid}` : sub.src, srcLang: sub.srcLang || 'en', label: sub.label || 'Subtitle', default: sub.default || false }));
       const formattedVersions = (media.video_versions || []).map((v: any) => ({ label: v.label, url: getStorageUrl(v.url) }));
+
+      if (!hasVideoPlayer) {
+        return (
+          <div className="flex min-h-[400px] w-full flex-col items-center justify-center rounded-2xl border border-border/50 bg-card/40 p-8 text-center shadow-inner">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+              <LockKeyhole className="h-7 w-7 text-primary" />
+            </div>
+            <h3 className="mt-5 text-2xl font-black tracking-tight text-foreground">Video Player Locked</h3>
+            <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+              This tenant can keep the file in storage, but playback and subtitles require the `video_player` module.
+            </p>
+            {canManage ? (
+              <Button onClick={() => setCheckoutModuleSlug("video_player")} className="mt-6 rounded-xl px-6 font-semibold">
+                <Layers className="mr-2 h-4 w-4" /> Subscribe with ArifPay
+              </Button>
+            ) : null}
+          </div>
+        );
+      }
 
       return (
         <div className="flex flex-col items-center justify-center bg-black rounded-2xl h-full min-h-[400px] border border-border/50 overflow-hidden shadow-inner w-full relative">
@@ -1676,6 +1776,25 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
         </DialogContent>
       </Dialog>
 
+      {lockedModule ? (
+        <ModuleSubscriptionCheckoutDialog
+          open={checkoutModuleSlug !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setCheckoutModuleSlug(null);
+            }
+          }}
+          modules={[lockedModule]}
+          paymentMethods={paymentMethods}
+          title={checkoutModuleSlug === "image_editor" ? "Unlock the Image Editor" : "Unlock the Video Player"}
+          description={
+            checkoutModuleSlug === "image_editor"
+              ? "Activate image editing for this tenant so operators can crop, enhance, and save new media versions."
+              : "Activate video playback for this tenant so operators can stream videos and manage subtitles."
+          }
+        />
+      ) : null}
+
       {/* PREVIEW MODAL */}
       <Dialog open={!!selectedFile} onOpenChange={(open) => {
         if (!open) {
@@ -1712,7 +1831,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
                     </div>
                   </div>
 
-                  {selectedFile.media_details?.mime_type?.startsWith('video/') && (
+                  {selectedFile.media_details?.mime_type?.startsWith('video/') && hasVideoPlayer && (
                     <div className="space-y-4">
                         <div className="flex justify-between items-center"><h4 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground"><Subtitles className="h-3.5 w-3.5" /> Subtitles</h4><Badge variant="outline" className="text-[10px] bg-background">{selectedFile.media_details?.subtitles?.length || 0}</Badge></div>
                         <div className="space-y-2 min-w-0">

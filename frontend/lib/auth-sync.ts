@@ -93,7 +93,8 @@ export const syncUserSession = async () => {
       const updatedUser = {
         ...localUser,
         roles: freshUserData.roles || localUser.roles,
-        permissions: freshUserData.permissions || localUser.permissions
+        permissions: freshUserData.permissions || localUser.permissions,
+        module_access: freshUserData.module_access || localUser.module_access,
       };
 
       // 🚀 Save the fresh data and ALWAYS dispatch the event

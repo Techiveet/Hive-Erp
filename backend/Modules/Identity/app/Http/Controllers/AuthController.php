@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Tenancy\Support\TenantModuleCatalog;
 use PragmaRX\Google2FA\Google2FA;
 use Stevebauman\Location\Facades\Location;
 use Spatie\Permission\PermissionRegistrar;
@@ -28,14 +29,7 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        return response()->json([
-            'id'                 => $user->id,
-            'name'               => $user->name,
-            'email'              => $user->email,
-            'roles'              => $user->getRoleNames(),
-            'permissions'        => $user->getAllPermissions()->pluck('name'),
-            'two_factor_enabled' => !empty($user->two_factor_secret) && $user->two_factor_confirmed_at !== null,
-        ], 200);
+        return response()->json($this->formatUserPayload($user, function_exists('tenant') && tenant('id') ? tenant('id') : 'central'), 200);
     }
 
     /**
@@ -165,14 +159,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Authentication successful.',
             'data' => [
-                'user' => [
-                    'id'                 => $user->id,
-                    'name'               => $user->name,
-                    'email'              => $user->email,
-                    'roles'              => $user->getRoleNames(),
-                    'permissions'        => $user->getAllPermissions()->pluck('name'),
-                    'two_factor_enabled' => false,
-                ],
+                'user' => $this->formatUserPayload($user, $currentTenant),
                 'token'   => $token,
                 'context' => $currentTenant
             ]
@@ -252,14 +239,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Authentication successful.',
             'data' => [
-                'user' => [
-                    'id'                 => $user->id,
-                    'name'               => $user->name,
-                    'email'              => $user->email,
-                    'roles'              => $user->getRoleNames(),
-                    'permissions'        => $user->getAllPermissions()->pluck('name'),
-                    'two_factor_enabled' => true,
-                ],
+                'user' => $this->formatUserPayload($user, $currentTenant, true),
                 'token'   => $token,
                 'context' => $currentTenant
             ]
@@ -370,5 +350,39 @@ class AuthController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function formatUserPayload(User $user, string $currentTenant, ?bool $twoFactorEnabled = null): array
+    {
+        /** @var \Modules\Tenancy\Models\Tenant|null $tenant */
+        $tenant = function_exists('tenant') ? tenant() : null;
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'roles' => $user->getRoleNames(),
+            'permissions' => $user->getAllPermissions()->pluck('name'),
+            'two_factor_enabled' => $twoFactorEnabled ?? (!empty($user->two_factor_secret) && $user->two_factor_confirmed_at !== null),
+            'module_access' => $tenant
+                ? TenantModuleCatalog::buildModuleAccess(
+                    is_array($tenant->module_subscriptions) ? $tenant->module_subscriptions : null,
+                    $tenant->plan
+                )
+                : [
+                    'plan' => 'central',
+                    'active_modules' => TenantModuleCatalog::slugs(),
+                    'statuses' => collect(TenantModuleCatalog::catalog())
+                        ->mapWithKeys(fn (array $module) => [
+                            $module['slug'] => [
+                                'active' => true,
+                                'included_in_plan' => true,
+                                'name' => $module['name'],
+                                'monthly_price_etb' => (float) ($module['monthly_price_etb'] ?? 0),
+                            ],
+                        ])
+                        ->all(),
+                ],
+        ];
     }
 }

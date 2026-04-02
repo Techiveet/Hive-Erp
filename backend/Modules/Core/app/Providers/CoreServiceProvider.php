@@ -6,6 +6,7 @@ use Nwidart\Modules\Support\ModuleServiceProvider;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Carbon;
 
 // Imports for the Global Interceptor
 use Illuminate\Support\Facades\Event;
@@ -141,19 +142,33 @@ class CoreServiceProvider extends ModuleServiceProvider
             $frequency = get_system_setting('backup_frequency', 'daily');
             $time      = get_system_setting('backup_time', '02:00');
             $day       = get_system_setting('backup_day', 1);
+            $cleanupAt = '03:00';
 
-            $backupJob  = $schedule->job(new RunSystemBackup());
-            $cleanupJob = $schedule->command('backup:clean')->withoutOverlapping();
+            try {
+                $cleanupAt = Carbon::createFromFormat('H:i', $time)->addHour()->format('H:i');
+            } catch (\Throwable) {
+                $cleanupAt = '03:00';
+            }
+
+            $backupJob = $schedule->call(function () {
+                (new RunSystemBackup(null, 'central', 'all', 'automatic'))->handle();
+            })
+                ->name('system-backups:run')
+                ->withoutOverlapping();
+
+            $cleanupJob = $schedule->command('backup:clean --disable-notifications')
+                ->name('system-backups:cleanup')
+                ->withoutOverlapping();
 
             if ($frequency === 'weekly') {
                 $backupJob->weeklyOn($day, $time);
-                $cleanupJob->weeklyOn($day, '03:00');
+                $cleanupJob->weeklyOn($day, $cleanupAt);
             } elseif ($frequency === 'monthly') {
                 $backupJob->monthlyOn($day, $time);
-                $cleanupJob->monthlyOn($day, '03:00');
+                $cleanupJob->monthlyOn($day, $cleanupAt);
             } else {
                 $backupJob->dailyAt($time);
-                $cleanupJob->dailyAt('03:00');
+                $cleanupJob->dailyAt($cleanupAt);
             }
 
         } catch (\Throwable $e) {

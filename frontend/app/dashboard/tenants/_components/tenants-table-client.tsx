@@ -4,7 +4,7 @@ import * as React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
-import { Server, PlusCircle, Pencil, Trash2, Loader2, Calendar, Globe, AlertCircle, Power, UserX, UserPlus, Mail, Eye, UserCheck } from "lucide-react";
+import { Server, PlusCircle, Pencil, Trash2, Loader2, Calendar, Globe, AlertCircle, Power, UserX, UserPlus, Mail, Eye, UserCheck, Layers } from "lucide-react";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -26,7 +26,10 @@ import {
     type TenantUpdateOfflinePayload,
     updateTenantOfflineMutationDefinition,
 } from "@/modules/shared/offline-mutations";
-import { fetchTenants } from "@/modules/tenancy/api";
+import { fetchSubscriptionCatalog, fetchTenants } from "@/modules/tenancy/api";
+import { ModuleSubscriptionSelector } from "@/modules/tenancy/components/module-subscription-selector";
+import { ModuleSubscriptionSummary } from "@/modules/tenancy/components/module-subscription-summary";
+import type { TenantCatalogModule, TenantCustomModuleInput } from "@/modules/tenancy/types";
 import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -38,6 +41,22 @@ type Props = {
 };
 
 const globalActionLock: Record<string, number> = {};
+const EMPTY_PLAN_DEFAULTS: Record<string, string[]> = {};
+const EMPTY_CATALOG: TenantCatalogModule[] = [];
+const EMPTY_STRING_LIST: string[] = [];
+
+const sanitizeCustomModules = (modules: TenantCustomModuleInput[]): TenantCustomModuleInput[] =>
+    modules
+        .map((module) => ({
+            slug: module.slug?.trim() || undefined,
+            name: module.name.trim(),
+            category: module.category?.trim() || "Custom",
+            description: module.description?.trim() || "",
+        }))
+        .filter((module) => module.name.length > 0);
+
+const areStringListsEqual = (left: string[], right: string[]): boolean =>
+    left.length === right.length && left.every((value, index) => value === right[index]);
 
 export function TenantsTableClient({ companySettings, brandingSettings }: Props) {
     const queryClient = useQueryClient();
@@ -69,6 +88,9 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
     const [formAdminName, setFormAdminName] = React.useState("");
     const [formAdminEmail, setFormAdminEmail] = React.useState("");
     const [formAdminPassword, setFormAdminPassword] = React.useState("");
+    const [formSelectedModules, setFormSelectedModules] = React.useState<string[]>([]);
+    const [formCustomModules, setFormCustomModules] = React.useState<TenantCustomModuleInput[]>([]);
+    const [subscriptionTouched, setSubscriptionTouched] = React.useState(false);
 
     const triggerAudit = React.useCallback(async (action: string, description: string) => {
         if (typeof window === "undefined") return;
@@ -87,6 +109,35 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         },
         placeholderData: (prev) => prev,
     });
+
+    const { data: subscriptionCatalogData } = useQuery({
+        queryKey: ["tenant-subscription-catalog"],
+        queryFn: fetchSubscriptionCatalog,
+        enabled: canCreate || canEdit,
+        staleTime: 300_000,
+    });
+
+    const subscriptionCatalog = React.useMemo(
+        () => subscriptionCatalogData?.data?.catalog ?? EMPTY_CATALOG,
+        [subscriptionCatalogData]
+    );
+    const subscriptionPlanDefaults = React.useMemo(
+        () => subscriptionCatalogData?.data?.plan_defaults ?? EMPTY_PLAN_DEFAULTS,
+        [subscriptionCatalogData]
+    );
+
+    const handlePlanChange = React.useCallback((nextPlan: string) => {
+        setFormPlan(nextPlan);
+
+        if (isEdit || subscriptionTouched) {
+            return;
+        }
+
+        const nextDefaults = subscriptionPlanDefaults[nextPlan] ?? EMPTY_STRING_LIST;
+        setFormSelectedModules((previous) =>
+            areStringListsEqual(previous, nextDefaults) ? previous : [...nextDefaults]
+        );
+    }, [isEdit, subscriptionPlanDefaults, subscriptionTouched]);
 
     const createTenantMut = useOfflineMutation<any, Error, TenantCreateOfflinePayload>({
         definition: createTenantOfflineMutationDefinition,
@@ -211,13 +262,21 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
     
     const openCreate = () => {
         setEditingTenant(null); setFormId(""); setFormName(""); setFormPlan("business"); setFormDomain("");
-        setFormAdminName(""); setFormAdminEmail(""); setFormAdminPassword(""); setDialogOpen(true);
+        setFormAdminName(""); setFormAdminEmail(""); setFormAdminPassword("");
+        setFormSelectedModules([...(subscriptionPlanDefaults.business ?? EMPTY_STRING_LIST)]);
+        setFormCustomModules([]);
+        setSubscriptionTouched(false);
+        setDialogOpen(true);
         triggerAudit('viewed', 'Operator accessed the Provisioning UI panel');
     };
     
     const openEdit = (tenant: any) => {
         setEditingTenant(tenant); setFormId(tenant.id); setFormName(tenant.name); setFormPlan(tenant.plan); setFormDomain(tenant.domain);
-        setFormAdminEmail(tenant.admin_email || ""); setFormAdminName(""); setFormAdminPassword(""); setDialogOpen(true);
+        setFormAdminEmail(tenant.admin_email || ""); setFormAdminName(""); setFormAdminPassword("");
+        setFormSelectedModules(tenant.module_subscriptions?.enabled_modules || []);
+        setFormCustomModules(tenant.module_subscriptions?.custom_modules || []);
+        setSubscriptionTouched(true);
+        setDialogOpen(true);
         triggerAudit('viewed', `Operator accessed Reconfiguration UI panel for Node ID: ${tenant.id}`);
     };
 
@@ -232,6 +291,10 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                     admin_name: formAdminName,
                     admin_email: formAdminEmail,
                     admin_password: formAdminPassword,
+                    module_subscriptions: {
+                        enabled_modules: formSelectedModules,
+                        custom_modules: sanitizeCustomModules(formCustomModules),
+                    },
                 },
             };
             updateTenantMut.mutate(payload);
@@ -246,6 +309,10 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
             admin_name: formAdminName,
             admin_email: formAdminEmail,
             admin_password: formAdminPassword,
+            module_subscriptions: {
+                enabled_modules: formSelectedModules,
+                custom_modules: sanitizeCustomModules(formCustomModules),
+            },
         };
         createTenantMut.mutate(payload);
     };
@@ -274,6 +341,24 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         { 
             id: "plan", accessorFn: (row) => row.plan, header: t('tenants.col_plan', "Capacity Plan"), 
             cell: ({ row }) => getPlanBadge(row.original.plan) 
+        },
+        {
+            id: "modules",
+            accessorFn: (row) => row.subscribed_modules_count,
+            header: t('nav.subscriptions', "Module Subscriptions"),
+            cell: ({ row }) => (
+                <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <Layers className="h-3.5 w-3.5 text-primary" />
+                        {row.original.subscribed_modules_count || 0} active
+                    </div>
+                    <ModuleSubscriptionSummary
+                        modules={row.original.subscribed_modules}
+                        maxVisible={2}
+                        emptyLabel="No modules"
+                    />
+                </div>
+            ),
         },
         {
             id: "domain", accessorFn: (row) => row.domain, header: t('tenants.col_domain', "Routing Address"),
@@ -367,7 +452,7 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
 
             {/* CREATE / EDIT DIALOG */}
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if(!open) triggerAudit('viewed', 'Closed Provisioning/Reconfiguration Matrix'); }}>
-                <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl max-h-[90vh] flex flex-col">
+                <DialogContent className="sm:max-w-[760px] p-0 overflow-hidden rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl max-h-[90vh] flex flex-col">
                     <div className="px-6 py-5 border-b border-border/40 bg-muted/20 shrink-0"><DialogHeader><DialogTitle className="text-xl font-space font-black">{isEdit ? t('tenants.reconfigure', "Reconfigure Node") : t('tenants.provision_new', "Provision New Node")}</DialogTitle></DialogHeader></div>
                     <div className="overflow-y-auto p-6 scrollbar-thin">
                         <form id="tenant-form" onSubmit={handleSubmit} className="space-y-6">
@@ -379,7 +464,7 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                                         <div className="space-y-1.5 col-span-2 sm:col-span-1"><Label className="text-xs uppercase tracking-widest text-muted-foreground">{t('tenants.node_id', "Node ID")}</Label><Input required disabled={isEdit} value={formId} onChange={e => handleIdChange(e.target.value)} placeholder="acme" className="h-11 font-mono bg-muted/30" /></div>
                                         <div className="space-y-1.5 col-span-2 sm:col-span-1">
                                             <Label className="text-xs uppercase tracking-widest text-muted-foreground">{t('tenants.plan', "Capacity Plan")}</Label>
-                                            <Select value={formPlan} onValueChange={setFormPlan}>
+                                            <Select value={formPlan} onValueChange={handlePlanChange}>
                                                 <SelectTrigger className="h-11 bg-muted/30"><SelectValue /></SelectTrigger>
                                                 <SelectContent className="rounded-xl border-border/50 shadow-xl"><SelectItem value="startup">Startup</SelectItem><SelectItem value="business">Business</SelectItem><SelectItem value="enterprise">Enterprise</SelectItem><SelectItem value="overlord">Overlord</SelectItem></SelectContent>
                                             </Select>
@@ -388,11 +473,34 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                                     </div>
                                 </div>
                                 <div className="col-span-2 space-y-4 pt-2">
+                                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1.5 border-b border-border/40 pb-2"><Layers className="h-3.5 w-3.5" /> {t('nav.subscriptions', "Module Subscriptions")}</h4>
+                                    {subscriptionCatalog.length > 0 ? (
+                                        <ModuleSubscriptionSelector
+                                            catalog={subscriptionCatalog}
+                                            selectedModules={formSelectedModules}
+                                            customModules={formCustomModules}
+                                            onSelectedModulesChange={(next) => {
+                                                setSubscriptionTouched(true);
+                                                setFormSelectedModules(next);
+                                            }}
+                                            onCustomModulesChange={(next) => {
+                                                setSubscriptionTouched(true);
+                                                setFormCustomModules(next);
+                                            }}
+                                            plan={formPlan}
+                                        />
+                                    ) : (
+                                        <div className="rounded-[1.5rem] border border-dashed border-border/60 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                                            Loading subscription catalog...
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="col-span-2 space-y-4 pt-2">
                                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1.5 border-b border-border/40 pb-2"><UserPlus className="h-3.5 w-3.5" /> {t('tenants.super_admin', "Super Admin Settings")}</h4>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1.5 col-span-2"><Label className="text-xs uppercase tracking-widest text-muted-foreground">{t('tenants.operator_name', "Operator Name")}</Label><Input required={!isEdit} value={formAdminName} onChange={e => setFormAdminName(e.target.value)} placeholder="Operator Name" className="h-11 bg-muted/30" /></div>
                                         <div className="space-y-1.5 col-span-2 sm:col-span-1"><Label className="text-xs uppercase tracking-widest text-muted-foreground">{t('tenants.email', "Email")}</Label><Input type="email" required={!isEdit} value={formAdminEmail} onChange={e => setFormAdminEmail(e.target.value)} placeholder="admin@acme.com" className="h-11 bg-muted/30" /></div>
-                                        <div className="space-y-1.5 col-span-2 sm:col-span-1"><Label className="text-xs uppercase tracking-widest text-muted-foreground">{t('tenants.access_key', "Access Key")}</Label><Input type="password" required={!isEdit} value={formAdminPassword} onChange={e => setFormAdminPassword(e.target.value)} placeholder="••••••••" className="h-11 bg-muted/30" /></div>
+                                        <div className="space-y-1.5 col-span-2 sm:col-span-1"><Label className="text-xs uppercase tracking-widest text-muted-foreground">{t('tenants.access_key', "Access Key")}</Label><Input type="password" required={!isEdit} value={formAdminPassword} onChange={e => setFormAdminPassword(e.target.value)} placeholder="********" className="h-11 bg-muted/30" /></div>
                                     </div>
                                 </div>
                             </div>
@@ -406,7 +514,40 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
             <Dialog open={viewDialogOpen} onOpenChange={(open) => { setViewDialogOpen(open); if(!open) triggerAudit('viewed', 'Closed Deep Metric Inspection view'); }}>
                 <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
                     <div className="px-6 py-6 border-b border-border/40 bg-muted/20 flex items-center gap-4"><div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner shrink-0"><Server className="h-7 w-7 text-primary" /></div><div><DialogTitle className="text-2xl font-black font-space tracking-tight">{viewTenant?.name}</DialogTitle><DialogDescription className="font-mono text-[10px] uppercase tracking-widest mt-1">{t('tenants.view_identity', "Node Identity")}: <span className="font-bold">{viewTenant?.id}</span></DialogDescription></div></div>
-                    <div className="px-6 py-6 space-y-6"><div className="grid grid-cols-2 gap-y-6 gap-x-4"><div><p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_status', "Network Status")}</p><Badge variant="outline" className={cn("uppercase text-[10px]", viewTenant?.is_active ? "text-emerald-500 bg-emerald-50/50" : "text-destructive bg-destructive/10")}>{viewTenant?.is_active ? t('global.online', "Online") : t('global.suspended', "Suspended")}</Badge></div><div><p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_plan', "Capacity Plan")}</p>{viewTenant?.plan && getPlanBadge(viewTenant.plan)}</div><div className="col-span-2"><p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_domain', "Routing Domain")}</p><div className="flex items-center gap-2 font-mono text-sm bg-muted/30 p-3 rounded-xl border border-border/50"><Globe className="h-4 w-4 text-muted-foreground" />{viewTenant?.domain}</div></div><div className="col-span-2"><p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_contact', "Super Admin Contact")}</p><div className="flex items-center gap-2 font-mono text-sm bg-muted/30 p-3 rounded-xl border border-border/50"><Mail className="h-4 w-4 text-muted-foreground" />{viewTenant?.admin_email || t('tenants.no_email', "No email registered")}{viewTenant?.admin_email && <Badge variant="outline" className={cn("ml-auto text-[9px] uppercase border-0", viewTenant?.admin_active === false ? "text-destructive bg-destructive/10" : "text-emerald-500 bg-emerald-500/10")}>{viewTenant?.admin_active === false ? t('global.suspended', "Suspended") : t('global.active', "Active")}</Badge>}</div></div></div></div>
+                    <div className="px-6 py-6 space-y-6">
+                        <div className="grid grid-cols-2 gap-y-6 gap-x-4">
+                            <div>
+                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_status', "Network Status")}</p>
+                                <Badge variant="outline" className={cn("uppercase text-[10px]", viewTenant?.is_active ? "text-emerald-500 bg-emerald-50/50" : "text-destructive bg-destructive/10")}>{viewTenant?.is_active ? t('global.online', "Online") : t('global.suspended', "Suspended")}</Badge>
+                            </div>
+                            <div>
+                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_plan', "Capacity Plan")}</p>
+                                {viewTenant?.plan && getPlanBadge(viewTenant.plan)}
+                            </div>
+                            <div className="col-span-2">
+                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_domain', "Routing Domain")}</p>
+                                <div className="flex items-center gap-2 font-mono text-sm bg-muted/30 p-3 rounded-xl border border-border/50"><Globe className="h-4 w-4 text-muted-foreground" />{viewTenant?.domain}</div>
+                            </div>
+                            <div className="col-span-2">
+                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_contact', "Super Admin Contact")}</p>
+                                <div className="flex items-center gap-2 font-mono text-sm bg-muted/30 p-3 rounded-xl border border-border/50"><Mail className="h-4 w-4 text-muted-foreground" />{viewTenant?.admin_email || t('tenants.no_email', "No email registered")}{viewTenant?.admin_email && <Badge variant="outline" className={cn("ml-auto text-[9px] uppercase border-0", viewTenant?.admin_active === false ? "text-destructive bg-destructive/10" : "text-emerald-500 bg-emerald-500/10")}>{viewTenant?.admin_active === false ? t('global.suspended', "Suspended") : t('global.active', "Active")}</Badge>}</div>
+                            </div>
+                            <div className="col-span-2">
+                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('nav.subscriptions', "Module Subscriptions")}</p>
+                                <div className="space-y-3 rounded-xl border border-border/50 bg-muted/30 p-3">
+                                    <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                                        <Layers className="h-4 w-4 text-primary" />
+                                        {viewTenant?.subscribed_modules_count || 0} active modules
+                                    </div>
+                                    <ModuleSubscriptionSummary
+                                        modules={viewTenant?.subscribed_modules}
+                                        maxVisible={8}
+                                        emptyLabel="No modules enabled for this tenant."
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div className="px-6 py-4 border-t border-border/40 bg-muted/20 flex justify-end"><Button variant="outline" onClick={() => setViewDialogOpen(false)} className="rounded-xl px-8 shadow-sm">{t('tenants.close_view', "Close Overview")}</Button></div>
                 </DialogContent>
             </Dialog>
