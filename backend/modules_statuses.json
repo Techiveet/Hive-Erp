@@ -2,5 +2,6 @@
     "Identity": true,
     "Tenancy": true,
     "Core": true,
-    "ActivityObserver": true
+    "ActivityObserver": true,
+    "MailBox": true
 }

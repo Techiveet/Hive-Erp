@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { Command, Menu, Search, LogOut, X, Loader2 } from "lucide-react";
+import { Command, Menu, Search, LogOut, X, Loader2, FileType, Mail } from "lucide-react";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { DASHBOARD_NAV, DASHBOARD_SECONDARY, type NavItem } from "./nav";
@@ -179,6 +179,35 @@ export function MobileSidebar() {
                     </SheetClose>
                   );
                 })}
+
+                {/* 🚀 APPS AND TOOLS SECTION */}
+                {!searchQuery && (
+                  <div className="pt-2 flex flex-col gap-1">
+                    <div className="flex items-center gap-3 px-4 py-2 mt-4 text-xs font-black uppercase text-muted-foreground tracking-widest">
+                      Apps & Tools
+                    </div>
+                    
+                    <SheetClose asChild>
+                      <Link 
+                        href="/dashboard/tools/converter"
+                        className={cn("flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200", pathname.includes('/dashboard/tools/converter') ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")}
+                      >
+                        <FileType className={cn("h-5 w-5", pathname.includes('/dashboard/tools/converter') ? "text-primary-foreground" : "text-muted-foreground")} />
+                        <span className="truncate">HTML to PDF</span>
+                      </Link>
+                    </SheetClose>
+
+                    <SheetClose asChild>
+                      <Link 
+                        href="/dashboard/mail"
+                        className={cn("flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200", pathname.includes('/dashboard/mail') ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")}
+                      >
+                        <Mail className={cn("h-5 w-5", pathname.includes('/dashboard/mail') ? "text-primary-foreground" : "text-muted-foreground")} />
+                        <span className="truncate">Internal Mail</span>
+                      </Link>
+                    </SheetClose>
+                  </div>
+                )}
               </nav>
 
               {(filteredSecondary.length > 0 || !searchQuery) && isMounted && (

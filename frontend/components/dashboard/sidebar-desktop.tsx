@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Loader2, Layers, ChevronDown, ChevronRight, FileType } from "lucide-react"; 
+import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Loader2, Layers, ChevronDown, ChevronRight, FileType, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { DASHBOARD_NAV, DASHBOARD_SECONDARY, type NavItem } from "./nav";
@@ -252,11 +252,25 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                   <FileType className="h-4 w-4 shrink-0" />
                   <span className="truncate">HTML to PDF</span>
                 </Link>
+                
+                <Link 
+                  href="/dashboard/mail"
+                  className={cn(
+                    "group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-all duration-200",
+                    pathname.includes('/dashboard/mail') 
+                      ? "bg-primary/10 text-primary font-bold" 
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                  )}
+                >
+                  <Mail className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Internal Mail</span>
+                </Link>
               </div>
             )}
 
             {/* Sub-menu (Collapsed mode shortcut) */}
             {collapsed && (
+              <>
                <Link 
                   href="/dashboard/tools/converter"
                   title="HTML to PDF"
@@ -269,6 +283,19 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                >
                  <FileType className="h-4 w-4 shrink-0" />
                </Link>
+               <Link 
+                  href="/dashboard/mail"
+                  title="Internal Mail"
+                  className={cn(
+                    "group flex items-center justify-center rounded-2xl px-0 py-3 text-sm transition-all duration-200 mt-1",
+                    pathname.includes('/dashboard/mail') 
+                      ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
+                      : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
+                  )}
+               >
+                 <Mail className="h-4 w-4 shrink-0" />
+               </Link>
+              </>
             )}
           </div>
         )}

@@ -58,7 +58,6 @@ class _LandingPageState extends State<LandingPage> {
                   child: CustomPaint(
                     painter: HexagonBackgroundPainter(),
                   ))),
-
           CustomScrollView(
             controller: _scrollController,
             slivers: [
@@ -78,7 +77,6 @@ class _LandingPageState extends State<LandingPage> {
               ),
             ],
           ),
-
           if (_showScrollTop)
             Positioned(
               bottom: 24,
@@ -106,7 +104,7 @@ class HexagonBackgroundPainter extends CustomPainter {
 
     const double radius = 40.0;
     final double hexWidth = math.sqrt(3) * radius;
-    final double hexHeight = 2 * radius;
+    const double hexHeight = 2 * radius;
 
     for (double y = 0; y < size.height + hexHeight; y += hexHeight * 0.75) {
       bool isEven = (y / (hexHeight * 0.75)).round() % 2 == 0;
@@ -131,7 +129,7 @@ class HexagonBackgroundPainter extends CustomPainter {
     }
     path.close();
     canvas.drawPath(path, paint);
-    
+
     // Technical node point
     final pointPaint = Paint()
       ..color = HiveTheme.primary.withOpacity(0.1)

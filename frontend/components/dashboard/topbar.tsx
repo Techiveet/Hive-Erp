@@ -16,6 +16,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useTour } from "@/components/providers/tour-provider";
 import { useTranslation } from "@/store/use-translation";
 import { GlobalSearch } from "./global-search";
+import { TopbarMailIcon } from "./topbar-mail";
 import { getTenantId, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -275,6 +276,8 @@ export function DashboardTopbar() {
                   <Bell className="h-5 w-5" />
                 </Button>
               )}
+
+              <TopbarMailIcon activeUser={activeUser} />
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
