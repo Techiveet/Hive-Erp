@@ -1,0 +1,15 @@
+hive.hinohaet.com {
+    reverse_proxy frontend:3000
+}
+
+hive-backend.hinohaet.com {
+    # Proxy /app/ to the Reverb WebSocket server
+    handle_path /app/* {
+        reverse_proxy reverb:9000
+    }
+
+    # Proxy everything else to the Laravel Backend
+    handle {
+        reverse_proxy backend:8000
+    }
+}

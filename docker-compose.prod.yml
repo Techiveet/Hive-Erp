@@ -1,0 +1,182 @@
+services:
+  # Reverse Proxy
+  caddy:
+    image: caddy:2-alpine
+    container_name: hive-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./storage/caddy_data:/data
+      - ./storage/caddy_config:/config
+    networks:
+      - hive-network
+    depends_on:
+      - frontend
+      - backend
+      - reverb
+
+  # CACHE (Redis)
+  redis:
+    image: redis:alpine
+    container_name: hive-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hive-network
+
+  # DATABASE (Postgres 17)
+  db:
+    image: postgres:17-alpine
+    container_name: hive-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-hive}
+      POSTGRES_USER: ${DB_USERNAME:-hive}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+    volumes:
+      - ./storage/db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-hive}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hive-network
+
+  # SEARCH (Meilisearch)
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    container_name: hive-search
+    restart: unless-stopped
+    environment:
+      - MEILI_MASTER_KEY=${MEILISEARCH_KEY:-masterKey}
+      - MEILI_NO_ANALYTICS=true
+    volumes:
+      - ./storage/search-data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hive-network
+
+  # AI BACKGROUND REMOVAL (rembg)
+  rembg:
+    image: danielgatis/rembg:latest
+    container_name: hive-ai-rembg
+    restart: unless-stopped
+    command: s --host 0.0.0.0 --port 5000 
+    networks:
+      - hive-network
+
+  # PDF & DOC CONVERTER (Gotenberg)
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: hive-gotenberg
+    restart: unless-stopped
+    networks:
+      - hive-network
+
+  # THE BRAIN (Laravel 12 + Octane)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: hive-backend
+    restart: unless-stopped
+    volumes:
+      - ./storage/app:/var/www/html/storage/app
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      OCTANE_SERVER: roadrunner
+      DB_HOST: db
+      REDIS_HOST: redis
+      MEILISEARCH_HOST: http://meilisearch:7700
+      REVERB_HOST: reverb
+      PUSHER_HOST: reverb
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    networks:
+      - hive-network
+
+  # THE WORKER (Background Jobs)
+  queue:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: hive-queue
+    restart: unless-stopped
+    volumes:
+      - ./storage/app:/var/www/html/storage/app
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      DB_HOST: db
+      REDIS_HOST: redis
+      MEILISEARCH_HOST: http://meilisearch:7700
+      REVERB_HOST: reverb
+      PUSHER_HOST: reverb
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    command: php artisan horizon
+    networks:
+      - hive-network
+
+  # WEBSOCKET ENGINE (Reverb)
+  reverb:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: hive-reverb
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      DB_HOST: db
+      REDIS_HOST: redis
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    command: php artisan reverb:start --host=0.0.0.0 --port=9000
+    networks:
+      - hive-network
+
+  # THE FACE (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: hive-frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - backend
+    networks:
+      - hive-network
+
+networks:
+  hive-network:
+    driver: bridge
