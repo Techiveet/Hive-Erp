@@ -121,7 +121,7 @@ const { hasAnyPermission, isLoaded } = usePermissions();
             : "Central testing root.",
         }];
 
-        if (cancelled) return;
+        if (cancelled || !swaggerRef.current) return;
 
         swaggerRef.current.innerHTML = "";
         window.hiveSwaggerUi = window.SwaggerUIBundle({
