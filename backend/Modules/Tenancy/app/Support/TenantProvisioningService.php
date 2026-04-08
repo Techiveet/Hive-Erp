@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Modules\Identity\Models\User;
+use Modules\Subscription\Support\TenantSubscriptionService;
 use Modules\Tenancy\Mail\TenantCreated;
 use Modules\Tenancy\Models\Tenant;
 use Spatie\Permission\Models\Role;
@@ -15,6 +16,11 @@ use Throwable;
 
 class TenantProvisioningService
 {
+    public function __construct(
+        protected TenantSubscriptionService $subscriptions,
+    ) {
+    }
+
     public function provision(array $payload, ?string $initiatedBy = null): Tenant
     {
         try {
@@ -25,11 +31,6 @@ class TenantProvisioningService
                 $tenant->plan = $payload['plan'];
                 $tenant->is_active = true;
                 $tenant->admin_email = strtolower($payload['admin_email']);
-                $tenant->module_subscriptions = TenantModuleCatalog::normalizeForStorage(
-                    $payload['module_subscriptions'] ?? null,
-                    $payload['plan'],
-                    $initiatedBy ?? strtolower($payload['admin_email'])
-                );
                 $tenant->save();
 
                 return $tenant;
@@ -78,6 +79,13 @@ class TenantProvisioningService
                     \Illuminate\Support\Facades\Log::warning('Tenant welcome email failed: ' . $mailException->getMessage());
                 }
             });
+
+            $this->subscriptions->ensureForTenant(
+                $tenant,
+                $payload['module_subscriptions'] ?? null,
+                $initiatedBy ?? strtolower($payload['admin_email']),
+                true
+            );
 
             return $tenant->load('domains');
         } catch (Throwable $exception) {

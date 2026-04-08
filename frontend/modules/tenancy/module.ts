@@ -1,4 +1,4 @@
-import { Layers, Network } from "lucide-react";
+import { Network } from "lucide-react";
 import type { FrontendModuleDefinition } from "@/modules/types";
 
 export const tenancyModule: FrontendModuleDefinition = {
@@ -6,7 +6,7 @@ export const tenancyModule: FrontendModuleDefinition = {
   name: "Tenancy",
   description: "Tenant provisioning, lifecycle management, and node operations.",
   backendModule: "Modules\\Tenancy",
-  routePrefixes: ["/dashboard/tenants", "/dashboard/subscriptions"],
+  routePrefixes: ["/dashboard/tenants"],
   navItems: [
     {
       moduleId: "tenancy",
@@ -16,15 +16,6 @@ export const tenancyModule: FrontendModuleDefinition = {
       icon: Network,
       permissions: ["manage_tenants", "view_tenants"],
       tourId: "tour-nav-tenants",
-      placement: "primary",
-    },
-    {
-      moduleId: "tenancy",
-      translationKey: "nav.subscriptions",
-      fallbackLabel: "Module Subscriptions",
-      href: "/dashboard/subscriptions",
-      icon: Layers,
-      permissions: ["view_module_subscriptions", "manage_module_subscriptions"],
       placement: "primary",
     },
   ],

@@ -24,8 +24,8 @@ import { PdfViewer } from '@/components/ui/pdf-viewer';
 import { CodeEditor, type VirtualFile } from '@/components/ui/code-editor';
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
-import { fetchCurrentTenantSubscriptions } from "@/modules/tenancy/api";
-import { ModuleSubscriptionCheckoutDialog } from "@/modules/tenancy/components/module-subscription-checkout-dialog";
+import { fetchCurrentTenantSubscriptions } from "@/modules/subscription/api";
+import { ModuleSubscriptionCheckoutDialog } from "@/modules/subscription/components/module-subscription-checkout-dialog";
 import { getTenantId } from "@/lib/runtime-context";
 
 const getApiUrl = () => {
@@ -192,7 +192,7 @@ export default function FileConverterPage() {
                         </p>
                     </div>
                     <Button onClick={() => setCheckoutOpen(true)} className="rounded-xl px-6 font-semibold">
-                        <Layers className="mr-2 h-4 w-4" /> Subscribe with ArifPay
+                        <Layers className="mr-2 h-4 w-4" /> Unlock with Checkout
                     </Button>
                 </div>
 
@@ -203,7 +203,7 @@ export default function FileConverterPage() {
                         modules={[converterModule]}
                         paymentMethods={paymentMethods}
                         title="Activate the Document Converter"
-                        description="Complete the module checkout with ArifPay to unlock the HTML-to-PDF workspace for this tenant."
+                        description="Complete the module checkout to unlock the HTML-to-PDF workspace for this tenant."
                     />
                 ) : null}
             </>

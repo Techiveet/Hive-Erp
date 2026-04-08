@@ -14,16 +14,16 @@ class MailReceived implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public array $messageData;
+    public array $participantData;
     public $userId;
     public $tenantId;
 
     /**
      * Create a new event instance.
      */
-    public function __construct(array $messageData, $userId, $tenantId = null) 
+    public function __construct(array $participantData, $userId, $tenantId = null) 
     {
-        $this->messageData = $messageData;
+        $this->participantData = $participantData;
         $this->userId = $userId;
         $this->tenantId = $tenantId;
     }

@@ -34,8 +34,8 @@ import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, getTenantId } 
 import { useTranslation } from "@/store/use-translation";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
-import { fetchCurrentTenantSubscriptions } from "@/modules/tenancy/api";
-import { ModuleSubscriptionCheckoutDialog } from "@/modules/tenancy/components/module-subscription-checkout-dialog";
+import { fetchCurrentTenantSubscriptions } from "@/modules/subscription/api";
+import { ModuleSubscriptionCheckoutDialog } from "@/modules/subscription/components/module-subscription-checkout-dialog";
 
 // Reusable Viewer Components
 import { VideoPlayer } from "@/components/ui/video-player";
@@ -1144,7 +1144,19 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
           method: 'POST', headers: getAuthHeaders(), body: formData
         });
 
-        if (!res.ok) throw new Error(`Server Error during upload.`);
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error("Upload 403/Error:", res.status, errText);
+          let errMsg = `Upload failed (${res.status}).`;
+          try {
+            const data = JSON.parse(errText);
+            if (data.message) errMsg = data.message;
+            if (res.status === 402 && data.module) {
+              throw Object.assign(new Error(data.message || "Subscription required."), { module: data.module });
+            }
+          } catch(e) {}
+          throw new Error(errMsg);
+        }
         setUploadProgress(Math.round(((chunkIndex + 1) / totalChunks) * 100));
       }
     },
@@ -1343,7 +1355,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
             </p>
             {canManage ? (
               <Button onClick={() => setCheckoutModuleSlug("video_player")} className="mt-6 rounded-xl px-6 font-semibold">
-                <Layers className="mr-2 h-4 w-4" /> Subscribe with ArifPay
+                <Layers className="mr-2 h-4 w-4" /> Unlock with Checkout
               </Button>
             ) : null}
           </div>

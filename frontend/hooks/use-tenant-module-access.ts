@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import type { TenantModuleAccessState } from "@/modules/tenancy/types";
+import type { TenantModuleAccessState } from "@/modules/subscription/types";
 
 const readModuleAccess = (): TenantModuleAccessState | null => {
   if (typeof window === "undefined") {

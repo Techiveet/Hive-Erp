@@ -1,0 +1,576 @@
+"use client";
+
+import React, { useEffect, forwardRef, useImperativeHandle, useState } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import { Node, mergeAttributes, Extension } from '@tiptap/core';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
+import { FontFamily } from '@tiptap/extension-font-family';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import Image from '@tiptap/extension-image';
+import Highlight from '@tiptap/extension-highlight';
+import Link from '@tiptap/extension-link';
+import TextAlign from '@tiptap/extension-text-align';
+import Mention from '@tiptap/extension-mention';
+import suggestion from './mention-suggestion';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { SignaturePad } from '@/components/ui/signature-pad';
+import EmojiPicker from 'emoji-picker-react';
+import { cn } from '@/lib/utils';
+import {
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  Strikethrough,
+  Highlighter,
+  Link2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  List,
+  ListOrdered,
+  Heading1,
+  Heading2,
+  Heading3,
+  Quote,
+  Undo,
+  Redo,
+  Code,
+  Image as ImageIcon,
+  Eraser,
+  Baseline,
+  Smile,
+  Maximize2,
+  Minimize2
+} from 'lucide-react';
+
+export interface RichTextEditorRef {
+  insertMedia: (url: string, type: 'image' | 'video' | 'audio' | 'raw') => void;
+}
+
+interface RichTextEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  onOpenMediaPicker?: () => void;
+}
+
+const FontSize = Extension.create({
+  name: 'fontSize',
+  addOptions() {
+    return { types: ['textStyle'] };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: element => element.style.fontSize?.replace(/['"]+/g, ''),
+            renderHTML: attributes => {
+              if (!attributes.fontSize) return {};
+              return { style: `font-size: ${attributes.fontSize}` };
+            },
+          },
+        },
+      },
+    ];
+  },
+  addCommands() {
+    return {
+      setFontSize: (fontSize: string) => ({ chain }: any) => {
+        return chain().setMark('textStyle', { fontSize }).run();
+      },
+      unsetFontSize: () => ({ chain }: any) => {
+        return chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run();
+      },
+    } as any;
+  },
+});
+
+const FONT_FAMILIES = ["Inter", "Comic Sans MS", "Georgia", "Impact", "Times New Roman", "monospace"];
+const FONT_SIZES = ["10px", "12px", "14px", "16px", "18px", "20px", "24px", "30px", "36px"];
+
+const VideoExtension = Node.create({
+  name: 'video',
+  group: 'block',
+  selectable: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      src: {
+        default: null,
+      },
+      controls: {
+        default: true,
+      },
+      class: {
+        default: 'rounded-md border shadow-sm w-full max-w-[600px] my-4 block',
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'video',
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['video', mergeAttributes(HTMLAttributes)];
+  },
+});
+
+const AudioExtension = Node.create({
+  name: 'audio',
+  group: 'block',
+  selectable: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      src: {
+        default: null,
+      },
+      controls: {
+        default: true,
+      },
+      class: {
+        default: 'w-full max-w-[400px] my-4 block',
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'audio',
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['audio', mergeAttributes(HTMLAttributes)];
+  },
+});
+
+const MenuBar = ({ editor, onOpenMediaPicker, isFullscreen, toggleFullscreen }: { editor: any, onOpenMediaPicker?: () => void, isFullscreen: boolean, toggleFullscreen: () => void }) => {
+  if (!editor) {
+    return null;
+  }
+
+  const handleLink = () => {
+    const previousUrl = editor.getAttributes('link').href;
+    const url = window.prompt('URL', previousUrl);
+
+    // cancelled
+    if (url === null) {
+      return;
+    }
+
+    // empty
+    if (url === '') {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      return;
+    }
+
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+  };
+
+  const buttons = [
+    {
+      icon: <Undo className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().undo().run(),
+      disabled: !editor.can().chain().focus().undo().run(),
+      title: 'Undo',
+    },
+    {
+      icon: <Redo className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().redo().run(),
+      disabled: !editor.can().chain().focus().redo().run(),
+      title: 'Redo',
+    },
+    { divider: true },
+    {
+      icon: <Eraser className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().clearNodes().unsetAllMarks().run(),
+      title: 'Remove Formatting',
+    },
+    { divider: true },
+    {
+      icon: <Heading1 className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+      isActive: editor.isActive('heading', { level: 1 }),
+      title: 'Heading 1',
+    },
+    {
+      icon: <Heading2 className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+      isActive: editor.isActive('heading', { level: 2 }),
+      title: 'Heading 2',
+    },
+    {
+      icon: <Heading3 className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+      isActive: editor.isActive('heading', { level: 3 }),
+      title: 'Heading 3',
+    },
+    { divider: true },
+    {
+      icon: <Bold className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleBold().run(),
+      isActive: editor.isActive('bold'),
+      title: 'Bold (Cmd+B)',
+    },
+    {
+      icon: <Italic className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleItalic().run(),
+      isActive: editor.isActive('italic'),
+      title: 'Italic (Cmd+I)',
+    },
+    {
+      icon: <UnderlineIcon className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleUnderline().run(),
+      isActive: editor.isActive('underline'),
+      title: 'Underline (Cmd+U)',
+    },
+    {
+      icon: <Strikethrough className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleStrike().run(),
+      isActive: editor.isActive('strike'),
+      title: 'Strikethrough',
+    },
+    {
+      icon: <Highlighter className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleHighlight().run(),
+      isActive: editor.isActive('highlight'),
+      title: 'Highlight',
+    },
+    { divider: true },
+    {
+      icon: <AlignLeft className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().setTextAlign('left').run(),
+      isActive: editor.isActive({ textAlign: 'left' }),
+      title: 'Align Left',
+    },
+    {
+      icon: <AlignCenter className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().setTextAlign('center').run(),
+      isActive: editor.isActive({ textAlign: 'center' }),
+      title: 'Align Center',
+    },
+    {
+      icon: <AlignRight className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().setTextAlign('right').run(),
+      isActive: editor.isActive({ textAlign: 'right' }),
+      title: 'Align Right',
+    },
+    { divider: true },
+    {
+      icon: <List className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleBulletList().run(),
+      isActive: editor.isActive('bulletList'),
+      title: 'Bullet List',
+    },
+    {
+      icon: <ListOrdered className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleOrderedList().run(),
+      isActive: editor.isActive('orderedList'),
+      title: 'Ordered List',
+    },
+    { divider: true },
+    {
+      icon: <Quote className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleBlockquote().run(),
+      isActive: editor.isActive('blockquote'),
+      title: 'Blockquote',
+    },
+    {
+      icon: <Code className="h-[15px] w-[15px]" />,
+      onClick: () => editor.chain().focus().toggleCodeBlock().run(),
+      isActive: editor.isActive('codeBlock'),
+      title: 'Code Block',
+    },
+    {
+      icon: <Link2 className="h-[15px] w-[15px]" />,
+      onClick: handleLink,
+      isActive: editor.isActive('link'),
+      title: 'Insert Link',
+    },
+    { divider: true },
+    {
+      icon: <ImageIcon className="h-[15px] w-[15px] text-emerald-500" />,
+      onClick: () => {
+        if (onOpenMediaPicker) {
+          onOpenMediaPicker();
+        } else {
+          const url = window.prompt('Image URL');
+          if (url) editor.chain().focus().setImage({ src: url }).run();
+        }
+      },
+      title: 'Insert Media',
+    }
+  ];
+
+  return (
+    <div className="flex flex-wrap items-center gap-[4px] p-1.5 bg-muted/30 border-b shrink-0">
+      <Select
+        value={editor.getAttributes('textStyle').fontFamily || "default"}
+        onValueChange={(val) => {
+          if (val === "default") editor.chain().focus().unsetFontFamily().run();
+          else editor.chain().focus().setFontFamily(val).run();
+        }}
+      >
+        <SelectTrigger className="h-7 w-[120px] text-xs">
+          <SelectValue placeholder="Font" />
+        </SelectTrigger>
+        <SelectContent>
+           <SelectItem value="default">Default Font</SelectItem>
+           {FONT_FAMILIES.map(v => <SelectItem key={v} value={v} style={{fontFamily: v}}>{v.split(',')[0]}</SelectItem>)}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={editor.getAttributes('textStyle').fontSize || "default"}
+        onValueChange={(val) => {
+          if (val === "default") (editor.chain().focus() as any).unsetFontSize().run();
+          else (editor.chain().focus() as any).setFontSize(val).run();
+        }}
+      >
+        <SelectTrigger className="h-7 w-[75px] text-xs">
+          <SelectValue placeholder="Size" />
+        </SelectTrigger>
+        <SelectContent>
+           <SelectItem value="default">Auto</SelectItem>
+           {FONT_SIZES.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+        </SelectContent>
+      </Select>
+
+      <div className="relative flex items-center justify-center p-1 hover:bg-muted rounded-md transition-colors overflow-hidden h-7 w-7">
+        <Baseline className="absolute z-0 h-[16px] w-[16px] pointer-events-none" style={{ color: editor.getAttributes('textStyle').color || "currentColor" }} />
+        <input 
+           type="color" 
+           onInput={e => editor.chain().focus().setColor(e.currentTarget.value).run()}
+           value={editor.getAttributes('textStyle').color || "#000000"}
+           className="absolute inset-0 w-10 h-10 -ml-2 -mt-2 opacity-0 cursor-pointer z-10"
+           title="Text Color"
+        />
+      </div>
+
+      <div className="w-[1px] h-[18px] bg-border mx-[2px]" />
+
+      {buttons.map((btn, index) => {
+        if (btn.divider) {
+          return <div key={index} className="w-[1px] h-[18px] bg-border mx-[2px]" />;
+        }
+        return (
+          <Button
+            key={index}
+            variant="ghost"
+            size="icon"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              btn.onClick?.();
+            }}
+            disabled={btn.disabled}
+            className={cn(
+              "h-7 w-7 text-muted-foreground hover:text-foreground",
+              btn.isActive && "bg-muted text-foreground font-bold shadow-sm"
+            )}
+            title={btn.title}
+            type="button"
+          >
+            {btn.icon}
+          </Button>
+        );
+      })}
+
+      <div className="w-[1px] h-[18px] bg-border mx-[2px]" />
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" title="Insert Emoji">
+            <Smile className="h-[15px] w-[15px] text-amber-500" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[350px] p-0" align="end" sideOffset={5} onOpenAutoFocus={(e) => e.preventDefault()}>
+          <div className="h-[400px] overflow-hidden rounded-md border shadow-md">
+             <EmojiPicker 
+               onEmojiClick={(data) => editor.chain().focus().insertContent(data.emoji).run()} 
+               width="100%" 
+               height="100%"
+               lazyLoadEmojis={true}
+             />
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <SignaturePad 
+        onSave={(dataUrl) => editor.chain().focus().setImage({ src: dataUrl }).run()} 
+      />
+
+      <div className="flex-1" />
+      <Button 
+         variant="ghost" 
+         size="icon" 
+         className="h-7 w-7 text-muted-foreground hover:text-foreground" 
+         onClick={toggleFullscreen} 
+         title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+         type="button"
+      >
+         {isFullscreen ? <Minimize2 className="h-[15px] w-[15px]" /> : <Maximize2 className="h-[15px] w-[15px]" />}
+      </Button>
+    </div>
+  );
+};
+
+export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
+  ({ value, onChange, placeholder = "Write something...", className, onOpenMediaPicker }, ref) => {
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    
+    const editor = useEditor({
+      immediatelyRender: false,
+      extensions: [
+        StarterKit.configure({
+          heading: {
+            levels: [1, 2, 3],
+            HTMLAttributes: {
+              class: 'font-bold mt-6 mb-2 !leading-tight text-foreground',
+            },
+          },
+          bulletList: {
+            HTMLAttributes: {
+              class: 'list-disc list-outside ml-6 space-y-1 mb-4',
+            },
+          },
+          orderedList: {
+            HTMLAttributes: {
+              class: 'list-decimal list-outside ml-6 space-y-1 mb-4',
+            },
+          },
+          blockquote: {
+            HTMLAttributes: {
+              class: 'border-l-4 border-primary/50 bg-muted/40 text-muted-foreground italic pl-4 py-2 my-4 rounded-r-md',
+            },
+          },
+          codeBlock: {
+            HTMLAttributes: {
+              class: 'bg-muted/60 rounded-md p-4 my-4 font-mono text-sm border shadow-inner',
+            },
+          },
+        }),
+        TextStyle as any,
+        Color as any,
+        FontFamily as any,
+        FontSize as any,
+        Underline,
+        Highlight,
+        Image.configure({
+          inline: true,
+          allowBase64: true,
+          HTMLAttributes: {
+             class: 'rounded-md max-w-full my-4 border shadow-sm',
+          }
+        }),
+        VideoExtension,
+        AudioExtension,
+        Link.configure({
+          openOnClick: false,
+        }),
+        TextAlign.configure({
+          types: ['heading', 'paragraph'],
+        }),
+        Mention.configure({
+          HTMLAttributes: {
+            class: 'mention inline-block px-1.5 py-0.5 rounded-md bg-[#8b5cf6]/20 text-[#8b5cf6] font-semibold tracking-tight shadow-sm border border-[#8b5cf6]/30',
+          },
+          suggestion,
+        }),
+      ],
+      content: value,
+      editorProps: {
+        attributes: {
+          class: cn(
+            "prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[220px] p-4",
+            "prose-headings:font-bold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg",
+            "prose-p:leading-relaxed prose-a:text-primary prose-a:underline",
+            className
+          ),
+        },
+      },
+      onUpdate: ({ editor }) => {
+        onChange(editor.getHTML());
+      },
+    });
+
+    useImperativeHandle(ref, () => ({
+      insertMedia: (url: string, type: 'image' | 'video' | 'audio' | 'raw') => {
+        if (!editor) return;
+        
+        if (type === 'image') {
+          editor.chain().focus().setImage({ src: url }).run();
+        } else if (type === 'video') {
+          editor.chain().focus().insertContent([
+            {
+              type: 'video',
+              attrs: { src: url }
+            },
+            {
+              type: 'paragraph'
+            }
+          ]).run();
+        } else if (type === 'audio') {
+          editor.chain().focus().insertContent([
+            {
+              type: 'audio',
+              attrs: { src: url }
+            },
+            {
+              type: 'paragraph'
+            }
+          ]).run();
+        }
+      }
+    }));
+
+    // Sync external changes (e.g., when clearing the form on complete)
+    useEffect(() => {
+      if (editor && value !== editor.getHTML()) {
+         if (value === '') {
+             editor.commands.setContent('');
+         }
+      }
+    }, [value, editor]);
+
+    return (
+      <div className={cn(
+        "border border-input overflow-hidden rounded-md flex flex-col bg-background transition-shadow shadow-sm max-w-[100vw]",
+        isFullscreen ? "fixed inset-0 z-[100] rounded-none border-none shadow-xl" : "focus-within:ring-1 focus-within:ring-ring"
+      )}>
+        <MenuBar 
+           editor={editor} 
+           onOpenMediaPicker={onOpenMediaPicker} 
+           isFullscreen={isFullscreen} 
+           toggleFullscreen={() => setIsFullscreen(!isFullscreen)} 
+        />
+        <div 
+           className={cn("overflow-y-auto cursor-text text-sm flex-1", isFullscreen ? "h-full bg-muted/10 p-8" : "max-h-[50dvh]")} 
+           onClick={() => editor?.commands.focus()}
+        >
+          <div className={cn(isFullscreen && "max-w-[1000px] mx-auto bg-background rounded-md shadow-sm border p-4 min-h-[800px]")}>
+            <EditorContent editor={editor} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+);
+RichTextEditor.displayName = 'RichTextEditor';

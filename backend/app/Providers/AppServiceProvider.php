@@ -25,9 +25,42 @@ class AppServiceProvider extends ServiceProvider
         // But ONLY on your local machine, never in production.
         Model::shouldBeStrict(! app()->isProduction());
 
-        // Implicitly grant "Super Admin" role all permissions
+        // Implicitly grant "Super Admin" role all permissions across central,
+        // tenant, and Sanctum API guard contexts.
         Gate::before(function ($user, $ability) {
-            return $user->hasRole('Super Admin', 'sanctum') ? true : null;
+            return $this->hasSuperAdminRole($user) ? true : null;
         });
+    }
+
+    protected function hasSuperAdminRole(mixed $user): bool
+    {
+        if (! method_exists($user, 'hasRole')) {
+            return false;
+        }
+
+        $guards = array_values(array_unique(array_filter([
+            config('auth.defaults.guard'),
+            $user->guard_name ?? null,
+            'web',
+            'tenant',
+            'sanctum',
+        ])));
+
+        foreach ($guards as $guard) {
+            try {
+                if ($user->hasRole('Super Admin', $guard)) {
+                    return true;
+                }
+            } catch (\Throwable) {
+                // Keep checking other guards; Spatie throws when a role belongs
+                // to a different guard than the one being tested.
+            }
+        }
+
+        try {
+            return $user->hasRole('Super Admin');
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

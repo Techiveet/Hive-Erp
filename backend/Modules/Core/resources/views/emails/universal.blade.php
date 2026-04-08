@@ -189,6 +189,12 @@
 
                 @if(($type ?? '') === 'created')
                     <div style="margin-top: 36px;">
+                        @if(!empty($credentialEmail))
+                            <div class="data-label">Login Email</div>
+                            <div class="code-block" style="margin-bottom: 16px;">
+                                {{ $credentialEmail }}
+                            </div>
+                        @endif
                         <div class="data-label">Temporary Encryption Key</div>
                         <div class="code-block">
                             {{ $rawPassword ?? '********' }}

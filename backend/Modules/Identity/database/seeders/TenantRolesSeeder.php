@@ -39,7 +39,6 @@ class TenantRolesSeeder extends Seeder
         }
 
         $roles = [
-            'Super Admin' => $perms, // 🚀 FIX: Name changed to 'Super Admin' to align with UI creations
             'HR Manager' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_users', 'create_users', 'edit_users', 'view_roles', 'view_storage', 'view_module_subscriptions'],
             'Finance Controller' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_invoices', 'manage_invoices', 'view_logs', 'export_logs', 'view_module_subscriptions'],
             'Logistics Coordinator' => ['view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts', 'view_inventory', 'manage_inventory', 'manage_fleet', 'view_module_subscriptions'],
@@ -50,5 +49,9 @@ class TenantRolesSeeder extends Seeder
             $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => $guard]);
             $role->syncPermissions($rolePerms);
         }
+
+        // 🚀 SUPER ADMIN: GETS ALL PERMISSIONS IN DB dynamically
+        $superAdmin = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => $guard]);
+        $superAdmin->syncPermissions(Permission::where('guard_name', $guard)->get());
     }
 }

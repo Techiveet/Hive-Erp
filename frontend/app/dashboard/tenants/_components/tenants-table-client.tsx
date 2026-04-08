@@ -26,10 +26,11 @@ import {
     type TenantUpdateOfflinePayload,
     updateTenantOfflineMutationDefinition,
 } from "@/modules/shared/offline-mutations";
-import { fetchSubscriptionCatalog, fetchTenants } from "@/modules/tenancy/api";
-import { ModuleSubscriptionSelector } from "@/modules/tenancy/components/module-subscription-selector";
-import { ModuleSubscriptionSummary } from "@/modules/tenancy/components/module-subscription-summary";
-import type { TenantCatalogModule, TenantCustomModuleInput } from "@/modules/tenancy/types";
+import { fetchSubscriptionCatalog } from "@/modules/subscription/api";
+import { ModuleSubscriptionSelector } from "@/modules/subscription/components/module-subscription-selector";
+import { ModuleSubscriptionSummary } from "@/modules/subscription/components/module-subscription-summary";
+import type { TenantCatalogModule, TenantCustomModuleInput } from "@/modules/subscription/types";
+import { fetchTenants } from "@/modules/tenancy/api";
 import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -523,6 +524,15 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                             <div>
                                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_plan', "Capacity Plan")}</p>
                                 {viewTenant?.plan && getPlanBadge(viewTenant.plan)}
+                            </div>
+                            <div>
+                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">Subscription</p>
+                                <Badge variant="outline" className={cn("uppercase text-[10px]", viewTenant?.subscription?.status === "expired" ? "text-destructive bg-destructive/10" : viewTenant?.subscription?.needs_renewal ? "text-amber-600 bg-amber-500/10" : "text-emerald-500 bg-emerald-500/10")}>
+                                    {String(viewTenant?.subscription?.status || "active").replaceAll("_", " ")}
+                                </Badge>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                    {viewTenant?.subscription?.expires_at ? `Expires ${new Date(viewTenant.subscription.expires_at).toLocaleDateString()}` : "No expiry date available"}
+                                </p>
                             </div>
                             <div className="col-span-2">
                                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_domain', "Routing Domain")}</p>

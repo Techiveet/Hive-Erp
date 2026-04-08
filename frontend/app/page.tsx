@@ -345,7 +345,7 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
           <button onClick={() => scrollToSection('hr')} className="hover:text-primary hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">Payroll</button>
           <button onClick={() => scrollToSection('architecture')} className="hover:text-primary hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">Architecture</button>
           {!initialIsTenant && (
-            <button onClick={() => scrollToSection('pricing')} className="hover:text-primary hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">Deploy</button>
+            <button onClick={() => scrollToSection('pricing')} className="hover:text-primary hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-primary font-black">Pricing</button>
           )}
         </div>
 
@@ -808,66 +808,190 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
         </div>
       </section>
 
-      {/* --- PRICING & DEPLOYMENT TIERS --- */}
+      {/* ─── HOW IT WORKS ──────────────────────────────────────────────── */}
       {!initialIsTenant && (
-        <section id="pricing" className="py-24 bg-card/20 relative overflow-hidden border-b border-border">
+        <section id="how-it-works" className="py-24 bg-background border-b border-border relative overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 blur-[120px] rounded-full" />
+            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/5 blur-[120px] rounded-full" />
+          </div>
+
           <div className="max-w-6xl mx-auto px-4">
             <div className="text-center mb-16">
-              <Badge className="mb-4 bg-primary/20 text-primary border-none shadow-none">SCALABLE ARCHITECTURE</Badge>
-              <h2 className="font-space text-4xl md:text-5xl font-bold mb-4">Choose Your <span className="text-primary">Deployment</span></h2>
+              <Badge className="mb-4 bg-indigo-500/10 text-indigo-500 border-none shadow-none">TWO WAYS TO GET STARTED</Badge>
+              <h2 className="font-space text-4xl md:text-5xl font-bold mb-4">How <span className="text-indigo-500">Onboarding</span> Works</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-                Whether you're a lean startup or a massive corporate enterprise, Hive scales infrastructure directly to your operational needs.
+                Every organization on Hive chooses their own deployment path. Self-service is instant, or let our admin team provision your node manually.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              <div className="bg-background border border-border rounded-2xl p-8 hover:border-primary/40 transition-all flex flex-col">
-                <h3 className="font-space font-bold text-2xl mb-2">Startup Node</h3>
-                <p className="text-sm text-muted-foreground mb-6">Perfect for small teams launching their operations.</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-black">Free</span>
-                  <span className="text-muted-foreground text-sm"> / forever</span>
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Self-Service Path */}
+              <div className="relative rounded-[2rem] border border-indigo-500/30 bg-gradient-to-br from-indigo-500/10 to-violet-500/5 p-8 hover:shadow-lg hover:shadow-indigo-500/10 transition-all group">
+                <div className="absolute top-6 right-6 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">Self-Service</div>
+                <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center mb-6">
+                  <Zap className="h-7 w-7 text-indigo-500" />
                 </div>
-                <ul className="space-y-3 mb-8 flex-1 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-primary" /> Up to 5 Employees</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-primary" /> Basic Ledger & Payroll</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-primary" /> Shared Database Instance</li>
-                </ul>
-                <Button variant="outline" className="w-full font-space font-bold uppercase tracking-wider">Deploy Free Node</Button>
+                <h3 className="text-2xl font-black font-space mb-3">Tenants Register Themselves</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed mb-8">
+                  Any organization can visit this page, pick a plan, complete payment via ArifPay, and get their workspace provisioned automatically — no admin required.
+                </p>
+                <ol className="space-y-4 mb-8">
+                  {[
+                    { n: '01', title: 'Choose a Plan', desc: 'Compare plans below and pick the one that fits your team.' },
+                    { n: '02', title: 'Complete ArifPay Checkout', desc: 'Pay securely via Telebirr, CBE or Card through ArifPay.' },
+                    { n: '03', title: 'Workspace Auto-Provisions', desc: 'Your isolated tenant database and admin account are created instantly.' },
+                    { n: '04', title: 'Add Modules Anytime', desc: 'Upgrade or add more modules from your subscription dashboard.' },
+                  ].map(step => (
+                    <li key={step.n} className="flex gap-4">
+                      <span className="h-8 w-8 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-500 font-black text-xs shrink-0 mt-0.5 border border-indigo-500/20">{step.n}</span>
+                      <div>
+                        <p className="font-bold text-foreground text-sm">{step.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{step.desc}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                <Link href="/auth/signup">
+                  <Button className="w-full font-space font-bold uppercase tracking-wider bg-indigo-500 hover:bg-indigo-600 text-white border-none shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 transition-all gap-2">
+                    Get Started Free <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
               </div>
 
-              <div className="bg-primary text-primary-foreground border-none rounded-2xl p-8 transform md:-translate-y-4 shadow-2xl shadow-primary/20 flex flex-col relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-white/20 px-3 py-1 text-xs font-bold rounded-bl-lg">MOST POPULAR</div>
-                <h3 className="font-space font-bold text-2xl mb-2">Growth Node</h3>
-                <p className="text-sm text-primary-foreground/80 mb-6">Dedicated resources for scaling logistics and HR.</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-black text-white">Custom</span>
-                  <span className="text-primary-foreground/80 text-sm"> / month</span>
+              {/* Admin-Provisioned Path */}
+              <div className="relative rounded-[2rem] border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-orange-500/5 p-8 hover:shadow-lg hover:shadow-amber-500/10 transition-all group">
+                <div className="absolute top-6 right-6 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 border border-amber-500/20">Admin-Managed</div>
+                <div className="h-14 w-14 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-6">
+                  <ShieldCheck className="h-7 w-7 text-amber-500" />
                 </div>
-                <ul className="space-y-3 mb-8 flex-1 text-sm text-primary-foreground/90">
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4" /> Unlimited Employees</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4" /> Full Logistics & Waybills</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4" /> Isolated Docker Container</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4" /> Payment Gateway API (Chapa)</li>
-                </ul>
-                <Button className="w-full bg-background text-foreground hover:bg-background/90 font-space font-bold uppercase tracking-wider">Contact Sales</Button>
+                <h3 className="text-2xl font-black font-space mb-3">Central Admin Provisions Tenants</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed mb-8">
+                  Central Super Admins can manually create and configure any tenant — assigning their plan, storage quota, and enabled modules directly from the admin panel.
+                </p>
+                <ol className="space-y-4 mb-8">
+                  {[
+                    { n: '01', title: 'Open Tenants Panel', desc: 'Go to Dashboard → Tenants and click "Create New Tenant".' },
+                    { n: '02', title: 'Select Plan & Modules', desc: 'Assign a subscription plan and pick which modules to enable.' },
+                    { n: '03', title: 'Set Storage Quota', desc: 'Override the plan default or use per-plan quotas set in Email Settings.' },
+                    { n: '04', title: 'Provision Instantly', desc: 'The tenant workspace is created immediately with full isolation.' },
+                  ].map(step => (
+                    <li key={step.n} className="flex gap-4">
+                      <span className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 font-black text-xs shrink-0 mt-0.5 border border-amber-500/20">{step.n}</span>
+                      <div>
+                        <p className="font-bold text-foreground text-sm">{step.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{step.desc}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                <Link href="/sign-in">
+                  <Button variant="outline" className="w-full font-space font-bold uppercase tracking-wider border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-500 transition-all gap-2">
+                    Admin Sign In <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
               </div>
+            </div>
+          </div>
+        </section>
+      )}
 
-              <div className="bg-background border border-border rounded-2xl p-8 hover:border-primary/40 transition-all flex flex-col">
-                <h3 className="font-space font-bold text-2xl mb-2">Enterprise Mesh</h3>
-                <p className="text-sm text-muted-foreground mb-6">For corporations requiring strict localized data governance.</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-black">On-Prem</span>
-                  <span className="text-muted-foreground text-sm"> / deployment</span>
+      {/* ─── PRICING & PLAN COMPARISON ────────────────────────────────── */}
+      {!initialIsTenant && (
+        <section id="pricing" className="py-24 bg-card/20 relative overflow-hidden border-b border-border">
+          <div className="absolute left-0 top-0 w-96 h-96 bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
+          <div className="absolute right-0 bottom-0 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full pointer-events-none" />
+
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="text-center mb-16">
+              <Badge className="mb-4 bg-primary/20 text-primary border-none shadow-none">SUBSCRIPTION PLANS</Badge>
+              <h2 className="font-space text-4xl md:text-5xl font-bold mb-4">Transparent <span className="text-primary">Pricing</span></h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+                Every plan includes an isolated tenant workspace, secure mailbox, and a bundled module stack. Add more modules anytime via ArifPay checkout.
+              </p>
+            </div>
+
+            {/* Plan grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+              {([
+                { key: 'larva',      label: 'Larva',      tagline: 'Free trial',      price: 'Free',       priceNote: 'forever',  storage: '512 MB',  color: 'text-slate-500',  ring: 'ring-slate-500/30',  bg: 'from-slate-500/10 to-slate-400/5',   highlight: false, features: ['Internal Mailbox', '512 MB mailbox quota', 'Up to 5 users', 'Shared instance', 'Dashboard overview'] },
+                { key: 'startup',    label: 'Startup',    tagline: 'Launch-ready',    price: 'Free',       priceNote: '/month',   storage: '2 GB',    color: 'text-sky-500',    ring: 'ring-sky-500/30',    bg: 'from-sky-500/10 to-cyan-400/5',      highlight: false, features: ['Mailbox + File Manager', 'Image Editor', 'Document Converter', '2 GB storage quota', 'Isolated DB schema'] },
+                { key: 'business',   label: 'Business',   tagline: 'Most popular',    price: 'ETB 3,499',  priceNote: '/month',   storage: '10 GB',   color: 'text-indigo-500', ring: 'ring-indigo-500/30', bg: 'from-indigo-500/10 to-violet-400/5', highlight: true,  features: ['All Startup modules', 'Media Library + Video Player', 'Advanced Analytics', 'Audit Logs + Alerts Center', 'Invoice & Billing', 'Inventory Control', 'Security Management', '10 GB storage quota'] },
+                { key: 'enterprise', label: 'Enterprise', tagline: 'Large-scale ops', price: 'ETB 7,999',  priceNote: '/month',   storage: '50 GB',   color: 'text-violet-500', ring: 'ring-violet-500/30', bg: 'from-violet-500/10 to-purple-400/5', highlight: false, features: ['All Business modules', 'Workflow Automation', 'API Access + API Docs', 'Fleet Management', 'Developer tools', '50 GB storage quota', 'Priority support'] },
+                { key: 'overlord',   label: 'Overlord',   tagline: 'All-inclusive',   price: 'ETB 12,999', priceNote: '/month',   storage: '200 GB',  color: 'text-amber-500',  ring: 'ring-amber-500/30',  bg: 'from-amber-500/10 to-orange-400/5',  highlight: false, features: ['Every module unlocked (17 total)', '200 GB storage quota', 'Custom module integrations', 'Dedicated SLA', 'Techive engineering support'] },
+              ] as const).map(plan => (
+                <div
+                  key={plan.key}
+                  className={cn(
+                    'relative flex flex-col rounded-[2rem] p-6 border transition-all duration-300 hover:shadow-xl overflow-hidden',
+                    plan.highlight
+                      ? `ring-2 ${plan.ring} border-transparent bg-gradient-to-br ${plan.bg} shadow-lg`
+                      : 'border-border/50 bg-card/40 backdrop-blur-md hover:bg-card/60 hover:border-primary/30'
+                  )}
+                >
+                  {plan.highlight && (
+                    <div className={cn('absolute top-0 inset-x-0 h-1 rounded-t-[2rem] bg-gradient-to-r', 'from-indigo-500 via-violet-500 to-purple-500')} />
+                  )}
+                  {'highlight' in plan && plan.highlight && (
+                    <div className="absolute top-5 right-5 text-[9px] font-black uppercase tracking-widest bg-indigo-500 text-white px-2 py-0.5 rounded-full">Popular</div>
+                  )}
+
+                  <div className={cn('text-xs font-black uppercase tracking-widest mb-1', plan.color)}>{plan.label}</div>
+                  <p className="text-xs text-muted-foreground mb-4">{plan.tagline}</p>
+
+                  <div className="mb-5">
+                    <span className="text-3xl font-black text-foreground">{plan.price}</span>
+                    <span className="text-xs text-muted-foreground ml-1">{plan.priceNote}</span>
+                  </div>
+
+                  <div className={cn('rounded-xl px-3 py-2 mb-5 text-xs font-bold flex items-center gap-2', plan.color, `bg-gradient-to-br ${plan.bg}`)}>
+                    <Globe className="h-3.5 w-3.5 shrink-0" />
+                    {plan.storage} mailbox quota
+                  </div>
+
+                  <ul className="space-y-2.5 flex-1 mb-6">
+                    {plan.features.map((f, i) => (
+                      <li key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Check className={cn('h-3.5 w-3.5 shrink-0', plan.color)} />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Link href="/auth/signup">
+                    <Button
+                      size="sm"
+                      className={cn(
+                        'w-full rounded-xl font-bold uppercase tracking-wider text-xs gap-1.5 transition-all',
+                        plan.highlight
+                          ? 'bg-indigo-500 hover:bg-indigo-600 text-white border-none shadow-md shadow-indigo-500/30'
+                          : 'variant-outline border-current/30 bg-transparent hover:bg-current/10'
+                      )}
+                      variant={plan.highlight ? 'default' : 'outline'}
+                    >
+                      Get Started <ArrowRight className="h-3 w-3" />
+                    </Button>
+                  </Link>
                 </div>
-                <ul className="space-y-3 mb-8 flex-1 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-primary" /> Installed on your local servers</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-primary" /> INSA compliance guaranteed</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-primary" /> Custom legacy integrations</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-primary" /> Dedicated Techive support</li>
-                </ul>
-                <Button variant="outline" className="w-full font-space font-bold uppercase tracking-wider">Talk to Engineering</Button>
+              ))}
+            </div>
+
+            {/* Admin-provision callout */}
+            <div className="mt-10 rounded-[2rem] border border-border/50 bg-card/30 backdrop-blur-md p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-2xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="h-6 w-6 text-amber-500" />
+                </div>
+                <div>
+                  <p className="font-black text-foreground">Need a managed deployment?</p>
+                  <p className="text-sm text-muted-foreground">Central admins can provision tenant workspaces with custom quotas and module overrides from the admin panel.</p>
+                </div>
               </div>
+              <Link href="/sign-in" className="shrink-0">
+                <Button variant="outline" className="font-space font-bold uppercase tracking-wider border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-500 transition-all gap-2 whitespace-nowrap">
+                  Admin Portal <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
             </div>
           </div>
         </section>
@@ -914,20 +1038,23 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl h-full bg-primary/10 blur-[100px] rounded-full pointer-events-none"></div>
           
           <div className="max-w-4xl mx-auto text-center relative z-10">
-            <h2 className="font-space text-5xl md:text-6xl font-black mb-6">Ready to upgrade your Ethiopian Enterprise?</h2>
+            <h2 className="font-space text-5xl md:text-6xl font-black mb-6">Ready to deploy your<br /><span className="text-primary">Hive workspace?</span></h2>
             <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
-              Join the companies leveraging Techive Technology Solutions to streamline their entire operation.
+              Pick a plan and get your isolated tenant node provisioned in minutes — or contact the admin team for a managed setup.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/auth/signup">
-                <Button className="px-8 py-6 text-lg font-space font-bold uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/20 border-none hover:scale-105 transition-all duration-300">
-                  Deploy Your Node Now
+                <Button className="px-8 py-6 text-lg font-space font-bold uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/20 border-none hover:scale-105 transition-all duration-300 gap-2">
+                  Start Free — Pick a Plan <ArrowRight className="h-5 w-5" />
                 </Button>
               </Link>
-              <Button variant="outline" className="px-8 py-6 text-lg font-space font-bold uppercase tracking-wider hover:bg-primary/10 hover:text-primary transition-all duration-300">
-                Contact Sales
-              </Button>
+              <Link href="/sign-in">
+                <Button variant="outline" className="px-8 py-6 text-lg font-space font-bold uppercase tracking-wider hover:bg-primary/10 hover:text-primary transition-all duration-300">
+                  Admin Sign In
+                </Button>
+              </Link>
             </div>
+            <p className="mt-6 text-sm text-muted-foreground">No credit card required for Larva & Startup plans · Powered by ArifPay</p>
           </div>
         </section>
       )}

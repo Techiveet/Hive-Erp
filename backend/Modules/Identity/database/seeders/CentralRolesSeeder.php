@@ -34,7 +34,7 @@ class CentralRolesSeeder extends Seeder
 
             // System & Settings
             'view_system_dashboard', 'manage_system_settings', 'view_storage', 'manage_storage',
-            'manage_brand_settings', 'manage_general_settings', 'manage_localization', 'view_api_docs',
+            'manage_brand_settings', 'manage_general_settings', 'manage_payment_settings', 'manage_localization', 'view_api_docs',
         ];
 
         // 1. Establish the Capability Dictionary

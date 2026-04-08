@@ -1,1 +1,1 @@
-export { default } from "@/modules/tenancy/pages/subscriptions-page";
+export { default } from "@/modules/subscription/pages/subscriptions-page";

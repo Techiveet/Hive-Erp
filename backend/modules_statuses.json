@@ -1,6 +1,7 @@
 {
     "Identity": true,
     "Tenancy": true,
+    "Subscription": true,
     "Core": true,
     "ActivityObserver": true,
     "MailBox": true

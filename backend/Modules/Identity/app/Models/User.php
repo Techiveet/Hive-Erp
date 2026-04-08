@@ -75,6 +75,11 @@ class User extends Authenticatable
         return $this->avatar_path;
     }
 
+    public function receivesBroadcastNotificationsOn(): string
+    {
+        return 'App.Models.User.' . $this->getKey();
+    }
+
     public function searchableAs()
     {
         $prefix = function_exists('tenant') && tenant('id')

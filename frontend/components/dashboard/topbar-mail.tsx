@@ -25,7 +25,7 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
     return `http://${host}:8085/api/v1`;
   };
 
-  const getTenantHeaders = () => {
+  const getTenantHeaders = (): Record<string, string> => {
     const tenantId = getTenantId();
     return tenantId ? { "X-Tenant": tenantId } : {};
   };
@@ -42,7 +42,7 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
         const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
         if (!token) throw new Error("No token");
         const res = await fetch(getTenantAwareEndpoint('/mail/unread-count'), {
-            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() } as Record<string, string>
         });
         if (!res.ok) throw new Error("Failed to fetch count");
         return res.json();
@@ -56,7 +56,7 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
         const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
         if (!token) throw new Error("No token");
         const res = await fetch(getTenantAwareEndpoint('/mail?folder=inbox'), {
-            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() } as Record<string, string>
         });
         if (!res.ok) throw new Error("Failed to fetch mails");
         return res.json();
@@ -84,7 +84,7 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
                    count: (oldData?.count || 0) + 1
                }));
                queryClient.invalidateQueries({ queryKey: ['recentMails'] });
-               toast.info(`New mail: ${e.messageData?.subject || 'No Subject'}`);
+               toast.info(`New mail: ${e.participantData?.message?.subject || 'No Subject'}`);
            });
            
         return () => {

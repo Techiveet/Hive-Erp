@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import api from '@/lib/api';
 
 export interface User {
-  id: number;
+  id: number | string;
   name: string;
   email: string;
   avatar_url?: string;
@@ -45,9 +45,17 @@ export function UserMultiSelect({ placeholder = "Search users...", selectedUsers
     const fetchUsers = async () => {
       setLoading(true);
       try {
-        const { data } = await api.get(`/users?search=${encodeURIComponent(query)}`);
-        // standard laravel pagination usually wraps data in data.data
-        const usersList = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+        const { data } = await api.get(`/directory/users?search=${encodeURIComponent(query)}`);
+        let usersList = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+        
+        const q = query.toLowerCase().trim();
+        if (q === 'all' || "all users".startsWith(q) || "everyone".startsWith(q)) {
+            usersList = [
+                { id: 'all', name: 'All Users (Everyone)', email: 'Broadcast to everyone in the company' },
+                ...usersList
+            ];
+        }
+
         setResults(usersList);
       } catch (err) {
         console.error("Failed to fetch users");
@@ -68,7 +76,7 @@ export function UserMultiSelect({ placeholder = "Search users...", selectedUsers
     setOpen(false);
   };
 
-  const handleRemove = (id: number) => {
+  const handleRemove = (id: number | string) => {
     onChange(selectedUsers.filter(u => u.id !== id));
   };
 

@@ -16,7 +16,7 @@ import {
   toggleTenantStatus,
   updateTenant,
 } from "@/modules/tenancy/api";
-import type { TenantModuleSubscriptionPayload } from "@/modules/tenancy/types";
+import type { TenantModuleSubscriptionPayload } from "@/modules/subscription/types";
 
 const tenantInvalidationKeys: QueryKey[] = [["tenants"]];
 const userInvalidationKeys: QueryKey[] = [["users"]];

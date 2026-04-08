@@ -37,7 +37,65 @@ export const getTenantId = (): string | null => {
   return isTenantHost(host) ? host.split(".")[0] : null;
 };
 
+export const getAppOrigin = (): string => {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
+
+  if (configured) {
+    return configured.replace(/\/+$/, "");
+  }
+
+  if (typeof window === "undefined") {
+    return "http://localhost:3000";
+  }
+
+  return window.location.origin;
+};
+
+const normalizeApiRoot = (value: string): string => {
+  const trimmed = value.trim().replace(/\/+$/, "");
+
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  const normalizePath = (path: string): string => {
+    const cleanPath = path.replace(/\/+$/, "");
+
+    if (!cleanPath || cleanPath === "/") {
+      return "/api/v1";
+    }
+
+    if (/\/api\/v1$/i.test(cleanPath)) {
+      return cleanPath;
+    }
+
+    if (/\/api$/i.test(cleanPath)) {
+      return `${cleanPath}/v1`;
+    }
+
+    return `${cleanPath}/api/v1`;
+  };
+
+  try {
+    const url = new URL(trimmed);
+    url.pathname = normalizePath(url.pathname);
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return normalizePath(trimmed);
+  }
+};
+
 export const getBackendOrigin = (): string => {
+  const configuredApiRoot = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  if (configuredApiRoot) {
+    try {
+      return new URL(configuredApiRoot).origin;
+    } catch {
+      return configuredApiRoot.replace(/\/api\/v1\/?$/, "").replace(/\/+$/, "");
+    }
+  }
+
   if (typeof window === "undefined") {
     return "http://localhost:8085";
   }
@@ -48,7 +106,15 @@ export const getBackendOrigin = (): string => {
   return `${protocol}//${host}:8085`;
 };
 
-export const getBackendApiRoot = (): string => `${getBackendOrigin()}/api/v1`;
+export const getBackendApiRoot = (): string => {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  if (configured) {
+    return normalizeApiRoot(configured);
+  }
+
+  return `${getBackendOrigin()}/api/v1`;
+};
 
 const getLocalPathname = (url: string): string => {
   try {

@@ -108,6 +108,38 @@ class UserController extends Controller
         }
     }
 
+    public function directory(Request $request)
+    {
+        $search = $request->input('search', '');
+        $isTenant = function_exists('tenant') && tenant('id');
+        
+        if (!empty($search)) {
+            $indexName = $isTenant ? "tenant_" . tenant('id') . "_users" : "central_users";
+            $users = User::search($search)
+                ->within($indexName)
+                ->query(fn($q) => $q->where('is_active', true))
+                ->take(15)
+                ->get();
+        } else {
+            $users = User::where('is_active', true)
+                ->take(15)
+                ->get();
+        }
+
+        // Map to a lightweight representation to prevent exfiltration of roles/permissions
+        $data = $users->map(function($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar_url' => $user->avatar_url,
+            ];
+        });
+
+        // Wrapper to match frontend expectations
+        return response()->json(['data' => $data]);
+    }
+
    public function store(Request $request)
 {
     $validated = $request->validate([

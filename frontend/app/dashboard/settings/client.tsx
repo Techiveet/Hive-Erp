@@ -6,7 +6,7 @@ import {
     Loader2, Palette, Shield, Settings, Globe, Bell, Headset, 
     Globe2, Sliders, AlertTriangle, Clock, HardDrive, HelpCircle, 
     Image as ImageIcon, Upload, CheckCircle2, X, Activity, Mail, UserPlus, ShieldCheck,
-    Database
+    CreditCard, Database, Sparkles
 } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LocalizationManager } from '@/components/settings/localization-manager';
 import { FileManagerClient } from "@/components/dashboard/file-manager-client"; 
 import { BackupSettings } from '@/components/settings/backup-settings'; 
+import { EmailSettings } from '@/components/settings/email-settings';
+import { PaymentSettings } from '@/components/settings/payment-settings';
+import { PlanSettings } from '@/components/settings/plan-settings';
 
 // ==========================================
 // 🚀 1. UTILITIES & FETCH HELPERS
@@ -641,12 +644,16 @@ function SettingsTabs({
     canManageGeneral,
     canManageLocalization,
     canAccessBackups,
+    canManagePayments,
+    canManagePlans,
     isCentralNode,
 }: {
     canManageBrand: boolean;
     canManageGeneral: boolean;
     canManageLocalization: boolean;
     canAccessBackups: boolean;
+    canManagePayments: boolean;
+    canManagePlans: boolean;
     isCentralNode: boolean;
 }) {
     const { t } = useTranslation();
@@ -681,8 +688,11 @@ function SettingsTabs({
     const TABS = [
         canManageBrand ? { id: 'brand', label: t('nav.settings_brand', 'Brand Settings'), icon: Palette } : null,
         canManageGeneral ? { id: 'general', label: t('nav.settings_general', 'General'), icon: Settings } : null,
+        canManageGeneral ? { id: 'email', label: t('nav.settings_email', 'Email Servers'), icon: Mail } : null,
+        canManagePayments ? { id: 'payments', label: 'Payment Providers', icon: CreditCard } : null,
         canManageLocalization ? { id: 'localization', label: t('nav.settings_loc', 'Localization'), icon: Globe } : null,
         canAccessBackups ? { id: 'backup', label: t('nav.settings_backup', 'System Backups'), icon: Database } : null,
+        canManagePlans ? { id: 'plans', label: 'Subscription Plans', icon: Sparkles } : null,
     ].filter(Boolean) as Array<{ id: string; label: string; icon: any }>;
 
     useEffect(() => {
@@ -719,6 +729,12 @@ function SettingsTabs({
             <div className="flex-1 min-w-0">
                 {canManageBrand && activeTab === 'brand' && <BrandSettings />}
                 {canManageGeneral && activeTab === 'general' && <GeneralSettings />}
+                {canManageGeneral && activeTab === 'email' && <EmailSettings />}
+                {canManagePayments && activeTab === 'payments' && (
+                    <div className="transition-all animate-in fade-in slide-in-from-bottom-2">
+                        <PaymentSettings />
+                    </div>
+                )}
                 {canManageLocalization && activeTab === 'localization' && (
                     <div className="p-6 border border-border/50 rounded-[2rem] bg-card/40 backdrop-blur-sm shadow-sm transition-all animate-in fade-in slide-in-from-bottom-2">
                         <LocalizationManager />
@@ -727,6 +743,11 @@ function SettingsTabs({
                 {canAccessBackups && activeTab === 'backup' && (
                     <div id="tour-settings-backup" className="transition-all animate-in fade-in slide-in-from-bottom-2">
                         <BackupSettings isCentralNode={isCentralNode} />
+                    </div>
+                )}
+                {canManagePlans && activeTab === 'plans' && (
+                    <div className="transition-all animate-in fade-in slide-in-from-bottom-2">
+                        <PlanSettings />
                     </div>
                 )}
             </div>
@@ -747,7 +768,9 @@ export default function SettingsClient() {
     const canManageGeneral = hasPermission("manage_general_settings");
     const canManageLocalization = hasPermission("manage_localization");
     const canAccessBackups = isCentralNode === true && hasAnyPermission(["view_backups", "manage_backups"]);
-    const hasAnySettingsAccess = canManageBrand || canManageGeneral || canManageLocalization || canAccessBackups;
+    const canManagePayments = isCentralNode === true && hasAnyPermission(["manage_payment_settings", "manage_general_settings", "manage_tenants"]);
+    const canManagePlans = isCentralNode === true && hasAnyPermission(["manage_tenants", "provision_tenants"]);
+    const hasAnySettingsAccess = canManageBrand || canManageGeneral || canManageLocalization || canAccessBackups || canManagePayments || canManagePlans;
 
     if (!isLoaded || isCentralNode === null) {
         return <SettingsWorkspaceSkeleton />;
@@ -778,6 +801,8 @@ export default function SettingsClient() {
                     canManageGeneral={canManageGeneral}
                     canManageLocalization={canManageLocalization}
                     canAccessBackups={canAccessBackups}
+                    canManagePayments={canManagePayments}
+                    canManagePlans={canManagePlans}
                     isCentralNode={isCentralNode}
                 />
             </Suspense>

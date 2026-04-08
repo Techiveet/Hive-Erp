@@ -116,6 +116,7 @@ export default function ApiDocsPage() {
         }];
 
         if (cancelled) return;
+        if (!swaggerRef.current) return;
 
         swaggerRef.current.innerHTML = "";
         window.hiveSwaggerUi = window.SwaggerUIBundle({

@@ -2,7 +2,7 @@
 
 namespace Tests\Unit;
 
-use Modules\Tenancy\Support\TenantModuleCatalog;
+use Modules\Subscription\Support\TenantModuleCatalog;
 use PHPUnit\Framework\TestCase;
 
 class TenantModuleCatalogTest extends TestCase
@@ -12,10 +12,10 @@ class TenantModuleCatalogTest extends TestCase
         $resolved = TenantModuleCatalog::resolve(null, 'startup');
 
         $this->assertSame(
-            ['image_editor', 'video_player', 'document_converter'],
+            ['mailbox', 'file_manager', 'image_editor', 'document_converter'],
             $resolved['enabled_modules']
         );
-        $this->assertSame(3, $resolved['module_count']);
+        $this->assertSame(4, $resolved['module_count']);
     }
 
     public function test_normalize_for_storage_filters_unknown_modules_and_custom_entries(): void

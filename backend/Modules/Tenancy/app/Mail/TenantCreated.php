@@ -54,6 +54,7 @@ class TenantCreated extends Mailable implements ShouldQueue
                 'actionUrl'     => $actionUrl,
                 'actionText'    => 'Login to Tenant Gateway',
                 'rawPassword'   => $this->rawPassword,
+                'credentialEmail' => $this->admin->email,
                 'appName'       => 'HIVE.OS',
                 'logoUrl'       => $logoUrl,
                 'user'          => $this->admin, // Pass the admin user to the template

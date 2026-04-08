@@ -13,8 +13,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { ModulePageSkeleton } from "@/components/ui/loading-states";
 import { getTenantId } from "@/lib/runtime-context";
 import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
-import { fetchCurrentTenantSubscriptions } from "@/modules/tenancy/api";
-import { ModuleSubscriptionCheckoutDialog } from "@/modules/tenancy/components/module-subscription-checkout-dialog";
+import { fetchCurrentTenantSubscriptions } from "@/modules/subscription/api";
+import { ModuleSubscriptionCheckoutDialog } from "@/modules/subscription/components/module-subscription-checkout-dialog";
 
 export default function StoragePage() {
   const { t } = useTranslation();
@@ -26,7 +26,7 @@ export default function StoragePage() {
   const canAccessStorage = hasAnyPermission(["view_storage", "manage_storage"]);
   const tenantId = getTenantId();
   const isTenantWorkspace = Boolean(tenantId);
-  const hasMediaLibrary = !isTenantWorkspace || hasModule("media_library");
+  const hasMediaLibrary = !isTenantWorkspace || hasModule('media_library') || hasModule('file_manager');
 
   useEffect(() => {
     if (tenantId) {
@@ -41,10 +41,16 @@ export default function StoragePage() {
     staleTime: 300_000,
   });
 
+  const fileManagerModule =
+    subscriptionData?.data?.module_subscriptions?.catalog_modules?.find(
+      (module: any) => module.slug === "file_manager"
+    ) ?? null;
   const mediaLibraryModule =
     subscriptionData?.data?.module_subscriptions?.catalog_modules?.find(
       (module: any) => module.slug === "media_library"
     ) ?? null;
+  // Prefer file_manager, fall back to media_library
+  const storageModule = fileManagerModule ?? mediaLibraryModule;
   const paymentMethods = subscriptionData?.data?.payment_methods ?? [];
 
   if (!isLoaded) {
@@ -89,20 +95,20 @@ export default function StoragePage() {
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Button onClick={() => setCheckoutOpen(true)} className="rounded-xl px-6 font-semibold">
-                <Layers className="mr-2 h-4 w-4" /> Subscribe with ArifPay
+                <Layers className="mr-2 h-4 w-4" /> Unlock with Checkout
               </Button>
             </div>
           </div>
         </div>
 
-        {mediaLibraryModule ? (
+        {storageModule ? (
           <ModuleSubscriptionCheckoutDialog
             open={checkoutOpen}
             onOpenChange={setCheckoutOpen}
-            modules={[mediaLibraryModule]}
+            modules={[storageModule]}
             paymentMethods={paymentMethods}
-            title="Unlock the Media Library"
-            description="Activate Hive storage for this tenant and ArifPay will take care of the checkout."
+            title="Unlock the File Manager"
+            description="Activate Hive storage for this tenant. Complete checkout and your file manager unlocks automatically."
           />
         ) : null}
       </>

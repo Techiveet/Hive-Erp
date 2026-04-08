@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Tenancy\Support\TenantModuleCatalog;
+use Modules\Subscription\Support\TenantModuleCatalog;
+use Modules\Subscription\Support\TenantSubscriptionService;
 use PragmaRX\Google2FA\Google2FA;
 use Stevebauman\Location\Facades\Location;
 use Spatie\Permission\PermissionRegistrar;
@@ -365,12 +366,10 @@ class AuthController extends Controller
             'permissions' => $user->getAllPermissions()->pluck('name'),
             'two_factor_enabled' => $twoFactorEnabled ?? (!empty($user->two_factor_secret) && $user->two_factor_confirmed_at !== null),
             'module_access' => $tenant
-                ? TenantModuleCatalog::buildModuleAccess(
-                    is_array($tenant->module_subscriptions) ? $tenant->module_subscriptions : null,
-                    $tenant->plan
-                )
+                ? app(TenantSubscriptionService::class)->buildModuleAccess($tenant)
                 : [
                     'plan' => 'central',
+                    'subscription_status' => 'active',
                     'active_modules' => TenantModuleCatalog::slugs(),
                     'statuses' => collect(TenantModuleCatalog::catalog())
                         ->mapWithKeys(fn (array $module) => [

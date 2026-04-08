@@ -57,6 +57,9 @@ foreach ($centralDomains as $domain) {
             Route::get('/permissions/export', [PermissionExportController::class, 'handleExport'])->middleware('permission:view_permissions,sanctum');
             Route::get('/permissions', [RoleController::class, 'permissions'])->middleware('permission:view_permissions,sanctum');
 
+            // Lightweight company directory for dropdowns (accessible to all authenticated users)
+            Route::get('/directory/users', [UserController::class, 'directory']);
+
             Route::apiResource('roles', RoleController::class)
                 ->only(['index', 'show'])
                 ->middleware('permission:view_roles|manage_roles,sanctum');
@@ -152,6 +155,10 @@ Route::middleware([
             });
             Route::get('/permissions/export', [PermissionExportController::class, 'handleExport'])->middleware('permission:view_permissions,sanctum');
             Route::get('/permissions', [RoleController::class, 'permissions'])->middleware('permission:view_permissions,sanctum');
+
+            // Lightweight company directory for dropdowns (accessible to all authenticated users)
+            Route::get('/directory/users', [UserController::class, 'directory']);
+
             Route::apiResource('roles', RoleController::class)
                 ->only(['index', 'show'])
                 ->middleware('permission:view_roles|manage_roles,sanctum');
@@ -189,6 +196,10 @@ Route::middleware([
         });
         Route::get('/permissions/export', [PermissionExportController::class, 'handleExport'])->middleware('permission:view_permissions,sanctum');
         Route::get('/permissions', [RoleController::class, 'permissions'])->middleware('permission:view_permissions,sanctum');
+
+        // Lightweight company directory for dropdowns (accessible to all authenticated users)
+        Route::get('/directory/users', [UserController::class, 'directory']);
+
         Route::apiResource('roles', RoleController::class)
             ->only(['index', 'show'])
             ->middleware('permission:view_roles|manage_roles,sanctum');

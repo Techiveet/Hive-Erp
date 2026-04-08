@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Modules\Identity\Database\Seeders\IdentityDatabaseSeeder;
+use Modules\Subscription\Database\Seeders\SubscriptionDatabaseSeeder;
 use Modules\Tenancy\Database\Seeders\TenancyDatabaseSeeder;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Spatie\Permission\PermissionRegistrar;
@@ -25,7 +26,10 @@ class DatabaseSeeder extends Seeder
             // 2. Spawn tenant databases (this triggers the tenant-specific seeders)
             TenancyDatabaseSeeder::class,
 
-            // 3. Establish global core settings and languages
+            // 3. Seed central subscription records for tenant workspaces
+            SubscriptionDatabaseSeeder::class,
+
+            // 4. Establish global core settings and languages
             CoreDatabaseSeeder::class,
         ]);
 

@@ -5,11 +5,17 @@ use Illuminate\Support\Facades\Broadcast;
 use App\Http\Middleware\InitializeTenantContext;
 
 use Modules\Core\Http\Controllers\ActivityLogController;
+use Modules\Core\Http\Controllers\NotificationCenterController;
 use Modules\Core\Http\Controllers\Settings\LocalizationController;
 use Modules\Core\Http\Controllers\GlobalSearchController;
 use Modules\Core\Http\Controllers\FileManagerController;
 use Modules\Core\Http\Controllers\Settings\BrandSettingsController;
+use Modules\Core\Http\Controllers\Settings\DirectTransferNotificationController;
+use Modules\Core\Http\Controllers\Settings\DirectTransferReviewController;
 use Modules\Core\Http\Controllers\Settings\GeneralSettingsController;
+use Modules\Core\Http\Controllers\Settings\EmailSettingsController;
+use Modules\Core\Http\Controllers\Settings\PaymentGatewaySettingsController;
+use Modules\Core\Http\Controllers\Settings\SubscriptionPlanSettingsController;
 use Modules\Core\Http\Controllers\Export\ActivityLogExportController;
 use Modules\Core\Http\Controllers\Dashboard\DashboardController;
 use Modules\Core\Http\Controllers\Dashboard\SystemOperationsController;
@@ -67,6 +73,27 @@ foreach ($centralDomains as $domain) {
                 Route::post('/brand', [BrandSettingsController::class, 'updateBrandSettings'])->middleware('permission:manage_brand_settings,sanctum');
                 Route::get('/general', [GeneralSettingsController::class, 'index'])->middleware('permission:manage_general_settings,sanctum');
                 Route::post('/general', [GeneralSettingsController::class, 'store'])->middleware('permission:manage_general_settings,sanctum');
+                Route::get('/email', [EmailSettingsController::class, 'index'])->middleware('permission:manage_general_settings,sanctum');
+                Route::post('/email', [EmailSettingsController::class, 'store'])->middleware('permission:manage_general_settings,sanctum');
+                Route::get('/payments', [PaymentGatewaySettingsController::class, 'index'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
+                Route::post('/payments', [PaymentGatewaySettingsController::class, 'store'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
+                Route::get('/direct-transfer/reviews', [DirectTransferReviewController::class, 'index'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
+                Route::post('/direct-transfer/reviews/{orderId}/approve', [DirectTransferReviewController::class, 'approve'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
+                Route::post('/direct-transfer/reviews/{orderId}/reject', [DirectTransferReviewController::class, 'reject'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
+                Route::get('/payments/direct-transfer/reviews', [DirectTransferReviewController::class, 'index'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
+                Route::post('/payments/direct-transfer/orders/{orderId}/approve', [DirectTransferReviewController::class, 'approve'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
+                Route::post('/payments/direct-transfer/orders/{orderId}/reject', [DirectTransferReviewController::class, 'reject'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
+                // ─── Subscription Plan Settings (Central Admin only) ───────
+                Route::get('/plans', [SubscriptionPlanSettingsController::class, 'index'])->middleware('permission:manage_tenants|provision_tenants,sanctum');
+                Route::post('/plans', [SubscriptionPlanSettingsController::class, 'store'])->middleware('permission:manage_tenants|provision_tenants,sanctum');
+                Route::post('/plans/{planKey}/reset', [SubscriptionPlanSettingsController::class, 'reset'])->middleware('permission:manage_tenants|provision_tenants,sanctum');
+            });
+
+            Route::prefix('notifications')->group(function () {
+                Route::get('/', [NotificationCenterController::class, 'index']);
+                Route::post('/read', [NotificationCenterController::class, 'markRead']);
+                Route::get('/direct-transfer', [DirectTransferNotificationController::class, 'index'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
+                Route::post('/direct-transfer/read', [DirectTransferNotificationController::class, 'markRead'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
             });
 
             Route::prefix('localization')->group(function () {
@@ -178,6 +205,8 @@ Route::middleware([
             Route::post('/brand', [BrandSettingsController::class, 'updateBrandSettings'])->middleware('permission:manage_brand_settings,sanctum');
             Route::get('/general', [GeneralSettingsController::class, 'index'])->middleware('permission:manage_general_settings,sanctum');
             Route::post('/general', [GeneralSettingsController::class, 'store'])->middleware('permission:manage_general_settings,sanctum');
+            Route::get('/email', [EmailSettingsController::class, 'index'])->middleware('permission:manage_general_settings,sanctum');
+            Route::post('/email', [EmailSettingsController::class, 'store'])->middleware('permission:manage_general_settings,sanctum');
         });
 
         Route::prefix('localization')->group(function () {
@@ -226,6 +255,11 @@ Route::middleware([
             Route::post('/settings', [ActivityLogController::class, 'updateSettings'])->middleware('permission:manage_log_settings,sanctum');
             Route::post('/archive', [ActivityLogController::class, 'archiveOldLogs'])->middleware('permission:archive_logs,sanctum');
             Route::get('/', [ActivityLogController::class, 'index'])->middleware('permission:view_logs,sanctum');
+        });
+
+        Route::prefix('notifications')->group(function () {
+            Route::get('/', [NotificationCenterController::class, 'index']);
+            Route::post('/read', [NotificationCenterController::class, 'markRead']);
         });
     });
 });

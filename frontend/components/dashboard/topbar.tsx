@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bell, Search, LogOut, Maximize, Minimize, HelpCircle, Globe, Check, Loader2 } from "lucide-react";
+import { Search, LogOut, Maximize, Minimize, HelpCircle, Globe, Check, Loader2 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -17,6 +17,7 @@ import { useTour } from "@/components/providers/tour-provider";
 import { useTranslation } from "@/store/use-translation";
 import { GlobalSearch } from "./global-search";
 import { TopbarMailIcon } from "./topbar-mail";
+import { TopbarNotificationsIcon } from "./topbar-notifications";
 import { getTenantId, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -28,7 +29,7 @@ const getApiUrl = () => {
   return `http://${host}:8085/api/v1`;
 };
 
-const getTenantHeaders = () => {
+const getTenantHeaders = (): Record<string, string> => {
   const tenantId = getTenantId();
   return tenantId ? { "X-Tenant": tenantId } : {};
 };
@@ -102,15 +103,14 @@ const SecureTopbarAvatar = ({ user, fallbackInitials, canViewProfile }: { user: 
 export function DashboardTopbar() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [localUser, setLocalUser] = useState<{ name: string, email: string } | null>(null);
+  const [localUser, setLocalUser] = useState<Record<string, any> | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentLocale, setCurrentLocale] = useState('en');
 
   const { startTour } = useTour();
   const { t } = useTranslation();
-  const { hasAnyPermission, hasPermission } = usePermissions();
+  const { hasAnyPermission } = usePermissions();
   const canViewProfile = hasAnyPermission([...PROFILE_ROUTE_PERMISSIONS]);
-  const canViewAlerts = hasPermission("view_alerts");
   const { data: serverUser } = useQuery({
       queryKey: ['authUserProfile'],
       queryFn: async () => {
@@ -266,16 +266,7 @@ export function DashboardTopbar() {
                 {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
               </Button>
 
-              {canViewAlerts && (
-                <Button
-                  id="tour-topbar-notifications"
-                  variant="ghost"
-                  className="h-10 w-10 rounded-xl p-0 shrink-0 text-muted-foreground hover:text-foreground"
-                  onClick={() => router.push("/dashboard/alerts")}
-                >
-                  <Bell className="h-5 w-5" />
-                </Button>
-              )}
+              <TopbarNotificationsIcon activeUser={activeUser} />
 
               <TopbarMailIcon activeUser={activeUser} />
 

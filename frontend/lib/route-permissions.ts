@@ -9,6 +9,7 @@ export const SETTINGS_ROUTE_PERMISSIONS = ["manage_brand_settings", "manage_gene
 export const ALERTS_ROUTE_PERMISSIONS = ["view_alerts"] as const;
 export const AUDIT_LOG_ROUTE_PERMISSIONS = ["view_logs"] as const;
 export const API_DOCS_ROUTE_PERMISSIONS = ["view_api_docs"] as const;
+export const DIRECT_TRANSFER_REVIEW_ROUTE_PERMISSIONS = ["manage_tenants", "manage_payment_settings", "manage_general_settings"] as const;
 
 export type RoutePermissionAccess = {
   hasPermission: (permission: string) => boolean;
@@ -71,6 +72,10 @@ export function canAccessDashboardRoute(rawPath: string, access: RoutePermission
     const canAccessBackupSettings = !isTenantSession() && access.hasAnyPermission(["view_backups", "manage_backups"]);
 
     return canAccessCoreSettings || canAccessBackupSettings;
+  }
+
+  if (matchesPrefix(path, "/dashboard/direct-transfer-reviews")) {
+    return access.hasAnyPermission([...DIRECT_TRANSFER_REVIEW_ROUTE_PERMISSIONS]);
   }
 
   if (matchesPrefix(path, "/dashboard/api-docs")) {

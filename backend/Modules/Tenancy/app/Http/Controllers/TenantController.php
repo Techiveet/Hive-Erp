@@ -14,11 +14,12 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Modules\Core\Support\ResolvesExportBranding;
 use Modules\Identity\Models\User;
+use Modules\Subscription\Support\TenantModuleCatalog;
+use Modules\Subscription\Support\TenantSubscriptionService;
 use Modules\Tenancy\Mail\AdminCredentialsUpdated;
 use Modules\Tenancy\Mail\AdminStatusChanged;
 use Modules\Tenancy\Mail\TenantStatusChanged;
 use Modules\Tenancy\Models\Tenant;
-use Modules\Tenancy\Support\TenantModuleCatalog;
 use Modules\Tenancy\Support\TenantProvisioningService;
 
 class TenantController extends Controller implements HasMiddleware
@@ -27,6 +28,7 @@ class TenantController extends Controller implements HasMiddleware
 
     public function __construct(
         protected TenantProvisioningService $tenantProvisioningService,
+        protected TenantSubscriptionService $subscriptions,
     ) {
     }
 
@@ -123,7 +125,7 @@ class TenantController extends Controller implements HasMiddleware
         $validated = $request->validate(array_merge([
             'id' => ['required', 'string', 'alpha_dash', 'max:20', Rule::unique('tenants', 'id')],
             'name' => 'required|string|max:255',
-            'plan' => 'required|string|in:startup,business,enterprise,overlord',
+            'plan' => ['required', 'string', Rule::in(array_keys(TenantModuleCatalog::planPricing()))],
             'domain' => ['required', 'string', Rule::unique('domains', 'domain')],
             'admin_name' => 'required|string|max:255',
             'admin_email' => 'required|email|max:255',
@@ -133,10 +135,7 @@ class TenantController extends Controller implements HasMiddleware
         try {
             $tenant = $this->tenantProvisioningService->provision($validated, auth()->user()?->email);
 
-            $resolvedSubscriptions = TenantModuleCatalog::resolve(
-                is_array($tenant->module_subscriptions) ? $tenant->module_subscriptions : null,
-                $tenant->plan
-            );
+            $resolvedSubscriptions = $this->subscriptions->currentForTenant($tenant)['module_subscriptions'];
 
             activity('Tenant Management')
                 ->causedBy(auth()->user() ?? null)
@@ -193,7 +192,7 @@ class TenantController extends Controller implements HasMiddleware
 
         $validated = $request->validate(array_merge([
             'name' => 'sometimes|string|max:255',
-            'plan' => 'sometimes|string|in:startup,business,enterprise,overlord',
+            'plan' => ['sometimes', 'string', Rule::in(array_keys(TenantModuleCatalog::planPricing()))],
             'admin_name' => 'nullable|string|max:255',
             'admin_email' => 'nullable|email|max:255',
             'admin_password' => 'nullable|string|min:8',
@@ -201,16 +200,18 @@ class TenantController extends Controller implements HasMiddleware
 
         $tenant->fill(Arr::only($validated, ['name', 'plan']));
 
-        if (array_key_exists('module_subscriptions', $validated)) {
-            $tenant->module_subscriptions = TenantModuleCatalog::normalizeForStorage(
-                $validated['module_subscriptions'],
-                $validated['plan'] ?? $tenant->plan,
-                auth()->user()?->email
-            );
-        }
-
         if ($tenant->isDirty()) {
             $tenant->save();
+        }
+
+        if (array_key_exists('module_subscriptions', $validated)) {
+            $this->subscriptions->updateModules(
+                $tenant,
+                $validated['module_subscriptions'],
+                auth()->user()?->email
+            );
+        } else {
+            $this->subscriptions->ensureForTenant($tenant, null, auth()->user()?->email);
         }
 
         if ($request->filled('admin_email') || $request->filled('admin_name') || $request->filled('admin_password')) {
@@ -261,10 +262,8 @@ class TenantController extends Controller implements HasMiddleware
             }
         }
 
-        $resolvedSubscriptions = TenantModuleCatalog::resolve(
-            is_array($tenant->module_subscriptions) ? $tenant->module_subscriptions : null,
-            $tenant->plan
-        );
+        $resolvedSubscriptionState = $this->subscriptions->currentForTenant($tenant->refresh());
+        $resolvedSubscriptions = $resolvedSubscriptionState['module_subscriptions'];
 
         activity('Tenant Management')
             ->causedBy(auth()->user())
@@ -382,10 +381,8 @@ class TenantController extends Controller implements HasMiddleware
     {
         $tenant->loadMissing('domains');
 
-        $subscriptions = TenantModuleCatalog::resolve(
-            is_array($tenant->module_subscriptions) ? $tenant->module_subscriptions : null,
-            $tenant->plan
-        );
+        $currentSubscription = $this->subscriptions->currentForTenant($tenant);
+        $subscriptions = $currentSubscription['module_subscriptions'];
 
         return [
             'id' => $tenant->id,
@@ -396,6 +393,7 @@ class TenantController extends Controller implements HasMiddleware
             'admin_email' => $tenant->admin_email,
             'admin_active' => $tenant->admin_active ?? true,
             'created_at' => $tenant->created_at,
+            'subscription' => collect($currentSubscription)->except('module_subscriptions')->all(),
             'module_subscriptions' => $subscriptions,
             'subscribed_modules' => $subscriptions['selected_modules'],
             'subscribed_modules_count' => $subscriptions['module_count'],
