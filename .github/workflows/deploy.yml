@@ -16,7 +16,7 @@ jobs:
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd ~/projects/hive || cd /var/www/hive || { echo "Project directory not found! Please create it."; exit 1; }
+            if [ -d "/var/www/hive" ]; then cd /var/www/hive; else cd ~/projects/hive; fi
             git checkout main
             git pull origin main
             docker compose -f docker-compose.prod.yml build
