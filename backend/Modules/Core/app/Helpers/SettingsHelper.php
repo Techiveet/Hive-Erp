@@ -41,11 +41,15 @@ if (!function_exists('get_system_setting')) {
      * @return mixed
      */
     function get_system_setting($key, $default = null) {
-        // Cache the settings array to prevent database hits on every request,
-        // but keep each tenant and the central node isolated from one another.
-        $settings = Cache::rememberForever(get_system_settings_cache_key(), function () {
-            return Setting::pluck('value', 'key')->toArray();
-        });
+        try {
+            // Cache the settings array to prevent database hits on every request,
+            // but keep each tenant and the central node isolated from one another.
+            $settings = Cache::rememberForever(get_system_settings_cache_key(), function () {
+                return Setting::query()->pluck('value', 'key')->toArray();
+            });
+        } catch (\Throwable) {
+            return $default;
+        }
 
         if (!array_key_exists($key, $settings)) {
             return $default;
