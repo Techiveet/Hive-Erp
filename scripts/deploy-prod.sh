@@ -9,6 +9,44 @@ compose() {
   docker compose -f "${COMPOSE_FILE}" "$@"
 }
 
+get_env_value() {
+  local key="$1"
+  local line
+
+  line="$(grep -E "^${key}=" .env | tail -n 1 || true)"
+  printf '%s' "${line#*=}"
+}
+
+set_env_value() {
+  local key="$1"
+  local value="$2"
+
+  if grep -q -E "^${key}=" .env; then
+    sed -i "s#^${key}=.*#${key}=${value}#" .env
+  else
+    printf '\n%s=%s\n' "$key" "$value" >> .env
+  fi
+}
+
+ensure_app_key() {
+  local current_value
+  current_value="$(get_env_value APP_KEY)"
+
+  if [ -n "${current_value}" ]; then
+    return
+  fi
+
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "APP_KEY is empty and openssl is unavailable. Set APP_KEY in .env before deploying." >&2
+    exit 1
+  fi
+
+  local generated_key
+  generated_key="base64:$(openssl rand -base64 32 | tr -d '\r\n')"
+  set_env_value APP_KEY "${generated_key}"
+  echo "Generated missing APP_KEY in .env"
+}
+
 show_failure_context() {
   echo "Deployment failed. Current compose status:" >&2
   compose ps || true
@@ -25,8 +63,11 @@ if [ ! -f ".env" ]; then
   exit 1
 fi
 
+ensure_app_key
+
 compose build
-compose up -d --remove-orphans
+compose up -d --remove-orphans redis db meilisearch rembg gotenberg
+compose up -d backend
 
 attempt=0
 until compose exec -T backend php artisan about >/dev/null 2>&1; do
@@ -44,5 +85,6 @@ compose exec -T backend php artisan storage:link || true
 compose exec -T backend php artisan optimize:clear
 compose exec -T backend php artisan migrate --force
 compose exec -T backend php artisan optimize
+compose up -d queue reverb frontend caddy
 
 compose ps
