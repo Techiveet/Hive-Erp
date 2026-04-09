@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Modules\Core\Models\Setting;
 
 if (!function_exists('get_system_settings_cache_key')) {
@@ -42,6 +43,10 @@ if (!function_exists('get_system_setting')) {
      */
     function get_system_setting($key, $default = null) {
         try {
+            if (!Schema::hasTable('settings')) {
+                return $default;
+            }
+
             // Cache the settings array to prevent database hits on every request,
             // but keep each tenant and the central node isolated from one another.
             $settings = Cache::rememberForever(get_system_settings_cache_key(), function () {

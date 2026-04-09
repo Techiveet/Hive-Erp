@@ -22,7 +22,6 @@ use Modules\Core\Http\Controllers\Dashboard\SystemOperationsController;
 use Modules\Core\Http\Controllers\SystemAlertController;
 use Modules\Core\Http\Controllers\Tools\FileConverterController; // 🚀 ADDED: File Converter
 use Modules\Identity\Http\Controllers\UserController;
-use Modules\Core\Models\Setting;
 
 $centralDomains = ['localhost', '127.0.0.1', 'hive-os.com'];
 
@@ -36,8 +35,7 @@ foreach ($centralDomains as $domain) {
         Route::get('/settings/brand/public', [BrandSettingsController::class, 'getPublicBrandSettings']);
 
         Route::get('/system/status-ticker', function() {
-            $message = Setting::where('key', 'maintenance_message')->value('value')
-                       ?? 'HIVE.OS: System neural links are currently undergoing optimization.';
+            $message = get_system_setting('maintenance_message', 'HIVE.OS: System neural links are currently undergoing optimization.');
             return response()->json(['message' => $message]);
         });
 
@@ -165,13 +163,12 @@ Route::middleware([
     Route::get('/settings/brand/public', [BrandSettingsController::class, 'getPublicBrandSettings']);
     Route::get('/tenant/settings/brand/public', [BrandSettingsController::class, 'getPublicBrandSettings']);
 
-    Route::prefix('system')->group(function () {
-        Route::get('/status-ticker', function() {
-            $message = Setting::where('key', 'maintenance_message')->value('value')
-                       ?? 'HIVE.OS: System neural links are currently undergoing optimization.';
-            return response()->json(['message' => $message]);
+        Route::prefix('system')->group(function () {
+            Route::get('/status-ticker', function() {
+                $message = get_system_setting('maintenance_message', 'HIVE.OS: System neural links are currently undergoing optimization.');
+                return response()->json(['message' => $message]);
+            });
         });
-    });
 
     // 🚀 LARGE FILE DOWNLOAD ROUTE (Tenant)
     Route::get('/system/backups/{id}/download', [SystemOperationsController::class, 'downloadBackup']);

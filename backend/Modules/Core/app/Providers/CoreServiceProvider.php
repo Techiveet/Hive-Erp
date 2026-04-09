@@ -6,6 +6,7 @@ use Nwidart\Modules\Support\ModuleServiceProvider;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Carbon;
 
 // Imports for the Global Interceptor
@@ -68,6 +69,10 @@ class CoreServiceProvider extends ModuleServiceProvider
 
                     // 🚀 FORCE THE CENTRAL DATABASE CONNECTION
                     $centralConnection = config('tenancy.database.central_connection', env('DB_CONNECTION', 'pgsql'));
+
+                    if (!Schema::connection($centralConnection)->hasTable('system_alerts')) {
+                        return;
+                    }
 
                     SystemAlert::on($centralConnection)->create([
                         'title' => $title,
