@@ -70,7 +70,7 @@ ensure_domain_defaults() {
   root_domain="$(get_env_value ROOT_DOMAIN)"
 
   if [ -z "${root_domain}" ]; then
-    root_domain="hinohaet.com"
+    root_domain="techiveet.com"
     set_env_value ROOT_DOMAIN "${root_domain}"
   fi
 
