@@ -12,7 +12,7 @@ import { useTranslation } from "@/store/use-translation";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
-import { getBackendApiRoot, getBackendStorageUrl, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
+import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 
 // 🚀 SECURE BRAND LOGO

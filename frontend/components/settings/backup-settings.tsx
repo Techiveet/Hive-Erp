@@ -255,7 +255,6 @@ export function BackupSettings({ isCentralNode }: BackupSettingsProps) {
                   <Select
                     value={String(formData.backup_day)}
                     onValueChange={(value) => setFormData((prev) => ({ ...prev, backup_day: Number.parseInt(value, 10) || 1 }))}
-                    disabled={formData.backup_frequency === "daily"}
                   >
                     <SelectTrigger className="h-12 rounded-xl bg-muted/30 font-bold focus:ring-primary">
                       <SelectValue />

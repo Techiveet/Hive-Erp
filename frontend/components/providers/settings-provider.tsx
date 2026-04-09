@@ -6,20 +6,7 @@ import { ShieldAlert } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { SystemOffline } from "@/components/auth/system-offline";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
-import { getTenantId } from "@/lib/runtime-context";
-
-// 🚀 Helper to get the correct API URL
-const getApiUrl = () => {
-    if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-    const host = window.location.hostname;
-    const protocol = window.location.protocol;
-    return `${protocol}//${host}:8085/api/v1`;
-};
-
-const getTenantHeaders = () => {
-    const tenantId = getTenantId();
-    return tenantId ? { "X-Tenant": tenantId } : {};
-};
+import { getAuthHeaders, getBackendApiRoot } from "@/lib/runtime-context";
 
 // 🚀 Interfaces
 export interface SystemSettings {
@@ -85,8 +72,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 return { data: null };
             }
 
-            const res = await fetch(`${getApiUrl()}/settings/general`, {
-                headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...getTenantHeaders() },
+            const res = await fetch(`${getBackendApiRoot()}/settings/general`, {
+                headers: getAuthHeaders(),
             });
 
             if (await handleAuthFailureResponse(res)) {

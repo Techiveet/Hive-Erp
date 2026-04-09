@@ -25,7 +25,7 @@ export function PermissionsTabClient({ tenantId }: { tenantId: string | null }) 
   const { data: permissionsData, isLoading } = useQuery({
     queryKey: ["permissions", tenantId],
     queryFn: async () => {
-      const res = await fetchPermissions(tenantId);
+      const res = await fetchPermissions();
       return Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
     },
   });

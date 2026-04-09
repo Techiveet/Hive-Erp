@@ -143,7 +143,7 @@ export const toggleUserStatusOfflineMutationDefinition: OfflineMutationDefinitio
   invalidateKeys: userInvalidationKeys,
 };
 
-const offlineMutationDefinitions: OfflineMutationDefinition[] = [
+const offlineMutationDefinitions: Array<OfflineMutationDefinition<any, unknown>> = [
   createTenantOfflineMutationDefinition,
   updateTenantOfflineMutationDefinition,
   deleteTenantOfflineMutationDefinition,

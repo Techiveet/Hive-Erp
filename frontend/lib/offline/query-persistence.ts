@@ -73,7 +73,7 @@ const persistQueryCache = (queryClient: QueryClient): void => {
 };
 
 export const subscribeToPersistedQueryCache = (queryClient: QueryClient): (() => void) => {
-  let timeoutId: ReturnType<typeof window.setTimeout> | null = null;
+  let timeoutId: number | null = null;
 
   const schedulePersist = () => {
     if (typeof window === "undefined") {
