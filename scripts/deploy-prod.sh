@@ -84,7 +84,8 @@ done
 compose exec -T backend php artisan storage:link || true
 compose exec -T backend php artisan optimize:clear
 compose exec -T backend php artisan migrate --force
-compose exec -T backend php artisan optimize
+compose exec -T backend php artisan config:cache
+compose exec -T backend php artisan view:cache
 compose up -d queue reverb frontend caddy
 
 compose ps
