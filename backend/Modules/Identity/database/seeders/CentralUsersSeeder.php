@@ -2,11 +2,12 @@
 
 namespace Modules\Identity\Database\Seeders;
 
-use Modules\Identity\Models\User;
-use Modules\Identity\Models\Permission;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Modules\Identity\Models\Permission;
+use Modules\Identity\Models\User;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -42,12 +43,24 @@ class CentralUsersSeeder extends Seeder
         }
 
         $roles = ['Support Specialist', 'Billing Admin', 'Security Auditor'];
-
         $existingRoles = Role::whereIn('name', $roles)->where('guard_name', $guard)->pluck('name')->toArray();
 
         if (empty($existingRoles)) {
-            $this->command->warn("⚠️ No operational roles found. Skipping staff role assignment.");
-            User::factory(10)->create(['password' => Hash::make('password')]);
+            $this->command->warn('No operational roles found. Creating central users without role assignments.');
+
+            for ($i = 1; $i <= 10; $i++) {
+                User::updateOrCreate(
+                    ['email' => "central-user-{$i}@hive.os"],
+                    [
+                        'name' => "Central User {$i}",
+                        'password' => Hash::make('password'),
+                        'email_verified_at' => now(),
+                        'is_active' => true,
+                        'two_factor_secret' => null,
+                        'two_factor_recovery_codes' => null,
+                    ]
+                );
+            }
         } else {
             $testAccounts = [
                 ['name' => 'Alice Auditor', 'email' => 'auditor@hive.os', 'role' => 'Security Auditor'],
@@ -55,27 +68,42 @@ class CentralUsersSeeder extends Seeder
             ];
 
             foreach ($testAccounts as $acc) {
-                $u = User::updateOrCreate(
+                $user = User::updateOrCreate(
                     ['email' => $acc['email']],
                     [
                         'name' => $acc['name'],
                         'password' => Hash::make('password'),
                         'email_verified_at' => now(),
                         'is_active' => true,
+                        'two_factor_secret' => null,
+                        'two_factor_recovery_codes' => null,
                     ]
                 );
-                if (in_array($acc['role'], $existingRoles)) {
-                    $u->syncRoles([$acc['role']]);
+
+                if (in_array($acc['role'], $existingRoles, true)) {
+                    $user->syncRoles([$acc['role']]);
                 }
             }
 
-            User::factory(8)->create(['password' => Hash::make('password')])->each(function ($user) use ($existingRoles) {
+            for ($i = 1; $i <= 8; $i++) {
+                $user = User::updateOrCreate(
+                    ['email' => "ops-user-{$i}@hive.os"],
+                    [
+                        'name' => 'Ops User '.Str::upper(Str::random(4)),
+                        'password' => Hash::make('password'),
+                        'email_verified_at' => now(),
+                        'is_active' => true,
+                        'two_factor_secret' => null,
+                        'two_factor_recovery_codes' => null,
+                    ]
+                );
+
                 $user->syncRoles([$existingRoles[array_rand($existingRoles)]]);
-            });
+            }
         }
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        $this->command->info("✅ Central Hive users & operational staff initialized.");
+        $this->command->info('Central Hive users and operational staff initialized.');
     }
 }

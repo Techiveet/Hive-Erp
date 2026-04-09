@@ -1,54 +1,33 @@
 <?php
 
-namespace Modules\Identity\Database\Factories; // 🚀 Match the new folder structure
+namespace Modules\Identity\Database\Factories;
 
-use Faker\Factory as FakerFactory;
-use Faker\Generator as FakerGenerator;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Modules\Identity\Models\User; // 🚀 Import the modular User model
+use Modules\Identity\Models\User;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\Modules\Identity\Models\User>
  */
 class UserFactory extends Factory
 {
-    /**
-     * The name of the factory's corresponding model.
-     *
-     * @var string
-     */
-    protected $model = User::class; // 🚀 Explicitly tell the factory which model it's for
+    protected $model = User::class;
 
-    /**
-     * The current password being used by the factory.
-     */
     protected static ?string $password;
-    protected static ?FakerGenerator $fallbackFaker = null;
 
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
     public function definition(): array
     {
-        $faker = $this->faker ?? static::$fallbackFaker ??= FakerFactory::create();
-
         return [
-            'name' => $faker->name(),
-            'email' => $faker->unique()->safeEmail(),
+            'name' => 'User '.Str::upper(Str::random(5)),
+            'email' => 'user_'.Str::lower(Str::random(12)).'@example.test',
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
-            'is_active' => true, // Added since your seeders rely on this
+            'is_active' => true,
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
     public function unverified(): static
     {
         return $this->state(fn (array $attributes) => [
