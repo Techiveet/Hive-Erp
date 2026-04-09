@@ -4,6 +4,13 @@ services:
     image: caddy:2-alpine
     container_name: hive-caddy
     restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:-hive.hinohaet.com}
+      BACKEND_DOMAIN: ${BACKEND_DOMAIN:-hive-backend.hinohaet.com}
+      REVERB_DOMAIN: ${REVERB_DOMAIN:-hive-ws.hinohaet.com}
+      HORIZON_DOMAIN: ${HORIZON_DOMAIN:-hive-queue.hinohaet.com}
     ports:
       - "80:80"
       - "443:443"
@@ -99,9 +106,29 @@ services:
     environment:
       APP_ENV: production
       OCTANE_SERVER: roadrunner
-      DB_HOST: db
-      REDIS_HOST: redis
-      MEILISEARCH_HOST: http://meilisearch:7700
+      SERVER_IP: ${SERVER_IP:-}
+      ROOT_DOMAIN: ${ROOT_DOMAIN:-hinohaet.com}
+      FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:-hive.hinohaet.com}
+      BACKEND_DOMAIN: ${BACKEND_DOMAIN:-hive-backend.hinohaet.com}
+      REVERB_DOMAIN: ${REVERB_DOMAIN:-hive-ws.hinohaet.com}
+      HORIZON_DOMAIN: ${HORIZON_DOMAIN:-hive-queue.hinohaet.com}
+      MEILISEARCH_DOMAIN: ${MEILISEARCH_DOMAIN:-hive-search.hinohaet.com}
+      REMBG_DOMAIN: ${REMBG_DOMAIN:-hive-rembg.hinohaet.com}
+      GOTENBERG_DOMAIN: ${GOTENBERG_DOMAIN:-hive-docs.hinohaet.com}
+      REDIS_DOMAIN: ${REDIS_DOMAIN:-hive-redis.hinohaet.com}
+      DB_DOMAIN: ${DB_DOMAIN:-hive-db.hinohaet.com}
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
+      FRONTEND_INTERNAL_URL: ${FRONTEND_INTERNAL_URL:-http://frontend:3000}
+      REVERB_INTERNAL_URL: ${REVERB_INTERNAL_URL:-http://reverb:9000}
+      QUEUE_INTERNAL_HOST: ${QUEUE_INTERNAL_HOST:-queue}
+      DB_HOST: ${DB_INTERNAL_HOST:-db}
+      DB_INTERNAL_HOST: ${DB_INTERNAL_HOST:-db}
+      REDIS_HOST: ${REDIS_INTERNAL_HOST:-redis}
+      REDIS_INTERNAL_HOST: ${REDIS_INTERNAL_HOST:-redis}
+      MEILISEARCH_HOST: ${MEILISEARCH_INTERNAL_URL:-http://meilisearch:7700}
+      MEILISEARCH_INTERNAL_URL: ${MEILISEARCH_INTERNAL_URL:-http://meilisearch:7700}
+      REMBG_INTERNAL_URL: ${REMBG_INTERNAL_URL:-http://rembg:5000}
+      GOTENBERG_INTERNAL_URL: ${GOTENBERG_INTERNAL_URL:-http://gotenberg:3000}
       REVERB_HOST: reverb
       PUSHER_HOST: reverb
     depends_on:
@@ -133,9 +160,17 @@ services:
       - .env
     environment:
       APP_ENV: production
-      DB_HOST: db
-      REDIS_HOST: redis
-      MEILISEARCH_HOST: http://meilisearch:7700
+      ROOT_DOMAIN: ${ROOT_DOMAIN:-hinohaet.com}
+      FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:-hive.hinohaet.com}
+      BACKEND_DOMAIN: ${BACKEND_DOMAIN:-hive-backend.hinohaet.com}
+      REVERB_DOMAIN: ${REVERB_DOMAIN:-hive-ws.hinohaet.com}
+      HORIZON_DOMAIN: ${HORIZON_DOMAIN:-hive-queue.hinohaet.com}
+      DB_HOST: ${DB_INTERNAL_HOST:-db}
+      DB_INTERNAL_HOST: ${DB_INTERNAL_HOST:-db}
+      REDIS_HOST: ${REDIS_INTERNAL_HOST:-redis}
+      REDIS_INTERNAL_HOST: ${REDIS_INTERNAL_HOST:-redis}
+      MEILISEARCH_HOST: ${MEILISEARCH_INTERNAL_URL:-http://meilisearch:7700}
+      MEILISEARCH_INTERNAL_URL: ${MEILISEARCH_INTERNAL_URL:-http://meilisearch:7700}
       REVERB_HOST: reverb
       PUSHER_HOST: reverb
     depends_on:
@@ -158,8 +193,11 @@ services:
       - .env
     environment:
       APP_ENV: production
-      DB_HOST: db
-      REDIS_HOST: redis
+      ROOT_DOMAIN: ${ROOT_DOMAIN:-hinohaet.com}
+      BACKEND_DOMAIN: ${BACKEND_DOMAIN:-hive-backend.hinohaet.com}
+      REVERB_DOMAIN: ${REVERB_DOMAIN:-hive-ws.hinohaet.com}
+      DB_HOST: ${DB_INTERNAL_HOST:-db}
+      REDIS_HOST: ${REDIS_INTERNAL_HOST:-redis}
       REVERB_SERVER_HOST: 0.0.0.0
       REVERB_SERVER_PORT: 9000
     depends_on:
@@ -180,6 +218,10 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
         NEXT_PUBLIC_CENTRAL_DOMAINS: ${NEXT_PUBLIC_CENTRAL_DOMAINS:-}
+        NEXT_PUBLIC_ROOT_DOMAIN: ${NEXT_PUBLIC_ROOT_DOMAIN:-hinohaet.com}
+        NEXT_PUBLIC_FRONTEND_DOMAIN: ${NEXT_PUBLIC_FRONTEND_DOMAIN:-hive.hinohaet.com}
+        NEXT_PUBLIC_BACKEND_DOMAIN: ${NEXT_PUBLIC_BACKEND_DOMAIN:-hive-backend.hinohaet.com}
+        NEXT_PUBLIC_REVERB_DOMAIN: ${NEXT_PUBLIC_REVERB_DOMAIN:-hive-ws.hinohaet.com}
         NEXT_PUBLIC_REVERB_APP_KEY: ${NEXT_PUBLIC_REVERB_APP_KEY}
         NEXT_PUBLIC_REVERB_HOST: ${NEXT_PUBLIC_REVERB_HOST}
         NEXT_PUBLIC_REVERB_PORT: ${NEXT_PUBLIC_REVERB_PORT}
@@ -190,13 +232,37 @@ services:
     env_file:
       - .env
     environment:
+      SERVER_IP: ${SERVER_IP:-}
+      ROOT_DOMAIN: ${ROOT_DOMAIN:-hinohaet.com}
+      FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:-hive.hinohaet.com}
+      BACKEND_DOMAIN: ${BACKEND_DOMAIN:-hive-backend.hinohaet.com}
+      REVERB_DOMAIN: ${REVERB_DOMAIN:-hive-ws.hinohaet.com}
+      HORIZON_DOMAIN: ${HORIZON_DOMAIN:-hive-queue.hinohaet.com}
+      MEILISEARCH_DOMAIN: ${MEILISEARCH_DOMAIN:-hive-search.hinohaet.com}
+      REMBG_DOMAIN: ${REMBG_DOMAIN:-hive-rembg.hinohaet.com}
+      GOTENBERG_DOMAIN: ${GOTENBERG_DOMAIN:-hive-docs.hinohaet.com}
+      REDIS_DOMAIN: ${REDIS_DOMAIN:-hive-redis.hinohaet.com}
+      DB_DOMAIN: ${DB_DOMAIN:-hive-db.hinohaet.com}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
       NEXT_PUBLIC_CENTRAL_DOMAINS: ${NEXT_PUBLIC_CENTRAL_DOMAINS:-}
+      NEXT_PUBLIC_ROOT_DOMAIN: ${NEXT_PUBLIC_ROOT_DOMAIN:-hinohaet.com}
+      NEXT_PUBLIC_FRONTEND_DOMAIN: ${NEXT_PUBLIC_FRONTEND_DOMAIN:-hive.hinohaet.com}
+      NEXT_PUBLIC_BACKEND_DOMAIN: ${NEXT_PUBLIC_BACKEND_DOMAIN:-hive-backend.hinohaet.com}
+      NEXT_PUBLIC_REVERB_DOMAIN: ${NEXT_PUBLIC_REVERB_DOMAIN:-hive-ws.hinohaet.com}
       NEXT_PUBLIC_REVERB_APP_KEY: ${NEXT_PUBLIC_REVERB_APP_KEY}
       NEXT_PUBLIC_REVERB_HOST: ${NEXT_PUBLIC_REVERB_HOST}
       NEXT_PUBLIC_REVERB_PORT: ${NEXT_PUBLIC_REVERB_PORT}
       NEXT_PUBLIC_REVERB_SCHEME: ${NEXT_PUBLIC_REVERB_SCHEME}
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
+      FRONTEND_INTERNAL_URL: ${FRONTEND_INTERNAL_URL:-http://frontend:3000}
+      REVERB_INTERNAL_URL: ${REVERB_INTERNAL_URL:-http://reverb:9000}
+      QUEUE_INTERNAL_HOST: ${QUEUE_INTERNAL_HOST:-queue}
+      DB_INTERNAL_HOST: ${DB_INTERNAL_HOST:-db}
+      REDIS_INTERNAL_HOST: ${REDIS_INTERNAL_HOST:-redis}
+      MEILISEARCH_INTERNAL_URL: ${MEILISEARCH_INTERNAL_URL:-http://meilisearch:7700}
+      REMBG_INTERNAL_URL: ${REMBG_INTERNAL_URL:-http://rembg:5000}
+      GOTENBERG_INTERNAL_URL: ${GOTENBERG_INTERNAL_URL:-http://gotenberg:3000}
       INTERNAL_API_URL: ${INTERNAL_API_URL:-http://backend:8000/api/v1}
     depends_on:
       backend:

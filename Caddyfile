@@ -1,15 +1,23 @@
-hive.hinohaet.com {
+{$FRONTEND_DOMAIN:hive.hinohaet.com} {
     reverse_proxy frontend:3000
 }
 
-hive-backend.hinohaet.com {
-    # Proxy /app/ to the Reverb WebSocket server
+{$BACKEND_DOMAIN:hive-backend.hinohaet.com} {
+    # Keep WebSocket upgrades working on the API domain for older clients.
     handle_path /app/* {
         reverse_proxy reverb:9000
     }
 
-    # Proxy everything else to the Laravel Backend
     handle {
         reverse_proxy backend:8000
     }
+}
+
+{$REVERB_DOMAIN:hive-ws.hinohaet.com} {
+    reverse_proxy reverb:9000
+}
+
+{$HORIZON_DOMAIN:hive-queue.hinohaet.com} {
+    redir / /horizon 308
+    reverse_proxy backend:8000
 }
