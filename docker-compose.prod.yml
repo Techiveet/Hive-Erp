@@ -4,6 +4,9 @@ services:
     image: caddy:2-alpine
     container_name: hive-caddy
     restart: unless-stopped
+    dns:
+      - ${DOCKER_DNS_1:-1.1.1.1}
+      - ${DOCKER_DNS_2:-8.8.8.8}
     env_file:
       - .env
     environment:
