@@ -20,6 +20,7 @@ use Modules\Core\Console\Commands\SyncLocalizationCommand;
 use Modules\Core\Console\Commands\ArchiveAuditLogs;
 use Modules\Core\Console\Commands\DescribeModulesCommand;
 use Modules\Core\Console\Commands\ScoutTenantImport;
+use Modules\Core\Console\Commands\BootstrapProductionCommand;
 use Modules\Core\Jobs\RunSystemBackup;
 
 class CoreServiceProvider extends ModuleServiceProvider
@@ -32,6 +33,7 @@ class CoreServiceProvider extends ModuleServiceProvider
         ArchiveAuditLogs::class,
         DescribeModulesCommand::class,
         ScoutTenantImport::class,
+        BootstrapProductionCommand::class,
     ];
 
     protected array $providers = [
