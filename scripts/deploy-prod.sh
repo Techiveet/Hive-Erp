@@ -64,6 +64,43 @@ ensure_app_key() {
   echo "Generated missing APP_KEY in .env"
 }
 
+ensure_reverb_credentials() {
+  local reverb_app_id reverb_app_key reverb_app_secret
+
+  ensure_env_value BROADCAST_CONNECTION "reverb"
+
+  reverb_app_id="$(get_env_value REVERB_APP_ID)"
+  reverb_app_key="$(get_env_value REVERB_APP_KEY)"
+  reverb_app_secret="$(get_env_value REVERB_APP_SECRET)"
+
+  if [ -n "${reverb_app_id}" ] && [ -n "${reverb_app_key}" ] && [ -n "${reverb_app_secret}" ]; then
+    return
+  fi
+
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "Reverb credentials are incomplete and openssl is unavailable. Set REVERB_APP_ID, REVERB_APP_KEY, and REVERB_APP_SECRET in .env before deploying." >&2
+    exit 1
+  fi
+
+  if [ -z "${reverb_app_id}" ]; then
+    reverb_app_id="$(date +%s)"
+    set_env_value REVERB_APP_ID "${reverb_app_id}"
+  fi
+
+  if [ -z "${reverb_app_key}" ]; then
+    reverb_app_key="$(openssl rand -hex 16)"
+    set_env_value REVERB_APP_KEY "${reverb_app_key}"
+  fi
+
+  if [ -z "${reverb_app_secret}" ]; then
+    reverb_app_secret="$(openssl rand -hex 32)"
+    set_env_value REVERB_APP_SECRET "${reverb_app_secret}"
+  fi
+
+  set_env_value NEXT_PUBLIC_REVERB_APP_KEY "${reverb_app_key}"
+  echo "Generated missing Reverb credentials in .env"
+}
+
 ensure_domain_defaults() {
   local root_domain frontend_domain backend_domain reverb_domain reverb_app_key
 
@@ -119,7 +156,7 @@ ensure_domain_defaults() {
 
   reverb_app_key="$(get_env_value REVERB_APP_KEY)"
 
-  if [ -n "${reverb_app_key}" ] && [ -z "$(get_env_value NEXT_PUBLIC_REVERB_APP_KEY)" ]; then
+  if [ -n "${reverb_app_key}" ] && [ "$(get_env_value NEXT_PUBLIC_REVERB_APP_KEY)" != "${reverb_app_key}" ]; then
     set_env_value NEXT_PUBLIC_REVERB_APP_KEY "${reverb_app_key}"
   fi
 }
@@ -141,6 +178,7 @@ if [ ! -f ".env" ]; then
 fi
 
 ensure_app_key
+ensure_reverb_credentials
 ensure_domain_defaults
 
 compose build
