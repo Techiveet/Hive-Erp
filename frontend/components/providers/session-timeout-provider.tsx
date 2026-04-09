@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ShieldAlert, Clock } from "lucide-react";
 import { useSystemSettings } from "@/components/providers/settings-provider"; 
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
-import { getTenantHeaders } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantHeaders } from "@/lib/runtime-context";
 import {
     AlertDialog,
     AlertDialogContent,
@@ -45,11 +45,9 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
     if (!token) return;
 
     try {
-      const host = window.location.hostname;
-      const protocol = window.location.protocol;
-      const endpoint = "/api/v1/logout";
+      const endpoint = "/logout";
       
-      await fetch(`${protocol}//${host}:8085${endpoint}`, {
+      await fetch(`${getBackendApiRoot()}${endpoint}`, {
         method: "POST",
         headers: {
           "Accept": "application/json",
@@ -78,9 +76,7 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
     if (!token) return;
 
     try {
-      const host = window.location.hostname;
-      const protocol = window.location.protocol;
-      const url = `${protocol}//${host}:8085/api/v1/ping`;
+      const url = `${getBackendApiRoot()}/ping`;
 
       const response = await fetch(url, {
         method: 'POST',

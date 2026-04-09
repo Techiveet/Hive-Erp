@@ -19,7 +19,9 @@ use Modules\Subscription\Support\TenantSubscriptionService;
 use Modules\Tenancy\Mail\AdminCredentialsUpdated;
 use Modules\Tenancy\Mail\AdminStatusChanged;
 use Modules\Tenancy\Mail\TenantStatusChanged;
+use Modules\Tenancy\Models\Domain;
 use Modules\Tenancy\Models\Tenant;
+use Modules\Tenancy\Support\TenantDomainService;
 use Modules\Tenancy\Support\TenantProvisioningService;
 
 class TenantController extends Controller implements HasMiddleware
@@ -29,6 +31,7 @@ class TenantController extends Controller implements HasMiddleware
     public function __construct(
         protected TenantProvisioningService $tenantProvisioningService,
         protected TenantSubscriptionService $subscriptions,
+        protected TenantDomainService $tenantDomains,
     ) {
     }
 
@@ -37,9 +40,9 @@ class TenantController extends Controller implements HasMiddleware
         return [
             new Middleware('permission:view_tenants|manage_tenants,sanctum', only: ['index', 'show', 'exportPdf']),
             new Middleware('permission:provision_tenants|manage_tenants,sanctum', only: ['store']),
-            new Middleware('permission:edit_tenants|manage_tenants,sanctum', only: ['update']),
+            new Middleware('permission:edit_tenants|manage_tenants,sanctum', only: ['update', 'storeDomain', 'updateDomain', 'verifyDomain', 'makePrimaryDomain']),
             new Middleware('permission:suspend_tenants|manage_tenants,sanctum', only: ['toggleStatus', 'toggleAdminStatus']),
-            new Middleware('permission:delete_tenants|manage_tenants,sanctum', only: ['destroy']),
+            new Middleware('permission:delete_tenants|manage_tenants,sanctum', only: ['destroy', 'destroyDomain']),
         ];
     }
 
@@ -53,7 +56,8 @@ class TenantController extends Controller implements HasMiddleware
                 $q->whereRaw('LOWER(id) LIKE ?', ["%{$search}%"])
                     ->orWhereRaw('LOWER(data->>\'name\') LIKE ?', ["%{$search}%"])
                     ->orWhereRaw('LOWER(data->>\'plan\') LIKE ?', ["%{$search}%"])
-                    ->orWhereRaw('LOWER(data->>\'admin_email\') LIKE ?', ["%{$search}%"]);
+                    ->orWhereRaw('LOWER(data->>\'admin_email\') LIKE ?', ["%{$search}%"])
+                    ->orWhereHas('domains', fn ($domainQuery) => $domainQuery->whereRaw('LOWER(domain) LIKE ?', ["%{$search}%"]));
             });
         }
 
@@ -89,7 +93,8 @@ class TenantController extends Controller implements HasMiddleware
                 $q->whereRaw('LOWER(id) LIKE ?', ["%{$search}%"])
                     ->orWhereRaw('LOWER(data->>\'name\') LIKE ?', ["%{$search}%"])
                     ->orWhereRaw('LOWER(data->>\'plan\') LIKE ?', ["%{$search}%"])
-                    ->orWhereRaw('LOWER(data->>\'admin_email\') LIKE ?', ["%{$search}%"]);
+                    ->orWhereRaw('LOWER(data->>\'admin_email\') LIKE ?', ["%{$search}%"])
+                    ->orWhereHas('domains', fn ($domainQuery) => $domainQuery->whereRaw('LOWER(domain) LIKE ?', ["%{$search}%"]));
             });
         }
 
@@ -184,6 +189,147 @@ class TenantController extends Controller implements HasMiddleware
         $tenant = Tenant::with('domains')->findOrFail($id);
 
         return response()->json(['data' => $this->formatTenant($tenant)], 200);
+    }
+
+    public function storeDomain(Request $request, string $id)
+    {
+        $tenant = Tenant::with('domains')->findOrFail($id);
+        $validated = $request->validate([
+            'domain' => ['required', 'string', 'max:255', Rule::unique('domains', 'domain')],
+        ]);
+
+        $domain = $this->tenantDomains->createCustomDomain($tenant, $validated['domain']);
+        $tenant->load('domains');
+
+        activity('Tenant Management')
+            ->causedBy(auth()->user())
+            ->performedOn($tenant)
+            ->event('updated')
+            ->withProperties([
+                'node_id' => $tenant->id,
+                'domain' => $domain->domain,
+                'action' => 'domain_added',
+            ])
+            ->log("Attached custom domain [{$domain->domain}] to Tenant Node [{$tenant->id}].");
+
+        return response()->json([
+            'message' => 'Custom domain added. Complete DNS verification before making it primary.',
+            'data' => $this->tenantDomains->domainPayload($domain),
+            'tenant' => $this->formatTenant($tenant),
+        ], 201);
+    }
+
+    public function updateDomain(Request $request, string $id, int $domainId)
+    {
+        $tenant = Tenant::with('domains')->findOrFail($id);
+        $domain = $this->findTenantDomain($tenant, $domainId);
+
+        $validated = $request->validate([
+            'domain' => ['required', 'string', 'max:255', Rule::unique('domains', 'domain')->ignore($domain->id)],
+        ]);
+
+        $updatedDomain = $this->tenantDomains->updateCustomDomain($tenant, $domain, $validated['domain']);
+        $tenant->load('domains');
+
+        activity('Tenant Management')
+            ->causedBy(auth()->user())
+            ->performedOn($tenant)
+            ->event('updated')
+            ->withProperties([
+                'node_id' => $tenant->id,
+                'domain' => $updatedDomain->domain,
+                'action' => 'domain_updated',
+            ])
+            ->log("Updated custom domain [{$updatedDomain->domain}] for Tenant Node [{$tenant->id}].");
+
+        return response()->json([
+            'message' => 'Custom domain updated. Re-run DNS verification after the new records propagate.',
+            'data' => $this->tenantDomains->domainPayload($updatedDomain),
+            'tenant' => $this->formatTenant($tenant),
+        ], 200);
+    }
+
+    public function verifyDomain(string $id, int $domainId)
+    {
+        $tenant = Tenant::with('domains')->findOrFail($id);
+        $domain = $this->findTenantDomain($tenant, $domainId);
+        $result = $this->tenantDomains->verifyDomain($tenant, $domain);
+        $tenant->load('domains');
+
+        activity('Tenant Management')
+            ->causedBy(auth()->user())
+            ->performedOn($tenant)
+            ->event('updated')
+            ->withProperties([
+                'node_id' => $tenant->id,
+                'domain' => $domain->domain,
+                'verified' => $result['verified'],
+                'action' => 'domain_verified',
+            ])
+            ->log(
+                $result['verified']
+                    ? "Verified custom domain [{$domain->domain}] for Tenant Node [{$tenant->id}]."
+                    : "DNS verification check failed for custom domain [{$domain->domain}] on Tenant Node [{$tenant->id}]."
+            );
+
+        return response()->json([
+            'message' => $result['verified']
+                ? 'Domain verified. You can now make it the primary tenant address.'
+                : 'Verification token not found yet. Confirm the TXT record and try again.',
+            'data' => $this->tenantDomains->domainPayload($result['domain']),
+            'tenant' => $this->formatTenant($tenant),
+        ], 200);
+    }
+
+    public function makePrimaryDomain(string $id, int $domainId)
+    {
+        $tenant = Tenant::with('domains')->findOrFail($id);
+        $domain = $this->findTenantDomain($tenant, $domainId);
+        $primaryDomain = $this->tenantDomains->makePrimary($tenant, $domain);
+        $tenant->load('domains');
+
+        activity('Tenant Management')
+            ->causedBy(auth()->user())
+            ->performedOn($tenant)
+            ->event('updated')
+            ->withProperties([
+                'node_id' => $tenant->id,
+                'domain' => $primaryDomain->domain,
+                'action' => 'domain_primary',
+            ])
+            ->log("Promoted domain [{$primaryDomain->domain}] to primary for Tenant Node [{$tenant->id}].");
+
+        return response()->json([
+            'message' => 'Primary tenant domain updated.',
+            'data' => $this->tenantDomains->domainPayload($primaryDomain),
+            'tenant' => $this->formatTenant($tenant),
+        ], 200);
+    }
+
+    public function destroyDomain(string $id, int $domainId)
+    {
+        $tenant = Tenant::with('domains')->findOrFail($id);
+        $domain = $this->findTenantDomain($tenant, $domainId);
+        $domainName = $domain->domain;
+
+        $this->tenantDomains->deleteDomain($tenant, $domain);
+        $tenant->load('domains');
+
+        activity('Tenant Management')
+            ->causedBy(auth()->user())
+            ->performedOn($tenant)
+            ->event('updated')
+            ->withProperties([
+                'node_id' => $tenant->id,
+                'domain' => $domainName,
+                'action' => 'domain_deleted',
+            ])
+            ->log("Removed custom domain [{$domainName}] from Tenant Node [{$tenant->id}].");
+
+        return response()->json([
+            'message' => 'Custom domain removed.',
+            'tenant' => $this->formatTenant($tenant),
+        ], 200);
     }
 
     public function update(Request $request, string $id)
@@ -380,6 +526,8 @@ class TenantController extends Controller implements HasMiddleware
     protected function formatTenant(Tenant $tenant): array
     {
         $tenant->loadMissing('domains');
+        $primaryDomain = $tenant->primaryDomain();
+        $fallbackDomain = $tenant->fallbackDomain();
 
         $currentSubscription = $this->subscriptions->currentForTenant($tenant);
         $subscriptions = $currentSubscription['module_subscriptions'];
@@ -388,7 +536,10 @@ class TenantController extends Controller implements HasMiddleware
             'id' => $tenant->id,
             'name' => $tenant->name ?? ucfirst($tenant->id),
             'plan' => $tenant->plan ?? 'Standard',
-            'domain' => $tenant->domains->first()->domain ?? $tenant->id . '.localhost',
+            'domain' => $primaryDomain?->domain ?? $tenant->id . '.localhost',
+            'primary_domain' => $primaryDomain?->domain ?? $tenant->id . '.localhost',
+            'fallback_domain' => $fallbackDomain?->domain ?? $tenant->id . '.localhost',
+            'domains' => $this->tenantDomains->domainsPayload($tenant),
             'is_active' => $tenant->is_active ?? true,
             'admin_email' => $tenant->admin_email,
             'admin_active' => $tenant->admin_active ?? true,
@@ -398,5 +549,10 @@ class TenantController extends Controller implements HasMiddleware
             'subscribed_modules' => $subscriptions['selected_modules'],
             'subscribed_modules_count' => $subscriptions['module_count'],
         ];
+    }
+
+    protected function findTenantDomain(Tenant $tenant, int $domainId): Domain
+    {
+        return $tenant->domains()->findOrFail($domainId);
     }
 }

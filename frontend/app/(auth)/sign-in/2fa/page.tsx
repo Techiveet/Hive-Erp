@@ -13,7 +13,7 @@ import { logFrontendAction } from "@/lib/api";
 import { clearHiveSession } from "@/lib/auth-sync";
 import { cn } from "@/lib/utils";
 import { QRCodeSVG } from "qrcode.react"; // 🚀 Used for forced setup
-import { isTenantHost } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantId, isTenantHost } from "@/lib/runtime-context";
 import { initializeSessionActivity } from "@/lib/session-activity";
 
 export default function TwoFactorPage() {
@@ -49,7 +49,7 @@ export default function TwoFactorPage() {
 
     const host = window.location.hostname;
     if (isTenantHost(host)) {
-      setPortalName(`${host.split(".")[0].toUpperCase()} NODE`);
+      setPortalName(`${(getTenantId() || host).toUpperCase()} NODE`);
       setIsTenant(true);
     }
   }, [router]);
@@ -67,11 +67,11 @@ export default function TwoFactorPage() {
 
     const email = sessionStorage.getItem("hive_pending_email");
     const host = window.location.hostname;
-    const tenantId = isTenantHost(host) ? host.split(".")[0] : null;
+    const tenantId = getTenantId();
     
     // If they are setting it up for the first time, hit the confirm endpoint. Otherwise, hit verify.
-    const endpoint = tenantId ? "tenant/verify-2fa" : "verify-2fa";
-    const apiUrl = `http://${host}:8085/api/v1/${endpoint}`;
+    const endpoint = isTenantHost(host) ? "tenant/verify-2fa" : "verify-2fa";
+    const apiUrl = `${getBackendApiRoot()}/${endpoint}`;
 
     try {
       const payload = { email, two_factor_token: sessionStorage.getItem("hive_2fa_token"), code };

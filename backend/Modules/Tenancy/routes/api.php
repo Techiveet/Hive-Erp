@@ -5,7 +5,25 @@ use Illuminate\Support\Facades\Route;
 use Modules\Tenancy\Http\Controllers\Export\TenantExportController;
 use Modules\Tenancy\Http\Controllers\TenantController;
 
-$centralDomains = ['localhost', '127.0.0.1', 'hive-os.com'];
+$centralDomains = collect(array_merge(
+    config('tenancy.central_domains', []),
+    ['hive-os.com']
+))
+    ->map(function ($domain) {
+        $domain = trim((string) $domain);
+
+        if ($domain === '') {
+            return null;
+        }
+
+        $host = parse_url(str_contains($domain, '://') ? $domain : "http://{$domain}", PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' ? strtolower($host) : null;
+    })
+    ->filter()
+    ->unique()
+    ->values()
+    ->all();
 
 // =========================================================================
 // 1. CENTRAL COMMAND (Tenancy)
@@ -18,16 +36,21 @@ foreach ($centralDomains as $domain) {
             return response()->json(['valid' => $exists], $exists ? 200 : 404);
         });
 
-        Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
-            Route::prefix('tenants')->group(function () {
-                Route::get('/export', [TenantExportController::class, 'handleExport']);
-                Route::post('/{id}/toggle-status', [TenantController::class, 'toggleStatus']);
-                Route::post('/{id}/toggle-admin-status', [TenantController::class, 'toggleAdminStatus']);
-            });
+            Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
+                Route::prefix('tenants')->group(function () {
+                    Route::get('/export', [TenantExportController::class, 'handleExport']);
+                    Route::post('/{id}/toggle-status', [TenantController::class, 'toggleStatus']);
+                    Route::post('/{id}/toggle-admin-status', [TenantController::class, 'toggleAdminStatus']);
+                    Route::post('/{id}/domains', [TenantController::class, 'storeDomain']);
+                    Route::put('/{id}/domains/{domainId}', [TenantController::class, 'updateDomain']);
+                    Route::post('/{id}/domains/{domainId}/verify', [TenantController::class, 'verifyDomain']);
+                    Route::post('/{id}/domains/{domainId}/make-primary', [TenantController::class, 'makePrimaryDomain']);
+                    Route::delete('/{id}/domains/{domainId}', [TenantController::class, 'destroyDomain']);
+                });
 
-            Route::apiResource('tenants', TenantController::class);
+                Route::apiResource('tenants', TenantController::class);
+            });
         });
-    });
 }
 
 // =========================================================================

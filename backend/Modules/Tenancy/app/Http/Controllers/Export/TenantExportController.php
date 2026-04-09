@@ -39,7 +39,8 @@ class TenantExportController extends Controller implements HasMiddleware
             $query->where(function ($q) use ($search) {
                 $q->whereRaw('LOWER(CAST(id AS TEXT)) LIKE ?', ["%{$search}%"])
                   ->orWhereRaw("LOWER(CAST(data->>'name' AS TEXT)) LIKE ?", ["%{$search}%"])
-                  ->orWhereRaw("LOWER(CAST(data->>'admin_email' AS TEXT)) LIKE ?", ["%{$search}%"]);
+                  ->orWhereRaw("LOWER(CAST(data->>'admin_email' AS TEXT)) LIKE ?", ["%{$search}%"])
+                  ->orWhereHas('domains', fn ($domainQuery) => $domainQuery->whereRaw('LOWER(domain) LIKE ?', ["%{$search}%"]));
             });
         }
 
@@ -116,7 +117,7 @@ class TenantExportController extends Controller implements HasMiddleware
         // --- Handle Print/JSON for Frontend DataTable Copy ---
         if (in_array($type, ['print', 'copy'])) {
             $tenants = $this->getFilteredQuery($request)->get()->map(function($tenant, $index) use ($t) {
-                $domain = $tenant->domains->first()?->domain ?? "{$tenant->id}.localhost";
+                $domain = $tenant->primaryDomain()?->domain ?? "{$tenant->id}.localhost";
 
                 return [
                     $t('tenants.col_id', 'Node ID')              => strtoupper($tenant->id),

@@ -2,6 +2,21 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+const extractHost = (value?: string | null): string | null => {
+    if (!value) return null;
+
+    try {
+        return new URL(value).hostname.toLowerCase();
+    } catch {
+        return value
+            .trim()
+            .toLowerCase()
+            .replace(/^https?:\/\//, '')
+            .replace(/\/.*$/, '')
+            .replace(/:\d+$/, '') || null;
+    }
+};
+
 export function proxy(req: NextRequest) {
     const url = req.nextUrl;
     
@@ -9,10 +24,18 @@ export function proxy(req: NextRequest) {
     const hostname = req.headers.get('host') || ''; 
     const currentHost = hostname.split(':')[0]; 
 
-    const centralDomains = ['localhost', '127.0.0.1'];
+    const centralDomains = new Set(
+        [
+            'localhost',
+            '127.0.0.1',
+            extractHost(process.env.NEXT_PUBLIC_APP_URL),
+            ...((process.env.NEXT_PUBLIC_CENTRAL_DOMAINS ?? '').split(',').map((value) => extractHost(value))),
+        ].filter((value): value is string => Boolean(value))
+    );
+    const isLocalTenantAlias = currentHost.endsWith('.localhost');
 
     // Multi-tenant routing logic
-    if (!centralDomains.includes(currentHost)) {
+    if (!centralDomains.has(currentHost) && isLocalTenantAlias) {
         const tenantId = currentHost.replace('.localhost', '');
         
         // 🚀 FIXED: Moved '/dashboard' out of exact matches...

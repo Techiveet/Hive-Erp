@@ -15,7 +15,7 @@ import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { logFrontendAction } from "@/lib/api"; 
 import { clearHiveSession } from "@/lib/auth-sync";
-import { getBackendApiRoot, getBackendStorageUrl, isTenantHost } from "@/lib/runtime-context";
+import { getBackendApiRoot, getBackendStorageUrl, getTenantId, isTenantHost } from "@/lib/runtime-context";
 import { initializeSessionActivity } from "@/lib/session-activity";
 
 export default function LoginPage() {
@@ -61,8 +61,8 @@ export default function LoginPage() {
 
     const host = window.location.hostname;
     if (isTenantHost(host)) {
-      const tenantId = host.split(".")[0].toUpperCase();
-      setPortalName(`${tenantId} NODE`);
+      const tenantLabel = (getTenantId() || host).toUpperCase();
+      setPortalName(`${tenantLabel} NODE`);
       setIsTenant(true);
     }
   }, []);
@@ -73,9 +73,9 @@ export default function LoginPage() {
     setError("");
 
     const host = window.location.hostname;
-    const tenantId = isTenantHost(host) ? host.split(".")[0] : null;
-    const endpoint = tenantId ? "/api/v1/tenant/login" : "/api/v1/login";
-    const apiUrl = `http://${host}:8085${endpoint}`;
+    const tenantId = getTenantId();
+    const endpoint = isTenantHost(host) ? "/tenant/login" : "/login";
+    const apiUrl = `${getBackendApiRoot()}${endpoint}`;
 
     try {
       const res = await fetch(apiUrl, {

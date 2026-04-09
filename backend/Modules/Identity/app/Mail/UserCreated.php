@@ -10,6 +10,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use Modules\Core\Models\Setting;
 use Modules\Identity\Models\User;
+use Modules\Tenancy\Models\Tenant;
 
 class UserCreated extends Mailable implements ShouldQueue
 {
@@ -34,7 +35,7 @@ class UserCreated extends Mailable implements ShouldQueue
         $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
 
         $actionUrl = $this->tenantId
-            ? "http://{$this->tenantId}.localhost:3000/sign-in"
+            ? $this->tenantSignInUrl($this->tenantId)
             : "{$frontendUrl}/sign-in";
 
         $logoUrl = $this->resolveBrandLogoUrl();
@@ -42,16 +43,16 @@ class UserCreated extends Mailable implements ShouldQueue
         return new Content(
             view: 'core::emails.universal',
             with: [
-                'title'         => 'Node Access Provisioned',
-                'type'          => 'created',
+                'title' => 'Node Access Provisioned',
+                'type' => 'created',
                 'message_intro' => 'Your tenant database has been deployed. You can now access your management gateway using the credentials below.',
-                'actionUrl'     => $actionUrl,
-                'actionText'    => 'Login to Tenant Gateway',
-                'rawPassword'   => $this->rawPassword,
-                'appName'       => 'HIVE.OS',
-                'logoUrl'       => $logoUrl,
-                'user'          => $this->user,
-                'token'         => $this->token,
+                'actionUrl' => $actionUrl,
+                'actionText' => 'Login to Tenant Gateway',
+                'rawPassword' => $this->rawPassword,
+                'appName' => 'HIVE.OS',
+                'logoUrl' => $logoUrl,
+                'user' => $this->user,
+                'token' => $this->token,
             ],
         );
     }
@@ -60,7 +61,6 @@ class UserCreated extends Mailable implements ShouldQueue
     {
         $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
 
-        // Fetch the string path from the settings cache
         $logoPath = cache()->remember(
             'mail_brand_logo_dark_path',
             now()->addHour(),
@@ -71,13 +71,29 @@ class UserCreated extends Mailable implements ShouldQueue
             return $fallback;
         }
 
-        // Check if the setting is somehow already a full URL
         if (filter_var($logoPath, FILTER_VALIDATE_URL)) {
             return $logoPath;
         }
 
-        // The Fix: Just wrap the path in asset().
-        // ltrim prevents double-slashes if your setting starts with a slash
         return asset(ltrim($logoPath, '/'));
+    }
+
+    protected function tenantSignInUrl(string $tenantId): string
+    {
+        $frontendUrl = rtrim((string) config('app.frontend_url', 'http://localhost:3000'), '/');
+        $tenant = Tenant::query()->with('domains')->find($tenantId);
+        $tenantDomain = $tenant?->primaryDomain()?->domain;
+
+        if ($tenantDomain) {
+            $scheme = parse_url($frontendUrl, PHP_URL_SCHEME) ?: 'http';
+
+            return "{$scheme}://{$tenantDomain}/sign-in";
+        }
+
+        $host = parse_url($frontendUrl, PHP_URL_HOST) ?: 'localhost';
+        $scheme = parse_url($frontendUrl, PHP_URL_SCHEME) ?: 'http';
+        $fallbackHost = $host === 'localhost' ? "{$tenantId}.localhost" : "{$tenantId}.{$host}";
+
+        return "{$scheme}://{$fallbackHost}/sign-in";
     }
 }

@@ -1,4 +1,4 @@
-import { getTenantId, isTenantSession } from "./runtime-context";
+import { getBackendApiRoot, getTenantId, isTenantSession } from "./runtime-context";
 import { clearSessionActivity } from "./session-activity";
 import { clearOfflineState } from "@/lib/offline/storage";
 
@@ -58,15 +58,13 @@ export const syncUserSession = async () => {
     const token = localStorage.getItem("hive_token");
     if (!token) return;
 
-    const host = window.location.hostname;
-    const protocol = window.location.protocol;
     const tenantId = getTenantId();
-    const endpoint = isTenantSession() ? "/api/v1/tenant/user" : "/api/v1/user";
+    const endpoint = isTenantSession() ? "/tenant/user" : "/user";
 
     // Use a plain fetch here so a transient /user failure never triggers the
     // global axios 401 interceptor and force-logs the operator out.
     const response = await fetch(
-      `${protocol}//${host}:8085${endpoint}?t=${Date.now()}`,
+      `${getBackendApiRoot()}${endpoint}?t=${Date.now()}`,
       {
         headers: {
           Accept: "application/json",

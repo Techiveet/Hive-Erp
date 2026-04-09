@@ -2,14 +2,15 @@
 
 namespace Modules\Tenancy\Mail;
 
-use Modules\Identity\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
-use Modules\Core\Models\Setting; // 🚀 Added Settings Model
+use Modules\Core\Models\Setting;
+use Modules\Identity\Models\User;
+use Modules\Tenancy\Models\Tenant;
 
 class AdminCredentialsUpdated extends Mailable implements ShouldQueue
 {
@@ -28,30 +29,25 @@ class AdminCredentialsUpdated extends Mailable implements ShouldQueue
     public function content(): Content
     {
         $tenantId = function_exists('tenant') ? tenant('id') : null;
-        $domain = $tenantId ? "http://{$tenantId}.localhost:3000" : "http://localhost:3000";
-
-        // 🚀 Fetch the dynamic logo
+        $frontendUrl = rtrim((string) config('app.frontend_url', 'http://localhost:3000'), '/');
+        $actionUrl = $tenantId ? $this->tenantSignInUrl((string) $tenantId) : "{$frontendUrl}/sign-in";
         $logoUrl = $this->resolveBrandLogoUrl();
 
         return new Content(
             view: 'core::emails.universal',
             with: [
-                'title'         => 'Credentials Updated',
-                'type'          => 'updated',
+                'title' => 'Credentials Updated',
+                'type' => 'updated',
                 'message_intro' => 'Your Super Admin access credentials for the tenant node have been modified by Central Command.',
-                'changes'       => $this->changes,
-
-                // INJECT BUTTON DATA
-                'actionUrl'     => "{$domain}/sign-in",
-                'actionText'    => 'Login with New Credentials',
-
-                'appName'       => 'HIVE.OS',
-                'logoUrl'       => $logoUrl, // 🚀 Passed to the view
+                'changes' => $this->changes,
+                'actionUrl' => $actionUrl,
+                'actionText' => 'Login with New Credentials',
+                'appName' => 'HIVE.OS',
+                'logoUrl' => $logoUrl,
             ],
         );
     }
 
-    // 🚀 Added the resolver method
     protected function resolveBrandLogoUrl(): string
     {
         $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
@@ -71,5 +67,24 @@ class AdminCredentialsUpdated extends Mailable implements ShouldQueue
         }
 
         return asset(ltrim($logoPath, '/'));
+    }
+
+    protected function tenantSignInUrl(string $tenantId): string
+    {
+        $frontendUrl = rtrim((string) config('app.frontend_url', 'http://localhost:3000'), '/');
+        $tenant = Tenant::query()->with('domains')->find($tenantId);
+        $tenantDomain = $tenant?->primaryDomain()?->domain;
+
+        if ($tenantDomain) {
+            $scheme = parse_url($frontendUrl, PHP_URL_SCHEME) ?: 'http';
+
+            return "{$scheme}://{$tenantDomain}/sign-in";
+        }
+
+        $host = parse_url($frontendUrl, PHP_URL_HOST) ?: 'localhost';
+        $scheme = parse_url($frontendUrl, PHP_URL_SCHEME) ?: 'http';
+        $fallbackHost = $host === 'localhost' ? "{$tenantId}.localhost" : "{$tenantId}.{$host}";
+
+        return "{$scheme}://{$fallbackHost}/sign-in";
     }
 }

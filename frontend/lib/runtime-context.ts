@@ -10,8 +10,54 @@ export const getStoredHiveContext = (): string | null => {
   return value;
 };
 
+const normalizeHost = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "")
+    .replace(/:\d+$/, "")
+    .replace(/\.+$/, "") || null;
+};
+
+const extractConfiguredHost = (value: string | null | undefined): string | null => {
+  const normalized = normalizeHost(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  try {
+    return normalizeHost(new URL(value as string).hostname);
+  } catch {
+    return normalized;
+  }
+};
+
+export const getCentralHosts = (): string[] => {
+  const configuredHosts = [
+    extractConfiguredHost(process.env.NEXT_PUBLIC_APP_URL),
+    extractConfiguredHost(process.env.NEXT_PUBLIC_API_URL),
+    ...(process.env.NEXT_PUBLIC_CENTRAL_DOMAINS?.split(",") ?? []).map((value) => normalizeHost(value)),
+  ].filter((value): value is string => Boolean(value));
+
+  return Array.from(new Set(["localhost", "127.0.0.1", ...configuredHosts]));
+};
+
+export const isCentralHost = (host: string): boolean => {
+  const normalized = normalizeHost(host);
+
+  if (!normalized) {
+    return true;
+  }
+
+  return getCentralHosts().includes(normalized);
+};
+
 export const isTenantHost = (host: string): boolean => {
-  return host.endsWith(".localhost");
+  return !isCentralHost(host);
 };
 
 export const isTenantSession = (): boolean => {
@@ -34,7 +80,15 @@ export const getTenantId = (): string | null => {
   }
 
   const host = window.location.hostname;
-  return isTenantHost(host) ? host.split(".")[0] : null;
+  if (host.endsWith(".localhost")) {
+    return host.split(".")[0] || null;
+  }
+
+  if (isTenantHost(host)) {
+    return normalizeHost(host);
+  }
+
+  return null;
 };
 
 export const getAppOrigin = (): string => {

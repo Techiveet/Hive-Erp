@@ -546,7 +546,7 @@ class TenantSubscriptionOrderService
             ], $order->admin_email);
 
             $order->tenant_id = $tenant->id;
-            $order->tenant_domain = $tenant->domains->first()->domain ?? $order->tenant_domain;
+            $order->tenant_domain = $tenant->primaryDomain()?->domain ?? $order->tenant_domain;
             $order->subscription_id = TenantSubscription::query()->where('tenant_id', $tenant->id)->value('id');
         } elseif ($order->scope === 'tenant_upgrade') {
             $tenant = Tenant::query()->with('domains')->findOrFail($order->tenant_id);

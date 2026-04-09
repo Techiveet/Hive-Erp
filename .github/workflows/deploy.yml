@@ -15,11 +15,16 @@ jobs:
           host: ${{ secrets.VPS_HOST_IP }}
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 60s
+          command_timeout: 40m
           script: |
-            if [ -d "/var/www/hive" ]; then cd /var/www/hive; else cd ~/projects/hive; fi
+            set -Eeuo pipefail
+            if [ -d "/var/www/hive" ]; then
+              cd /var/www/hive
+            else
+              cd ~/projects/hive
+            fi
+            git fetch origin main
             git checkout main
-            git pull origin main
-            docker compose -f docker-compose.prod.yml build
-            docker compose -f docker-compose.prod.yml up -d
-            docker compose -f docker-compose.prod.yml exec -T backend php artisan optimize:clear
-            docker compose -f docker-compose.prod.yml exec -T backend php artisan migrate --force
+            git pull --ff-only origin main
+            bash scripts/deploy-prod.sh

@@ -2,6 +2,7 @@
 
 namespace Modules\Tenancy\Models;
 
+use Illuminate\Support\Collection;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
@@ -52,7 +53,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'id'         => $this->id,
             'name'       => $this->name ?? $this->id,
             'plan'       => $this->plan ?? 'Standard',
-            'domain'     => $this->domains->first()?->domain,
+            'domain'     => $this->primaryDomain()?->domain,
             'created_at' => $this->created_at?->timestamp,
         ];
     }
@@ -60,5 +61,30 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function shouldBeSearchable(): bool
     {
         return $this->id !== null;
+    }
+
+    public function orderedDomains(): Collection
+    {
+        $this->loadMissing('domains');
+
+        return $this->domains
+            ->sortBy([
+                fn (Domain $domain) => $domain->is_primary ? 0 : 1,
+                fn (Domain $domain) => $domain->is_fallback ? 0 : 1,
+                fn (Domain $domain) => $domain->domain,
+            ])
+            ->values();
+    }
+
+    public function primaryDomain(): ?Domain
+    {
+        return $this->orderedDomains()->first();
+    }
+
+    public function fallbackDomain(): ?Domain
+    {
+        $this->loadMissing('domains');
+
+        return $this->domains->first(fn (Domain $domain) => (bool) $domain->is_fallback);
     }
 }

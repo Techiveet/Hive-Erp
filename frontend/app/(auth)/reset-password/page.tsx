@@ -18,7 +18,7 @@ import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { logFrontendAction } from "@/lib/api"; // 🚀 Added Telemetry
 import { cn } from "@/lib/utils";
-import { isTenantHost } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantId, isTenantHost } from "@/lib/runtime-context";
 
 function ResetPasswordForm({ isTenant }: { isTenant: boolean }) {
   const router = useRouter();
@@ -51,9 +51,9 @@ function ResetPasswordForm({ isTenant }: { isTenant: boolean }) {
 
       try {
         const host = window.location.hostname;
-        const tenantId = isTenantHost(host) ? host.split(".")[0] : null;
-        const endpoint = tenantId ? "/api/v1/tenant/password-policy" : "/api/v1/password-policy";
-        const res = await fetch(`http://${host}:8085${endpoint}`, {
+        const tenantId = getTenantId();
+        const endpoint = isTenantHost(host) ? "/tenant/password-policy" : "/password-policy";
+        const res = await fetch(`${getBackendApiRoot()}${endpoint}`, {
           signal: controller.signal,
           headers: {
             "Accept": "application/json",
@@ -101,11 +101,11 @@ function ResetPasswordForm({ isTenant }: { isTenant: boolean }) {
 
     setLoading(true);
     const host = window.location.hostname;
-    const tenantId = isTenantHost(host) ? host.split(".")[0] : null;
-    const endpoint = tenantId ? "/api/v1/tenant/reset-password" : "/api/v1/reset-password";
+    const tenantId = getTenantId();
+    const endpoint = isTenantHost(host) ? "/tenant/reset-password" : "/reset-password";
 
     try {
-      const res = await fetch(`http://${host}:8085${endpoint}`, {
+      const res = await fetch(`${getBackendApiRoot()}${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -226,9 +226,9 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const host = window.location.hostname;
-    if (host !== "localhost" && host !== "127.0.0.1") {
-      const tenantId = host.split(".")[0].toUpperCase();
-      setPortalName(`${tenantId} NODE`);
+    if (isTenantHost(host)) {
+      const tenantLabel = (getTenantId() || host).toUpperCase();
+      setPortalName(`${tenantLabel} NODE`);
       setIsTenant(true);
     }
   }, []);

@@ -36,7 +36,7 @@ class TenantsExport implements FromQuery, WithHeadings, WithMapping, WithStyles,
 
     public function map($tenant): array
     {
-        $domain = $tenant->domains->first()?->domain ?? "{$tenant->id}.localhost";
+        $domain = $tenant->primaryDomain()?->domain ?? "{$tenant->id}.localhost";
 
         $status = ($tenant->is_active ?? true) ? $this->t('global.online', 'ONLINE') : $this->t('global.suspended', 'SUSPENDED');
         $adminStatus = ($tenant->admin_active ?? true) ? $this->t('global.active', 'ACTIVE') : $this->t('global.suspended', 'LOCKED');

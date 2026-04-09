@@ -263,7 +263,7 @@
                             <span class="plan-badge">{{ $tenant->plan ?? 'Standard' }}</span>
                         </td>
                         <td class="domain-text">
-                            {{ $tenant->domains->first()->domain ?? $tenant->id . '.localhost' }}
+                            {{ $tenant->primaryDomain()?->domain ?? $tenant->id . '.localhost' }}
                         </td>
                         <td>
                             @if($tenant->is_active ?? true)

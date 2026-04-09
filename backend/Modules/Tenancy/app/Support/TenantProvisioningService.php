@@ -18,6 +18,7 @@ class TenantProvisioningService
 {
     public function __construct(
         protected TenantSubscriptionService $subscriptions,
+        protected TenantDomainService $domains,
     ) {
     }
 
@@ -36,7 +37,7 @@ class TenantProvisioningService
                 return $tenant;
             });
 
-            $tenant->domains()->create(['domain' => strtolower($payload['domain'])]);
+            $this->domains->createFallbackDomain($tenant, $payload['domain']);
 
             $dbManager = $tenant->database()->manager();
             $dbName = $tenant->database()->getName();

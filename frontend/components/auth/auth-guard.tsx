@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSystemSettings } from "@/components/providers/settings-provider";
-import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
-import { getTenantId, isTenantSession } from "@/lib/runtime-context";
+import { handleAuthFailureResponse } from "@/lib/auth-sync";
+import { getBackendApiRoot, getTenantId, isTenantSession } from "@/lib/runtime-context";
 import { FullScreenPlaceholder } from "@/components/ui/loading-states";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -34,12 +34,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const host = window.location.hostname;
-        const protocol = window.location.protocol;
         const tenantId = getTenantId();
-        const endpoint = isTenantSession() ? "/api/v1/tenant/user" : "/api/v1/user";
+        const endpoint = isTenantSession() ? "/tenant/user" : "/user";
 
-        const response = await fetch(`${protocol}//${host}:8085${endpoint}`, {
+        const response = await fetch(`${getBackendApiRoot()}${endpoint}`, {
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${token}`,

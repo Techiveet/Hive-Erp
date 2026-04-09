@@ -1,6 +1,6 @@
 import axios from "axios";
 import { clearHiveSession } from "@/lib/auth-sync";
-import { getTenantId } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantId } from "@/lib/runtime-context";
 
 export const api = axios.create({
   headers: {
@@ -13,9 +13,8 @@ api.interceptors.request.use((config) => {
     const token = localStorage.getItem("hive_token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
 
-    const host = window.location.hostname;
     const tenantId = getTenantId();
-    config.baseURL = `http://${host}:8085/api/v1`;
+    config.baseURL = getBackendApiRoot();
     if (tenantId) {
       config.headers["X-Tenant"] = tenantId;
     }

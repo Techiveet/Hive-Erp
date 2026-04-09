@@ -8,7 +8,8 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
-use Modules\Core\Models\Setting; // 🚀 Added Settings Model
+use Modules\Core\Models\Setting;
+use Modules\Tenancy\Models\Tenant;
 
 class TenantStatusChanged extends Mailable implements ShouldQueue
 {
@@ -23,6 +24,7 @@ class TenantStatusChanged extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         $status = $this->isActive ? 'Activated' : 'Suspended';
+
         return new Envelope(subject: "HIVE.OS: Your Workspace has been {$status}");
     }
 
@@ -32,29 +34,24 @@ class TenantStatusChanged extends Mailable implements ShouldQueue
         $instruction = $this->isActive
             ? 'You may now log in and access your node.'
             : 'Please contact billing or support for more details.';
-
-        // 🚀 Fetch the dynamic logo
+        $actionUrl = $this->isActive ? $this->tenantSignInUrl($this->tenantId) : null;
         $logoUrl = $this->resolveBrandLogoUrl();
 
         return new Content(
-           view: 'core::emails.universal',
+            view: 'core::emails.universal',
             with: [
-                'title'         => 'Workspace ' . ucfirst($statusText),
-                'type'          => 'notification',
+                'title' => 'Workspace ' . ucfirst($statusText),
+                'type' => 'notification',
                 'message_intro' => "The workspace '{$this->tenantName}' has been {$statusText} by the Central Command. {$instruction}",
-                'user'          => (object) ['name' => 'Node Administrator'],
-
-                // INJECT BUTTON DATA (Only show button if they are active)
-                'actionUrl'     => $this->isActive ? "http://{$this->tenantId}.localhost:3000/sign-in" : null,
-                'actionText'    => 'Access Node Gateway',
-
-                'appName'       => 'HIVE.OS',
-                'logoUrl'       => $logoUrl, // 🚀 Passed to the view
+                'user' => (object) ['name' => 'Node Administrator'],
+                'actionUrl' => $actionUrl,
+                'actionText' => 'Access Node Gateway',
+                'appName' => 'HIVE.OS',
+                'logoUrl' => $logoUrl,
             ],
         );
     }
 
-    // 🚀 Added the resolver method
     protected function resolveBrandLogoUrl(): string
     {
         $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
@@ -74,5 +71,24 @@ class TenantStatusChanged extends Mailable implements ShouldQueue
         }
 
         return asset(ltrim($logoPath, '/'));
+    }
+
+    protected function tenantSignInUrl(string $tenantId): string
+    {
+        $frontendUrl = rtrim((string) config('app.frontend_url', 'http://localhost:3000'), '/');
+        $tenant = Tenant::query()->with('domains')->find($tenantId);
+        $tenantDomain = $tenant?->primaryDomain()?->domain;
+
+        if ($tenantDomain) {
+            $scheme = parse_url($frontendUrl, PHP_URL_SCHEME) ?: 'http';
+
+            return "{$scheme}://{$tenantDomain}/sign-in";
+        }
+
+        $host = parse_url($frontendUrl, PHP_URL_HOST) ?: 'localhost';
+        $scheme = parse_url($frontendUrl, PHP_URL_SCHEME) ?: 'http';
+        $fallbackHost = $host === 'localhost' ? "{$tenantId}.localhost" : "{$tenantId}.{$host}";
+
+        return "{$scheme}://{$fallbackHost}/sign-in";
     }
 }

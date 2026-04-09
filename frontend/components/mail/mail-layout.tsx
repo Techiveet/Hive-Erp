@@ -8,6 +8,7 @@ import ComposeModal from './compose-modal';
 import { useMailStore } from '@/store/mail-store';
 import { cn } from '@/lib/utils';
 import { initEcho } from '@/lib/echo';
+import { getTenantId } from '@/lib/runtime-context';
 import { toast } from 'sonner';
 
 export default function MailLayout() {
@@ -29,10 +30,7 @@ export default function MailLayout() {
       const user = JSON.parse(userStr);
       const echo = initEcho(token);
 
-      const currentHost = window.location.hostname;
-      const isTenant = currentHost !== 'localhost' && currentHost !== '127.0.0.1';
-      const tenantId = isTenant ? currentHost.split('.')[0] : null;
-
+      const tenantId = getTenantId();
       const prefix = tenantId ? `tenant.${tenantId}.` : '';
       const channelName = `${prefix}user.${user.id}.mail`;
 

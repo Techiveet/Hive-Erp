@@ -2,25 +2,44 @@
 
 declare(strict_types=1);
 
-use Stancl\Tenancy\Database\Models\Domain;
+$normalizeDomain = static function (?string $domain): ?string {
+    $domain = trim((string) $domain);
 
+    if ($domain === '') {
+        return null;
+    }
+
+    $host = parse_url(str_contains($domain, '://') ? $domain : "http://{$domain}", PHP_URL_HOST);
+    $candidate = is_string($host) && $host !== '' ? $host : $domain;
+    $candidate = strtolower(trim($candidate));
+
+    return $candidate !== '' ? $candidate : null;
+};
+
+$centralDomains = array_values(array_unique(array_filter(array_map(
+    $normalizeDomain,
+    array_merge(
+        ['127.0.0.1', 'localhost', 'localhost:8085'],
+        explode(',', (string) env('TENANCY_CENTRAL_DOMAINS', '')),
+        [
+            (string) env('APP_URL', ''),
+            (string) env('FRONTEND_URL', ''),
+        ],
+    ),
+))));
 
 return [
     'tenant_model' => \Modules\Tenancy\Models\Tenant::class,
     'id_generator' => Stancl\Tenancy\UUIDGenerator::class,
 
-    'domain_model' => Domain::class,
+    'domain_model' => \Modules\Tenancy\Models\Domain::class,
 
     /**
      * The list of domains hosting your central app.
      *
      * Only relevant if you're using the domain or subdomain identification middleware.
      */
-    'central_domains' => [
-        '127.0.0.1',
-        'localhost',
-        'localhost:8085',
-    ],
+    'central_domains' => $centralDomains,
 
     /**
      * Tenancy bootstrappers are executed when tenancy is initialized.

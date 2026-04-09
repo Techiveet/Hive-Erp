@@ -99,7 +99,7 @@ class TenantSubscriptionRenewalReminder extends Mailable implements ShouldQueue
 
     protected function actionUrl(): ?string
     {
-        $domain = $this->tenant->domains->first()?->domain ?? "{$this->tenant->id}.localhost";
+        $domain = $this->tenant->primaryDomain()?->domain ?? "{$this->tenant->id}.localhost";
         $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
         $parsedUrl = parse_url($frontendUrl);
         $scheme = $parsedUrl['scheme'] ?? 'http';

@@ -33,7 +33,7 @@ class TenantCreated extends Mailable implements ShouldQueue
     public function content(): Content
     {
         // Resolve the tenant's specific domain for the login link
-        $domain = $this->tenant->domains->first()?->domain ?? "{$this->tenant->id}.localhost";
+        $domain = $this->tenant->primaryDomain()?->domain ?? "{$this->tenant->id}.localhost";
 
         // Dynamically build the URL based on your frontend config
         $frontendUrl = config('app.frontend_url', 'http://localhost:3000');

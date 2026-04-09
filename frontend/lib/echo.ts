@@ -1,6 +1,7 @@
 //lib/echo.ts
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
+import { getBackendOrigin, getTenantId } from "@/lib/runtime-context";
 
 declare global {
   interface Window {
@@ -15,12 +16,8 @@ export const initEcho = (token: string) => {
 
     // Singleton pattern to prevent duplicate connections
     if (!window.Echo) {
-      // Dynamically map the auth endpoint to the current domain (Central vs Tenant)
-      const currentHost = window.location.hostname;
-      const apiPort = 8085; // Your backend port
-      const authEndpoint = `http://${currentHost}:${apiPort}/api/v1/broadcasting/auth`;
-      const isTenant = currentHost !== 'localhost' && currentHost !== '127.0.0.1';
-      const tenantId = isTenant ? currentHost.split('.')[0] : null;
+      const authEndpoint = `${getBackendOrigin()}/api/v1/broadcasting/auth`;
+      const tenantId = getTenantId();
 
       window.Echo = new Echo({
         broadcaster: 'reverb',

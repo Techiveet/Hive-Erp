@@ -27,10 +27,10 @@ import {
     updateTenantOfflineMutationDefinition,
 } from "@/modules/shared/offline-mutations";
 import { fetchSubscriptionCatalog } from "@/modules/subscription/api";
-import { ModuleSubscriptionSelector } from "@/modules/subscription/components/module-subscription-selector";
 import { ModuleSubscriptionSummary } from "@/modules/subscription/components/module-subscription-summary";
-import type { TenantCatalogModule, TenantCustomModuleInput } from "@/modules/subscription/types";
+import type { TenantCustomModuleInput } from "@/modules/subscription/types";
 import { fetchTenants } from "@/modules/tenancy/api";
+import { TenantDomainManager } from "@/modules/tenancy/components/tenant-domain-manager";
 import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -43,7 +43,6 @@ type Props = {
 
 const globalActionLock: Record<string, number> = {};
 const EMPTY_PLAN_DEFAULTS: Record<string, string[]> = {};
-const EMPTY_CATALOG: TenantCatalogModule[] = [];
 const EMPTY_STRING_LIST: string[] = [];
 
 const sanitizeCustomModules = (modules: TenantCustomModuleInput[]): TenantCustomModuleInput[] =>
@@ -91,7 +90,6 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
     const [formAdminPassword, setFormAdminPassword] = React.useState("");
     const [formSelectedModules, setFormSelectedModules] = React.useState<string[]>([]);
     const [formCustomModules, setFormCustomModules] = React.useState<TenantCustomModuleInput[]>([]);
-    const [subscriptionTouched, setSubscriptionTouched] = React.useState(false);
 
     const triggerAudit = React.useCallback(async (action: string, description: string) => {
         if (typeof window === "undefined") return;
@@ -118,10 +116,6 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         staleTime: 300_000,
     });
 
-    const subscriptionCatalog = React.useMemo(
-        () => subscriptionCatalogData?.data?.catalog ?? EMPTY_CATALOG,
-        [subscriptionCatalogData]
-    );
     const subscriptionPlanDefaults = React.useMemo(
         () => subscriptionCatalogData?.data?.plan_defaults ?? EMPTY_PLAN_DEFAULTS,
         [subscriptionCatalogData]
@@ -130,7 +124,7 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
     const handlePlanChange = React.useCallback((nextPlan: string) => {
         setFormPlan(nextPlan);
 
-        if (isEdit || subscriptionTouched) {
+        if (isEdit) {
             return;
         }
 
@@ -138,7 +132,8 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         setFormSelectedModules((previous) =>
             areStringListsEqual(previous, nextDefaults) ? previous : [...nextDefaults]
         );
-    }, [isEdit, subscriptionPlanDefaults, subscriptionTouched]);
+        setFormCustomModules([]);
+    }, [isEdit, subscriptionPlanDefaults]);
 
     const createTenantMut = useOfflineMutation<any, Error, TenantCreateOfflinePayload>({
         definition: createTenantOfflineMutationDefinition,
@@ -266,7 +261,6 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         setFormAdminName(""); setFormAdminEmail(""); setFormAdminPassword("");
         setFormSelectedModules([...(subscriptionPlanDefaults.business ?? EMPTY_STRING_LIST)]);
         setFormCustomModules([]);
-        setSubscriptionTouched(false);
         setDialogOpen(true);
         triggerAudit('viewed', 'Operator accessed the Provisioning UI panel');
     };
@@ -276,7 +270,6 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         setFormAdminEmail(tenant.admin_email || ""); setFormAdminName(""); setFormAdminPassword("");
         setFormSelectedModules(tenant.module_subscriptions?.enabled_modules || []);
         setFormCustomModules(tenant.module_subscriptions?.custom_modules || []);
-        setSubscriptionTouched(true);
         setDialogOpen(true);
         triggerAudit('viewed', `Operator accessed Reconfiguration UI panel for Node ID: ${tenant.id}`);
     };
@@ -472,29 +465,9 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                                         </div>
                                         <div className="space-y-1.5 col-span-2"><Label className="text-xs uppercase tracking-widest text-muted-foreground">{t('tenants.domain', "Routing Address")}</Label><div className="relative"><Globe className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input required disabled={isEdit} value={formDomain} onChange={e => setFormDomain(e.target.value)} placeholder="acme.localhost" className="h-11 pl-9 font-mono bg-muted/30" /></div></div>
                                     </div>
-                                </div>
-                                <div className="col-span-2 space-y-4 pt-2">
-                                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1.5 border-b border-border/40 pb-2"><Layers className="h-3.5 w-3.5" /> {t('nav.subscriptions', "Module Subscriptions")}</h4>
-                                    {subscriptionCatalog.length > 0 ? (
-                                        <ModuleSubscriptionSelector
-                                            catalog={subscriptionCatalog}
-                                            selectedModules={formSelectedModules}
-                                            customModules={formCustomModules}
-                                            onSelectedModulesChange={(next) => {
-                                                setSubscriptionTouched(true);
-                                                setFormSelectedModules(next);
-                                            }}
-                                            onCustomModulesChange={(next) => {
-                                                setSubscriptionTouched(true);
-                                                setFormCustomModules(next);
-                                            }}
-                                            plan={formPlan}
-                                        />
-                                    ) : (
-                                        <div className="rounded-[1.5rem] border border-dashed border-border/60 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
-                                            Loading subscription catalog...
-                                        </div>
-                                    )}
+                                    <div className="rounded-[1.25rem] border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                                        Module subscriptions are managed in the dedicated subscriptions workspace. New tenants will still inherit the defaults for the selected plan.
+                                    </div>
                                 </div>
                                 <div className="col-span-2 space-y-4 pt-2">
                                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1.5 border-b border-border/40 pb-2"><UserPlus className="h-3.5 w-3.5" /> {t('tenants.super_admin', "Super Admin Settings")}</h4>
@@ -513,9 +486,9 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
 
             {/* VIEW MODAL */}
             <Dialog open={viewDialogOpen} onOpenChange={(open) => { setViewDialogOpen(open); if(!open) triggerAudit('viewed', 'Closed Deep Metric Inspection view'); }}>
-                <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
-                    <div className="px-6 py-6 border-b border-border/40 bg-muted/20 flex items-center gap-4"><div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner shrink-0"><Server className="h-7 w-7 text-primary" /></div><div><DialogTitle className="text-2xl font-black font-space tracking-tight">{viewTenant?.name}</DialogTitle><DialogDescription className="font-mono text-[10px] uppercase tracking-widest mt-1">{t('tenants.view_identity', "Node Identity")}: <span className="font-bold">{viewTenant?.id}</span></DialogDescription></div></div>
-                    <div className="px-6 py-6 space-y-6">
+                <DialogContent className="sm:max-w-[860px] p-0 overflow-hidden rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl max-h-[90vh] flex flex-col">
+                    <div className="px-6 py-6 border-b border-border/40 bg-muted/20 flex items-center gap-4 shrink-0"><div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner shrink-0"><Server className="h-7 w-7 text-primary" /></div><div><DialogTitle className="text-2xl font-black font-space tracking-tight">{viewTenant?.name}</DialogTitle><DialogDescription className="font-mono text-[10px] uppercase tracking-widest mt-1">{t('tenants.view_identity', "Node Identity")}: <span className="font-bold">{viewTenant?.id}</span></DialogDescription></div></div>
+                    <div className="px-6 py-6 space-y-6 overflow-y-auto scrollbar-thin">
                         <div className="grid grid-cols-2 gap-y-6 gap-x-4">
                             <div>
                                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_status', "Network Status")}</p>
@@ -535,10 +508,6 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                                 </p>
                             </div>
                             <div className="col-span-2">
-                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_domain', "Routing Domain")}</p>
-                                <div className="flex items-center gap-2 font-mono text-sm bg-muted/30 p-3 rounded-xl border border-border/50"><Globe className="h-4 w-4 text-muted-foreground" />{viewTenant?.domain}</div>
-                            </div>
-                            <div className="col-span-2">
                                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_contact', "Super Admin Contact")}</p>
                                 <div className="flex items-center gap-2 font-mono text-sm bg-muted/30 p-3 rounded-xl border border-border/50"><Mail className="h-4 w-4 text-muted-foreground" />{viewTenant?.admin_email || t('tenants.no_email', "No email registered")}{viewTenant?.admin_email && <Badge variant="outline" className={cn("ml-auto text-[9px] uppercase border-0", viewTenant?.admin_active === false ? "text-destructive bg-destructive/10" : "text-emerald-500 bg-emerald-500/10")}>{viewTenant?.admin_active === false ? t('global.suspended', "Suspended") : t('global.active', "Active")}</Badge>}</div>
                             </div>
@@ -556,9 +525,14 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                                     />
                                 </div>
                             </div>
+                            <div className="col-span-2">
+                                {viewTenant?.id ? (
+                                    <TenantDomainManager tenantId={viewTenant.id} onTenantUpdated={setViewTenant} />
+                                ) : null}
+                            </div>
                         </div>
                     </div>
-                    <div className="px-6 py-4 border-t border-border/40 bg-muted/20 flex justify-end"><Button variant="outline" onClick={() => setViewDialogOpen(false)} className="rounded-xl px-8 shadow-sm">{t('tenants.close_view', "Close Overview")}</Button></div>
+                    <div className="px-6 py-4 border-t border-border/40 bg-muted/20 flex justify-end shrink-0"><Button variant="outline" onClick={() => setViewDialogOpen(false)} className="rounded-xl px-8 shadow-sm">{t('tenants.close_view', "Close Overview")}</Button></div>
                 </DialogContent>
             </Dialog>
         </div>
