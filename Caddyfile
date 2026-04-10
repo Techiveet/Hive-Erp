@@ -25,6 +25,9 @@
 }
 
 {$BACKEND_DOMAIN:hive-backend.techiveet.com} {
+    @horizon path /horizon /horizon/*
+    redir @horizon https://{$HORIZON_DOMAIN:hive-queue.techiveet.com}{uri} 308
+
     # Keep WebSocket upgrades working on the API domain for older clients.
     handle_path /app/* {
         reverse_proxy reverb:9000
@@ -42,6 +45,10 @@
 {$HORIZON_DOMAIN:hive-queue.techiveet.com} {
     redir / /horizon 308
     reverse_proxy backend:8000
+}
+
+{$MEILISEARCH_DOMAIN:hive-search.techiveet.com} {
+    reverse_proxy meilisearch:7700
 }
 
 https:// {

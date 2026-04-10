@@ -19,6 +19,7 @@ services:
       BACKEND_DOMAIN: ${BACKEND_DOMAIN:-hive-backend.techiveet.com}
       REVERB_DOMAIN: ${REVERB_DOMAIN:-hive-ws.techiveet.com}
       HORIZON_DOMAIN: ${HORIZON_DOMAIN:-hive-queue.techiveet.com}
+      MEILISEARCH_DOMAIN: ${MEILISEARCH_DOMAIN:-hive-search.techiveet.com}
     ports:
       - "80:80"
       - "443:443"

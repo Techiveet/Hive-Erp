@@ -247,9 +247,32 @@ ensure_reverb_credentials() {
   echo "Generated missing Reverb credentials in .env"
 }
 
+ensure_meilisearch_key() {
+  local meilisearch_key
+
+  ensure_env_value SCOUT_DRIVER "meilisearch"
+
+  meilisearch_key="$(get_env_value MEILISEARCH_KEY)"
+
+  if [ -n "${meilisearch_key}" ]; then
+    return
+  fi
+
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "MEILISEARCH_KEY is empty and openssl is unavailable. Set MEILISEARCH_KEY in .env before deploying." >&2
+    exit 1
+  fi
+
+  meilisearch_key="$(openssl rand -hex 24)"
+  set_env_value MEILISEARCH_KEY "${meilisearch_key}"
+  echo "Generated missing MEILISEARCH_KEY in .env"
+}
+
 ensure_domain_defaults() {
   local root_domain previous_root_domain
   local frontend_domain backend_domain reverb_domain reverb_app_key server_ip
+  local horizon_domain meilisearch_domain
+  local current_central_domains current_stateful_domains
   local old_frontend_domain old_backend_domain old_reverb_domain old_horizon_domain
   local old_meilisearch_domain old_rembg_domain old_gotenberg_domain old_redis_domain old_db_domain
 
@@ -298,14 +321,24 @@ ensure_domain_defaults() {
   frontend_domain="$(get_env_value FRONTEND_DOMAIN)"
   backend_domain="$(get_env_value BACKEND_DOMAIN)"
   reverb_domain="$(get_env_value REVERB_DOMAIN)"
+  horizon_domain="$(get_env_value HORIZON_DOMAIN)"
+  meilisearch_domain="$(get_env_value MEILISEARCH_DOMAIN)"
   server_ip="$(get_env_value SERVER_IP)"
 
   sync_env_if_default APP_URL "https://${backend_domain}" "https://${old_backend_domain}"
   sync_env_if_default FRONTEND_URL "https://${frontend_domain}" "https://${old_frontend_domain}"
-  sync_env_if_default TENANCY_CENTRAL_DOMAINS "${frontend_domain},${backend_domain}" "${old_frontend_domain},${old_backend_domain}"
+  current_central_domains="$(get_env_value TENANCY_CENTRAL_DOMAINS)"
+  if [ -z "${current_central_domains}" ] || [ "${current_central_domains}" = "${frontend_domain},${backend_domain}" ] || [ "${current_central_domains}" = "${old_frontend_domain},${old_backend_domain}" ] || [ "${current_central_domains}" = "${old_frontend_domain},${old_backend_domain},${old_horizon_domain}" ]; then
+    set_env_value TENANCY_CENTRAL_DOMAINS "${frontend_domain},${backend_domain},${horizon_domain}"
+  fi
   sync_env_if_default SESSION_DOMAIN ".${root_domain}" ".${previous_root_domain}"
-  sync_env_if_default SANCTUM_STATEFUL_DOMAINS "${frontend_domain},${backend_domain}" "${old_frontend_domain},${old_backend_domain}"
+  current_stateful_domains="$(get_env_value SANCTUM_STATEFUL_DOMAINS)"
+  if [ -z "${current_stateful_domains}" ] || [ "${current_stateful_domains}" = "${frontend_domain},${backend_domain}" ] || [ "${current_stateful_domains}" = "${old_frontend_domain},${old_backend_domain}" ] || [ "${current_stateful_domains}" = "${old_frontend_domain},${old_backend_domain},${old_horizon_domain}" ]; then
+    set_env_value SANCTUM_STATEFUL_DOMAINS "${frontend_domain},${backend_domain},${horizon_domain}"
+  fi
   sync_env_if_default CORS_ALLOWED_ORIGINS "https://${frontend_domain}" "https://${old_frontend_domain}"
+  sync_env_if_default QUEUE_DASHBOARD_URL "https://${horizon_domain}/horizon" "https://${old_horizon_domain}/horizon"
+  sync_env_if_default SEARCH_DASHBOARD_URL "https://${meilisearch_domain}" "https://${old_meilisearch_domain}"
 
   sync_env_if_default NEXT_PUBLIC_API_URL "https://${backend_domain}/api/v1" "https://${old_backend_domain}/api/v1"
   sync_env_if_default NEXT_PUBLIC_APP_URL "https://${frontend_domain}" "https://${old_frontend_domain}"
@@ -326,6 +359,44 @@ ensure_domain_defaults() {
   if [ -n "${reverb_app_key}" ] && [ "$(get_env_value NEXT_PUBLIC_REVERB_APP_KEY)" != "${reverb_app_key}" ]; then
     set_env_value NEXT_PUBLIC_REVERB_APP_KEY "${reverb_app_key}"
   fi
+}
+
+is_meilisearch_enabled() {
+  [ "$(get_env_value SCOUT_DRIVER)" = "meilisearch" ]
+}
+
+wait_for_meilisearch() {
+  local attempt=0
+
+  until compose exec -T meilisearch curl -fsS http://127.0.0.1:7700/health >/dev/null 2>&1; do
+    attempt=$((attempt + 1))
+
+    if [ "${attempt}" -ge 24 ]; then
+      echo "Meilisearch did not become ready in time." >&2
+      exit 1
+    fi
+
+    sleep 5
+  done
+}
+
+wait_for_horizon() {
+  local attempt=0
+  local status_output=""
+
+  until status_output="$(compose exec -T backend php artisan horizon:status 2>&1)" && echo "${status_output}" | grep -qi "running"; do
+    attempt=$((attempt + 1))
+
+    if [ "${attempt}" -ge 24 ]; then
+      echo "Horizon did not report a running state in time." >&2
+      echo "${status_output}" >&2
+      exit 1
+    fi
+
+    sleep 5
+  done
+
+  echo "${status_output}"
 }
 
 ensure_cloudflare_wildcard_tls() {
@@ -410,6 +481,7 @@ apply_requested_overrides
 cleanup_stale_recreate_containers
 ensure_app_key
 ensure_reverb_credentials
+ensure_meilisearch_key
 ensure_domain_defaults
 configure_caddy_runtime
 
@@ -433,11 +505,19 @@ compose exec -T backend php artisan storage:link || true
 compose exec -T backend php artisan optimize:clear
 compose exec -T backend php artisan migrate --force
 compose exec -T backend php artisan tenants:migrate --force
+compose exec -T backend php artisan hive:sync-system-access --force
 if [ "${SKIP_FALLBACK_DOMAIN_SYNC}" -eq 0 ]; then
   compose exec -T backend php artisan hive:sync-fallback-domains
 fi
 compose exec -T backend php artisan config:cache
 compose exec -T backend php artisan view:cache
+
+if is_meilisearch_enabled; then
+  wait_for_meilisearch
+  compose exec -T backend php artisan scout:import-all
+fi
+
 compose up -d queue reverb frontend caddy
+wait_for_horizon
 
 compose ps

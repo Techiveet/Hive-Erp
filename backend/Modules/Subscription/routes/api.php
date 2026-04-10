@@ -5,7 +5,25 @@ use Illuminate\Support\Facades\Route;
 use Modules\Subscription\Http\Controllers\TenantSubscriptionCheckoutController;
 use Modules\Subscription\Http\Controllers\TenantSubscriptionController;
 
-$centralDomains = ['localhost', '127.0.0.1', 'hive-os.com'];
+$centralDomains = collect(array_merge(
+    config('tenancy.central_domains', []),
+    ['hive-os.com']
+))
+    ->map(function ($domain) {
+        $domain = trim((string) $domain);
+
+        if ($domain === '') {
+            return null;
+        }
+
+        $host = parse_url(str_contains($domain, '://') ? $domain : "http://{$domain}", PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' ? strtolower($host) : null;
+    })
+    ->filter()
+    ->unique()
+    ->values()
+    ->all();
 
 foreach ($centralDomains as $domain) {
     Route::domain($domain)->prefix('v1')->group(function () {

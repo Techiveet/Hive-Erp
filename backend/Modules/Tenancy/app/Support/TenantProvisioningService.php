@@ -6,11 +6,14 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Modules\Identity\Models\Permission;
 use Modules\Identity\Models\User;
 use Modules\Subscription\Support\TenantSubscriptionService;
+use Modules\Tenancy\Database\Seeders\TenantFoundationSeeder;
 use Modules\Tenancy\Mail\TenantCreated;
 use Modules\Tenancy\Models\Tenant;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Stancl\Tenancy\Jobs\CreateDatabase;
 use Throwable;
 
@@ -55,8 +58,14 @@ class TenantProvisioningService
                 ],
             ]);
 
+            Artisan::call('tenants:seed', [
+                '--tenants' => [$tenant->id],
+                '--class' => TenantFoundationSeeder::class,
+                '--force' => true,
+            ]);
+
             $tenant->run(function () use ($payload, $tenant) {
-                app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+                app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
                 $admin = User::updateOrCreate(
                     ['email' => strtolower($payload['admin_email'])],
@@ -71,7 +80,12 @@ class TenantProvisioningService
                 $admin->guard_name = 'tenant';
 
                 $role = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'tenant']);
-                $admin->assignRole($role);
+                $admin->syncRoles([$role->name]);
+                $admin->syncPermissions(
+                    Permission::where('guard_name', 'tenant')->pluck('name')->all()
+                );
+
+                app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
                 try {
                     $token = \Illuminate\Support\Facades\Password::broker()->createToken($admin);

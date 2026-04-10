@@ -5,7 +5,16 @@ export const SECURITY_ROUTE_PERMISSIONS = ["view_users", "manage_users", "view_r
 export const TENANTS_ROUTE_PERMISSIONS = ["view_tenants", "manage_tenants"] as const;
 export const SUBSCRIPTIONS_ROUTE_PERMISSIONS = ["view_module_subscriptions", "manage_module_subscriptions"] as const;
 export const STORAGE_ROUTE_PERMISSIONS = ["view_storage", "manage_storage"] as const;
-export const SETTINGS_ROUTE_PERMISSIONS = ["manage_brand_settings", "manage_general_settings", "manage_localization", "view_backups", "manage_backups"] as const;
+export const SETTINGS_ROUTE_PERMISSIONS = [
+  "manage_brand_settings",
+  "manage_general_settings",
+  "manage_localization",
+  "manage_payment_settings",
+  "manage_tenants",
+  "provision_tenants",
+  "view_backups",
+  "manage_backups",
+] as const;
 export const ALERTS_ROUTE_PERMISSIONS = ["view_alerts"] as const;
 export const AUDIT_LOG_ROUTE_PERMISSIONS = ["view_logs"] as const;
 export const API_DOCS_ROUTE_PERMISSIONS = ["view_api_docs"] as const;
@@ -68,10 +77,16 @@ export function canAccessDashboardRoute(rawPath: string, access: RoutePermission
       "manage_brand_settings",
       "manage_general_settings",
       "manage_localization",
+      "manage_payment_settings",
     ]);
-    const canAccessBackupSettings = !isTenantSession() && access.hasAnyPermission(["view_backups", "manage_backups"]);
+    const canAccessCentralSettings = !isTenantSession() && access.hasAnyPermission([
+      "manage_tenants",
+      "provision_tenants",
+      "view_backups",
+      "manage_backups",
+    ]);
 
-    return canAccessCoreSettings || canAccessBackupSettings;
+    return canAccessCoreSettings || canAccessCentralSettings;
   }
 
   if (matchesPrefix(path, "/dashboard/direct-transfer-reviews")) {

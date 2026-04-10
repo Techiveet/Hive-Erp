@@ -24,6 +24,9 @@ $centralDomains = array_values(array_unique(array_filter(array_map(
         [
             (string) env('APP_URL', ''),
             (string) env('FRONTEND_URL', ''),
+            (string) env('FRONTEND_DOMAIN', ''),
+            (string) env('BACKEND_DOMAIN', ''),
+            (string) env('HORIZON_DOMAIN', ''),
         ],
     ),
 ))));
@@ -218,7 +221,7 @@ return [
      * Parameters used by the tenants:seed command.
      */
     'seeder_parameters' => [
-        '--class' => 'DatabaseSeeder', // root seeder class
+        '--class' => \Modules\Tenancy\Database\Seeders\TenantFoundationSeeder::class,
         // '--force' => true, // This needs to be true to seed tenant databases in production
     ],
 ];
