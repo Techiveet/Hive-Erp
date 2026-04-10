@@ -1,7 +1,10 @@
 services:
   # Reverse Proxy
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+    image: hive-caddy
     container_name: hive-caddy
     restart: unless-stopped
     dns:
@@ -10,6 +13,8 @@ services:
     env_file:
       - .env
     environment:
+      CF_API_TOKEN: ${CF_API_TOKEN:-}
+      ROOT_DOMAIN: ${ROOT_DOMAIN:-techiveet.com}
       FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:-hive.techiveet.com}
       BACKEND_DOMAIN: ${BACKEND_DOMAIN:-hive-backend.techiveet.com}
       REVERB_DOMAIN: ${REVERB_DOMAIN:-hive-ws.techiveet.com}

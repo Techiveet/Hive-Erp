@@ -161,6 +161,34 @@ ensure_domain_defaults() {
   fi
 }
 
+ensure_cloudflare_wildcard_tls() {
+  local root_domain cf_api_token
+
+  root_domain="$(get_env_value ROOT_DOMAIN)"
+
+  case "${root_domain}" in
+    ""|"localhost"|"127.0.0.1")
+      return
+      ;;
+  esac
+
+  cf_api_token="$(get_env_value CF_API_TOKEN)"
+
+  if [ -z "${cf_api_token}" ]; then
+    cf_api_token="$(get_env_value CLOUDFLARE_API_TOKEN)"
+
+    if [ -n "${cf_api_token}" ]; then
+      set_env_value CF_API_TOKEN "${cf_api_token}"
+    fi
+  fi
+
+  if [ -z "$(get_env_value CF_API_TOKEN)" ]; then
+    echo "CF_API_TOKEN is required for Cloudflare wildcard TLS." >&2
+    echo "Create a scoped Cloudflare token with Zone.Zone:Read and Zone.DNS:Edit for ${root_domain}, then set CF_API_TOKEN in .env before deploying." >&2
+    exit 1
+  fi
+}
+
 show_failure_context() {
   echo "Deployment failed. Current compose status:" >&2
   compose ps || true
@@ -180,6 +208,7 @@ fi
 ensure_app_key
 ensure_reverb_credentials
 ensure_domain_defaults
+ensure_cloudflare_wildcard_tls
 
 compose build
 compose up -d --remove-orphans redis db meilisearch rembg gotenberg
