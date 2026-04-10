@@ -4,14 +4,17 @@ namespace Modules\Tenancy\Exports;
 
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
+use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithCustomChunkSize;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class TenantsExport implements FromQuery, WithHeadings, WithMapping, WithStyles, ShouldAutoSize
+class TenantsExport implements FromQuery, WithHeadings, WithMapping, WithStyles, WithCustomChunkSize
 {
+    use Exportable;
+
     public function __construct(private Builder $query, private array $dictionary = []) {}
 
     private function t($key, $default) {
@@ -64,5 +67,10 @@ class TenantsExport implements FromQuery, WithHeadings, WithMapping, WithStyles,
                 ]
             ],
         ];
+    }
+
+    public function chunkSize(): int
+    {
+        return 2000;
     }
 }

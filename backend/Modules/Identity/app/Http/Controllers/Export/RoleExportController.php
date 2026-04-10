@@ -3,6 +3,7 @@
 namespace Modules\Identity\Http\Controllers\Export;
 
 use Modules\Core\Support\ResolvesExportBranding;
+use Modules\Core\Support\HandlesScalableTabularExports;
 use Modules\Identity\Models\Role;
 use Modules\Core\Models\Language;
 use Modules\Identity\Exports\RolesExport;
@@ -15,6 +16,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class RoleExportController extends Controller
 {
+    use HandlesScalableTabularExports;
     use ResolvesExportBranding;
 
     private function getGuard(): string
@@ -53,7 +55,7 @@ class RoleExportController extends Controller
 
     public function handleExport(Request $request)
     {
-        $type = $request->query('type', $request->query('format', 'xlsx'));
+        $type = strtolower($request->query('type', $request->query('format', 'xlsx')));
 
         abort_unless(in_array($type, ['csv', 'excel', 'xlsx', 'pdf', 'print', 'copy']), Response::HTTP_BAD_REQUEST, 'Invalid export format.');
 
@@ -69,15 +71,52 @@ class RoleExportController extends Controller
 
         $filename = 'hive_roles_matrix_' . now()->format('Y-m-d_His');
         $branding = $this->getExportBranding(true);
+        $query = $this->getFilteredQuery($request);
 
-        if (in_array($type, ['csv', 'excel', 'xlsx'])) {
-            $format = ($type === 'csv') ? \Maatwebsite\Excel\Excel::CSV : \Maatwebsite\Excel\Excel::XLSX;
-            return Excel::download(new RolesExport($this->getFilteredQuery($request), $dictionary), "{$filename}.{$type}", $format);
+        if ($type === 'csv') {
+            return $this->streamCsvDownload(
+                $query,
+                "{$filename}.csv",
+                [
+                    '#',
+                    $t('roles.col_designation', 'Clearance Designation'),
+                    $t('roles.col_capabilities', 'Active Capabilities (Permissions)'),
+                    $t('roles.col_established', 'Established Date'),
+                ],
+                function ($role, int $rowNumber) use ($t) {
+                    $permissions = $role->permissions->pluck('name')->implode(', ');
+
+                    if ($role->name === 'Super Admin') {
+                        $permissions = $t('roles.god_mode', 'ALL PROTOCOLS (GOD MODE)');
+                    } elseif (empty($permissions)) {
+                        $permissions = $t('roles.no_access', 'No Access');
+                    }
+
+                    return [
+                        $rowNumber,
+                        $role->name,
+                        $permissions,
+                        $role->created_at->format('Y-m-d H:i:s'),
+                    ];
+                }
+            );
+        }
+
+        if (in_array($type, ['excel', 'xlsx'], true)) {
+            $this->enforceExcelLimit($query);
+            set_time_limit(0);
+
+            return Excel::download(
+                new RolesExport($query, $dictionary),
+                "{$filename}." . $this->normalizeSpreadsheetExtension($type),
+                \Maatwebsite\Excel\Excel::XLSX
+            );
         }
 
         // --- PDF EXPORT ---
         if ($type === 'pdf') {
-            $roles = $this->getFilteredQuery($request)->get();
+            $this->enforcePdfLimit($query);
+            $roles = (clone $query)->limit($this->maxPdfRows())->get();
             $pdf = Pdf::loadView('identity::exports.roles', [
                 'title'   => $t('roles.title', 'Hive Security: Access Control Matrix'),
                 'data'    => $roles,
@@ -94,7 +133,15 @@ class RoleExportController extends Controller
 
         // --- COPY & PRINT (Frontend React Data) ---
         if (in_array($type, ['print', 'copy'])) {
-            $roles = $this->getFilteredQuery($request)->get()->map(function($role) use ($t) {
+            if ($type === 'copy') {
+                $this->enforceCopyLimit($query);
+            } else {
+                $this->enforcePrintLimit($query);
+            }
+
+            $limit = $type === 'copy' ? $this->maxCopyRows() : $this->maxPrintRows();
+
+            $roles = (clone $query)->limit($limit)->get()->map(function($role) use ($t) {
                 $perms = $role->permissions->pluck('name')->implode(', ');
                 if ($role->name === 'Super Admin') $perms = $t('roles.god_mode', 'ALL PROTOCOLS (GOD MODE)');
                 if (empty($perms)) $perms = $t('roles.no_access', 'No Access');

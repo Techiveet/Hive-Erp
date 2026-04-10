@@ -8,9 +8,10 @@ use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithCustomChunkSize;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class UsersExport implements FromQuery, WithHeadings, WithMapping, WithStyles
+class UsersExport implements FromQuery, WithHeadings, WithMapping, WithStyles, WithCustomChunkSize
 {
     use Exportable;
 
@@ -55,5 +56,10 @@ class UsersExport implements FromQuery, WithHeadings, WithMapping, WithStyles
     public function styles(Worksheet $sheet)
     {
         return [ 1 => ['font' => ['bold' => true]] ];
+    }
+
+    public function chunkSize(): int
+    {
+        return 2000;
     }
 }

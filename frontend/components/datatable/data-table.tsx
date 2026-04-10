@@ -131,6 +131,31 @@ function downloadBlob(blob: Blob, filename: string) {
   window.URL.revokeObjectURL(url);
 }
 
+function getExportErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === "object" && error !== null) {
+    const maybeResponse = (error as any).response;
+    const responseData = maybeResponse?.data;
+
+    if (typeof responseData?.message === "string" && responseData.message.trim()) {
+      return responseData.message;
+    }
+
+    if (typeof responseData?.error === "string" && responseData.error.trim()) {
+      return responseData.error;
+    }
+
+    if (typeof responseData === "string" && responseData.trim()) {
+      return responseData;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 type ExportBrandingPayload = {
   app_title?: string;
   footer_text?: string;
@@ -383,7 +408,7 @@ function DataTableInner<TData, TValue>({
   columns, data = [], totalEntries = 0, loading = false, pageIndex = 1, pageSize = 10, pageSizeOptions = [10, 25, 50, 100],
   onQueryChange, title, description, searchPlaceholder = "Search...", serverSearchDebounceMs = 400, className,
   enableRowSelection = false, getRowId, selectedRowIds, onSelectionChange, onDeleteRows, onRefresh, onResetFilters, exportEndpoint, resourceName = "records", syncWithUrl = true,
-  onCopy, onPrint, onExport, companySettings, brandingSettings, canCopy = false, canExport = false, canPrint = false, canRefresh = false
+  onCopy, onPrint, onExport, companySettings, brandingSettings, canCopy, canExport, canPrint, canRefresh
 }: DataTableProps<TData, TValue>) {
   
   const router = useRouter();
@@ -408,6 +433,17 @@ function DataTableInner<TData, TValue>({
   const pageIndex0 = Math.max(0, effectivePageIndex - 1);
   const selectedCount = Object.keys(effectiveRowSelection).length;
   const hasSelection = enableRowSelection && selectedCount > 0;
+  const hasExportEndpoint = Boolean(exportEndpoint);
+  const allowCopy = canCopy ?? hasExportEndpoint;
+  const allowExport = canExport ?? hasExportEndpoint;
+  const allowPrint = canPrint ?? hasExportEndpoint;
+  const allowRefresh = canRefresh ?? Boolean(onRefresh);
+  const showToolbarActions = !hasSelection && hasExportEndpoint && (allowCopy || allowExport || allowPrint);
+  const showSelectionCopy = hasSelection && allowCopy;
+  const showSelectionExport = hasSelection && allowExport;
+  const showSelectionPrint = hasSelection && allowPrint;
+  const showSelectionDelete = hasSelection && Boolean(onDeleteRows);
+  const showSelectionToolbar = showSelectionCopy || showSelectionExport || showSelectionPrint || showSelectionDelete;
 
   const updateUrl = React.useCallback((updates: Record<string, any>) => {
     if (!syncWithUrl) return;
@@ -477,10 +513,11 @@ function DataTableInner<TData, TValue>({
     toast.success("Table data reloaded & filters cleared.");
   };
 
-  const handleExportAPI = async (type: string, fromSelection = false) => {
-    if (type === "copy" && !canCopy) return;
-    if (type === "print" && !canPrint) return;
-    if (["csv", "xlsx", "pdf"].includes(type) && !canExport) return;
+  const handleExportAPI = (type: string, fromSelection = false) => {
+    if (busy) return;
+    if (type === "copy" && !allowCopy) return;
+    if (type === "print" && !allowPrint) return;
+    if (["csv", "xlsx", "pdf", "excel"].includes(type) && !allowExport) return;
 
     if (!exportEndpoint) {
       toast.error("Export endpoint is not configured.");
@@ -508,7 +545,9 @@ function DataTableInner<TData, TValue>({
       `);
     }
     
-    const exportPromise = async () => {
+    setBusy(true);
+
+    const exportPromise = (async () => {
       const params: any = { type };
       if (fromSelection && selectedCount > 0) params.ids = Object.keys(effectiveRowSelection).join(",");
       
@@ -552,9 +591,9 @@ function DataTableInner<TData, TValue>({
           return `Print document generated with ${rows.length} ${resourceName}.`;
         }
       }
-    };
+    })();
 
-    toast.promise(exportPromise(), {
+    toast.promise(exportPromise, {
       loading: `Processing ${targetCount} ${resourceName}...`,
       success: (successMessage) => {
         if (fromSelection && ["copy", "print"].includes(type)) setRowSelection({});
@@ -562,9 +601,11 @@ function DataTableInner<TData, TValue>({
       },
       error: (err) => {
         if (printWin && !printWin.closed) printWin.close();
-        return err instanceof Error ? err.message : `Failed to complete ${type.toUpperCase()} action.`;
+        return getExportErrorMessage(err, `Failed to complete ${type.toUpperCase()} action.`);
       },
     });
+
+    void exportPromise.finally(() => setBusy(false));
   };
 
   return (
@@ -580,15 +621,15 @@ function DataTableInner<TData, TValue>({
           </div>
 
           <div className="flex items-center gap-2">
-            {!hasSelection && exportEndpoint && (
+            {showToolbarActions && (
               <>
-                {canCopy && (
+                {allowCopy && (
                   <Button id="tour-datatable-copy" variant="outline" size="icon" className="h-9 w-9 rounded-lg" onClick={() => handleExportAPI("copy")} disabled={loading || busy}>
                     <Copy className="h-4 w-4" />
                   </Button>
                 )}
 
-                {canExport && (
+                {allowExport && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button id="tour-datatable-export" variant="outline" size="icon" className="h-9 w-9 rounded-lg" disabled={loading || busy}>
@@ -603,7 +644,7 @@ function DataTableInner<TData, TValue>({
                   </DropdownMenu>
                 )}
 
-                {canPrint && (
+                {allowPrint && (
                   <Button id="tour-datatable-print" variant="outline" size="icon" className="h-9 w-9 rounded-lg" onClick={() => handleExportAPI("print")} disabled={loading || busy}>
                     <Printer className="h-4 w-4" />
                   </Button>
@@ -611,7 +652,7 @@ function DataTableInner<TData, TValue>({
               </>
             )}
 
-            {canRefresh && (
+            {allowRefresh && (
               <Button id="tour-datatable-refresh" variant="outline" size="icon" className="h-9 w-9 border-dashed rounded-lg" onClick={handleResetAndReload} disabled={loading || busy}>
                 <RotateCcw className={cn("h-4 w-4", (loading || busy) && "animate-spin")} />
               </Button>
@@ -695,37 +736,45 @@ function DataTableInner<TData, TValue>({
         </div>
       </div>
 
-      {hasSelection && (
+      {showSelectionToolbar && (
         <div className="fixed bottom-8 left-1/2 z-[100] -translate-x-1/2 animate-in slide-in-from-bottom-5">
           <div className="flex items-center gap-2 sm:gap-3 rounded-full border border-border/50 bg-background/90 backdrop-blur-xl p-2 px-4 sm:px-5 shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
             <span className="flex items-center justify-center h-6 min-w-[1.5rem] rounded-full bg-primary text-xs font-bold text-primary-foreground">{selectedCount}</span>
             <span className="text-sm font-medium text-foreground hidden sm:inline-block">Selected</span>
-            <Separator orientation="vertical" className="h-5 mx-1 border-border" />
-            
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => handleExportAPI("copy", true)} title="Copy Selected"><Copy className="h-4 w-4" /></Button>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Export Selected">
-                  <Download className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" side="top" sideOffset={10} className="rounded-xl shadow-xl border-border/50 bg-background/95 backdrop-blur-md mb-2">
-                <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("csv", true)}>
-                  <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export to CSV
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("xlsx", true)}>
-                  <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" /> Export to Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("pdf", true)}>
-                  <FileText className="mr-2 h-4 w-4 text-red-600" /> Export to PDF
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {(showSelectionCopy || showSelectionExport || showSelectionPrint || showSelectionDelete) && (
+              <Separator orientation="vertical" className="h-5 mx-1 border-border" />
+            )}
 
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => handleExportAPI("print", true)} title="Print Selected"><Printer className="h-4 w-4" /></Button>
+            {showSelectionCopy && (
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => handleExportAPI("copy", true)} title="Copy Selected"><Copy className="h-4 w-4" /></Button>
+            )}
 
-            {onDeleteRows && (
+            {showSelectionExport && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Export Selected">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" side="top" sideOffset={10} className="rounded-xl shadow-xl border-border/50 bg-background/95 backdrop-blur-md mb-2">
+                  <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("csv", true)}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export to CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("xlsx", true)}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" /> Export to Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer font-medium" onClick={() => handleExportAPI("pdf", true)}>
+                    <FileText className="mr-2 h-4 w-4 text-red-600" /> Export to PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {showSelectionPrint && (
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => handleExportAPI("print", true)} title="Print Selected"><Printer className="h-4 w-4" /></Button>
+            )}
+
+            {showSelectionDelete && (
               <>
                 <Separator orientation="vertical" className="h-5 mx-1 border-border" />
                 <Button variant="ghost" size="sm" className="h-8 text-red-500 hover:bg-red-500/10 hover:text-red-600 font-bold" onClick={async () => { await onDeleteRows(table.getSelectedRowModel().rows.map(r => r.original as TData)); setRowSelection({}); }}>

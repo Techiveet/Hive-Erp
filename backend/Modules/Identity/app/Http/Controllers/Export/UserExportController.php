@@ -3,6 +3,7 @@
 namespace Modules\Identity\Http\Controllers\Export;
 
 use App\Http\Controllers\Controller;
+use Modules\Core\Support\HandlesScalableTabularExports;
 use Modules\Core\Support\ResolvesExportBranding;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -20,6 +21,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class UserExportController extends Controller
 {
+    use HandlesScalableTabularExports;
     use ResolvesExportBranding;
 
     public function getFilteredQuery(Request $request)
@@ -58,7 +60,7 @@ class UserExportController extends Controller
 
     public function handleExport(Request $request)
     {
-        $type = $request->query('type', $request->query('format', 'xlsx'));
+        $type = strtolower($request->query('type', $request->query('format', 'xlsx')));
 
         abort_unless(
             in_array($type, ['csv', 'excel', 'xlsx', 'pdf', 'print', 'copy']),
@@ -94,15 +96,48 @@ class UserExportController extends Controller
 
         $filename = 'hive_users_report_' . now()->format('Y-m-d_His');
         $branding = $this->getExportBranding(true);
+        $query = $this->getFilteredQuery($request);
 
-        if (in_array($type, ['csv', 'excel', 'xlsx'])) {
-            $format = ($type === 'csv') ? \Maatwebsite\Excel\Excel::CSV : \Maatwebsite\Excel\Excel::XLSX;
-            return Excel::download(new UsersExport($this->getFilteredQuery($request), $dictionary), "{$filename}.{$type}", $format);
+        if ($type === 'csv') {
+            return $this->streamCsvDownload(
+                $query,
+                "{$filename}.csv",
+                [
+                    '#',
+                    $t('users.col_operator', 'Name'),
+                    $t('users.email_address', 'Email Address'),
+                    $t('users.col_clearance', 'Role'),
+                    $t('users.col_status', 'Status'),
+                    $t('users.col_provisioned', 'Date Provisioned'),
+                ],
+                function ($user, int $rowNumber) use ($t) {
+                    return [
+                        $rowNumber,
+                        $user->name,
+                        $user->email,
+                        $user->roles->first()?->name ?? 'User',
+                        $user->is_active ? $t('global.active', 'Active') : $t('global.locked', 'Locked'),
+                        $user->created_at->format('Y-m-d H:i:s'),
+                    ];
+                }
+            );
+        }
+
+        if (in_array($type, ['excel', 'xlsx'], true)) {
+            $this->enforceExcelLimit($query);
+            set_time_limit(0);
+
+            return Excel::download(
+                new UsersExport($query, $dictionary),
+                "{$filename}." . $this->normalizeSpreadsheetExtension($type),
+                \Maatwebsite\Excel\Excel::XLSX
+            );
         }
 
         // --- PDF EXPORT ---
         if ($type === 'pdf') {
-            $users = $this->getFilteredQuery($request)->get();
+            $this->enforcePdfLimit($query);
+            $users = (clone $query)->limit($this->maxPdfRows())->get();
             $pdf = Pdf::loadView('identity::exports.users', [
                 'title'   => $t('users.title', 'System Operators'),
                 'data'    => $users,
@@ -119,7 +154,15 @@ class UserExportController extends Controller
 
         // --- COPY & PRINT (Frontend React Data) ---
         if (in_array($type, ['print', 'copy'])) {
-            $users = $this->getFilteredQuery($request)->get()->map(fn($user) => [
+            if ($type === 'copy') {
+                $this->enforceCopyLimit($query);
+            } else {
+                $this->enforcePrintLimit($query);
+            }
+
+            $limit = $type === 'copy' ? $this->maxCopyRows() : $this->maxPrintRows();
+
+            $users = (clone $query)->limit($limit)->get()->map(fn($user) => [
                 $t('users.col_operator', 'Name')      => $user->name,
                 $t('users.email_address', 'Email')    => $user->email,
                 $t('users.col_clearance', 'Role')     => $user->roles->first()?->name ?? 'User',

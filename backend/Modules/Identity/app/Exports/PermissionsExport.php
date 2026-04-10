@@ -4,13 +4,17 @@ namespace Modules\Identity\Exports;
 
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
+use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithCustomChunkSize;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class PermissionsExport implements FromQuery, WithHeadings, WithMapping, WithStyles
+class PermissionsExport implements FromQuery, WithHeadings, WithMapping, WithStyles, WithCustomChunkSize
 {
+    use Exportable;
+
     private int $rowCount = 0;
 
     public function __construct(private Builder $query, private array $dictionary = []) {}
@@ -48,5 +52,10 @@ class PermissionsExport implements FromQuery, WithHeadings, WithMapping, WithSty
     public function styles(Worksheet $sheet)
     {
         return [1 => ['font' => ['bold' => true]]];
+    }
+
+    public function chunkSize(): int
+    {
+        return 2000;
     }
 }

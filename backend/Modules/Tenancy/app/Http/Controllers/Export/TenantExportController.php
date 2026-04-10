@@ -2,6 +2,7 @@
 
 namespace Modules\Tenancy\Http\Controllers\Export;
 
+use Modules\Core\Support\HandlesScalableTabularExports;
 use Modules\Core\Support\ResolvesExportBranding;
 use Modules\Tenancy\Models\Tenant;
 use Modules\Core\Models\Language;
@@ -18,6 +19,7 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class TenantExportController extends Controller implements HasMiddleware
 {
+    use HandlesScalableTabularExports;
     use ResolvesExportBranding;
 
     public static function middleware(): array
@@ -58,7 +60,7 @@ class TenantExportController extends Controller implements HasMiddleware
 
     public function handleExport(Request $request)
     {
-        $type = $request->query('type', $request->query('format', 'xlsx'));
+        $type = strtolower($request->query('type', $request->query('format', 'xlsx')));
 
         abort_unless(
             in_array($type, ['csv', 'excel', 'xlsx', 'pdf', 'print', 'copy']),
@@ -85,21 +87,61 @@ class TenantExportController extends Controller implements HasMiddleware
 
         $filename = 'hive_tenant_registry_' . now()->format('Y-m-d_His');
         $branding = $this->getExportBranding(true);
+        $query = $this->getFilteredQuery($request);
 
         activity('Tenant Management')
             ->causedBy(auth()->user())
             ->event('exported')
             ->log("Operator executed a data extraction sequence. Format: [" . strtoupper($type) . "]");
 
-        // --- Handle Excel/CSV ---
-        if (in_array($type, ['csv', 'excel', 'xlsx'])) {
-            $format = ($type === 'csv') ? \Maatwebsite\Excel\Excel::CSV : \Maatwebsite\Excel\Excel::XLSX;
-            return Excel::download(new TenantsExport($this->getFilteredQuery($request), $dictionary), "{$filename}.{$type}", $format);
+        if ($type === 'csv') {
+            return $this->streamCsvDownload(
+                $query,
+                "{$filename}.csv",
+                [
+                    $t('tenants.col_id', 'Node ID'),
+                    $t('tenants.col_org', 'Organization Name'),
+                    $t('tenants.col_plan', 'Capacity Plan'),
+                    $t('tenants.col_domain', 'Routing Domain'),
+                    $t('tenants.col_status', 'Node Status'),
+                    $t('tenants.view_contact', 'Super Admin Contact'),
+                    'Admin Status',
+                    $t('tenants.col_provisioned', 'Provisioned Date'),
+                ],
+                function ($tenant) use ($t) {
+                    $domain = $tenant->primaryDomain()?->domain ?? "{$tenant->id}.localhost";
+                    $status = ($tenant->is_active ?? true) ? $t('global.online', 'ONLINE') : $t('global.suspended', 'SUSPENDED');
+                    $adminStatus = ($tenant->admin_active ?? true) ? $t('global.active', 'ACTIVE') : $t('global.suspended', 'LOCKED');
+
+                    return [
+                        strtoupper((string) $tenant->id),
+                        (string) ($tenant->name ?? ucfirst($tenant->id)),
+                        strtoupper((string) ($tenant->plan ?? 'business')),
+                        (string) $domain,
+                        strtoupper($status),
+                        (string) ($tenant->admin_email ?? $t('tenants.no_email', 'Not Set')),
+                        strtoupper($adminStatus),
+                        $tenant->created_at ? $tenant->created_at->format('Y-m-d H:i:s') : 'N/A',
+                    ];
+                }
+            );
+        }
+
+        if (in_array($type, ['excel', 'xlsx'], true)) {
+            $this->enforceExcelLimit($query);
+            set_time_limit(0);
+
+            return Excel::download(
+                new TenantsExport($query, $dictionary),
+                "{$filename}." . $this->normalizeSpreadsheetExtension($type),
+                \Maatwebsite\Excel\Excel::XLSX
+            );
         }
 
         // --- Handle PDF ---
         if ($type === 'pdf') {
-            $data = $this->getFilteredQuery($request)->get();
+            $this->enforcePdfLimit($query);
+            $data = (clone $query)->limit($this->maxPdfRows())->get();
             $pdf = Pdf::loadView('tenancy::exports.tenants-pdf', [
                 'title'   => $t('tenants.title', 'Tenant Node Registry'),
                 'data'    => $data,
@@ -116,7 +158,15 @@ class TenantExportController extends Controller implements HasMiddleware
 
         // --- Handle Print/JSON for Frontend DataTable Copy ---
         if (in_array($type, ['print', 'copy'])) {
-            $tenants = $this->getFilteredQuery($request)->get()->map(function($tenant, $index) use ($t) {
+            if ($type === 'copy') {
+                $this->enforceCopyLimit($query);
+            } else {
+                $this->enforcePrintLimit($query);
+            }
+
+            $limit = $type === 'copy' ? $this->maxCopyRows() : $this->maxPrintRows();
+
+            $tenants = (clone $query)->limit($limit)->get()->map(function($tenant, $index) use ($t) {
                 $domain = $tenant->primaryDomain()?->domain ?? "{$tenant->id}.localhost";
 
                 return [

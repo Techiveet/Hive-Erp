@@ -3,9 +3,10 @@
 namespace Modules\Identity\Http\Controllers\Export;
 
 use Modules\Core\Support\ResolvesExportBranding;
+use Modules\Core\Support\HandlesScalableTabularExports;
 use Modules\Identity\Models\Permission;
 use Modules\Core\Models\Language;
-use App\Exports\PermissionsExport;
+use Modules\Identity\Exports\PermissionsExport;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
@@ -15,6 +16,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class PermissionExportController extends Controller
 {
+    use HandlesScalableTabularExports;
     use ResolvesExportBranding;
 
     private function getGuard(): string { return (function_exists('tenancy') && tenancy()->initialized) ? 'tenant' : 'web'; }
@@ -39,7 +41,7 @@ class PermissionExportController extends Controller
 
     public function handleExport(Request $request)
     {
-        $type = $request->query('type', $request->query('format', 'xlsx'));
+        $type = strtolower($request->query('type', $request->query('format', 'xlsx')));
 
         abort_unless(in_array($type, ['csv', 'excel', 'xlsx', 'pdf', 'print', 'copy']), Response::HTTP_BAD_REQUEST, 'Invalid export format.');
 
@@ -55,15 +57,48 @@ class PermissionExportController extends Controller
 
         $filename = 'hive_capability_dictionary_' . now()->format('Y-m-d_His');
         $branding = $this->getExportBranding(true);
+        $query = $this->getFilteredQuery($request);
 
-        if (in_array($type, ['csv', 'excel', 'xlsx'])) {
-            $format = ($type === 'csv') ? \Maatwebsite\Excel\Excel::CSV : \Maatwebsite\Excel\Excel::XLSX;
-            return Excel::download(new PermissionsExport($this->getFilteredQuery($request), $dictionary), "{$filename}.{$type}", $format);
+        if ($type === 'csv') {
+            return $this->streamCsvDownload(
+                $query,
+                "{$filename}.csv",
+                [
+                    '#',
+                    $t('permissions.col_code', 'Capability Code'),
+                    $t('permissions.col_desc', 'Human-Readable Description'),
+                    $t('permissions.col_scope', 'Security Scope'),
+                ],
+                function ($perm, int $rowNumber) use ($t) {
+                    $descContext = $t('permissions.allows_operator', 'Allows operator to');
+                    $description = $descContext . ' ' . ucwords(str_replace('_', ' ', $perm->name));
+                    $scope = $perm->guard_name === 'tenant' ? $t('permissions.tenant_node', 'Tenant Node') : $t('permissions.central', 'Central Command');
+
+                    return [
+                        $rowNumber,
+                        $perm->name,
+                        $description,
+                        $scope,
+                    ];
+                }
+            );
+        }
+
+        if (in_array($type, ['excel', 'xlsx'], true)) {
+            $this->enforceExcelLimit($query);
+            set_time_limit(0);
+
+            return Excel::download(
+                new PermissionsExport($query, $dictionary),
+                "{$filename}." . $this->normalizeSpreadsheetExtension($type),
+                \Maatwebsite\Excel\Excel::XLSX
+            );
         }
 
         // --- PDF EXPORT ---
         if ($type === 'pdf') {
-            $permissions = $this->getFilteredQuery($request)->get();
+            $this->enforcePdfLimit($query);
+            $permissions = (clone $query)->limit($this->maxPdfRows())->get();
             $pdf = Pdf::loadView('identity::exports.permissions', [
                 'title'   => $t('permissions.title', 'Hive Security: Capability Dictionary'),
                 'data'    => $permissions,
@@ -80,7 +115,15 @@ class PermissionExportController extends Controller
 
         // --- COPY & PRINT (Frontend React Data) ---
         if (in_array($type, ['print', 'copy'])) {
-            $permissions = $this->getFilteredQuery($request)->get()->map(function($perm) use ($t) {
+            if ($type === 'copy') {
+                $this->enforceCopyLimit($query);
+            } else {
+                $this->enforcePrintLimit($query);
+            }
+
+            $limit = $type === 'copy' ? $this->maxCopyRows() : $this->maxPrintRows();
+
+            $permissions = (clone $query)->limit($limit)->get()->map(function($perm) use ($t) {
 
                 $descContext = $t('permissions.allows_operator', 'Allows operator to');
                 $description = $descContext . ' ' . ucwords(str_replace('_', ' ', $perm->name));
