@@ -1,10 +1,9 @@
-{
-    on_demand_tls {
-        ask http://backend:8000/api/internal/caddy/allow-domain
+{$FRONTEND_DOMAIN:hive.techiveet.com}, *.{$ROOT_DOMAIN:techiveet.com} {
+    tls {
+        dns cloudflare {env.CF_API_TOKEN}
+        resolvers 1.1.1.1 1.0.0.1
     }
-}
 
-{$FRONTEND_DOMAIN:hive.techiveet.com} {
     handle /api/* {
         reverse_proxy backend:8000
     }
@@ -25,6 +24,11 @@
 }
 
 {$BACKEND_DOMAIN:hive-backend.techiveet.com} {
+    tls {
+        dns cloudflare {env.CF_API_TOKEN}
+        resolvers 1.1.1.1 1.0.0.1
+    }
+
     # Keep WebSocket upgrades working on the API domain for older clients.
     handle_path /app/* {
         reverse_proxy reverb:9000
@@ -36,36 +40,20 @@
 }
 
 {$REVERB_DOMAIN:hive-ws.techiveet.com} {
+    tls {
+        dns cloudflare {env.CF_API_TOKEN}
+        resolvers 1.1.1.1 1.0.0.1
+    }
+
     reverse_proxy reverb:9000
 }
 
 {$HORIZON_DOMAIN:hive-queue.techiveet.com} {
+    tls {
+        dns cloudflare {env.CF_API_TOKEN}
+        resolvers 1.1.1.1 1.0.0.1
+    }
+
     redir / /horizon 308
     reverse_proxy backend:8000
-}
-
-https:// {
-    tls {
-        on_demand
-    }
-
-    handle /api/* {
-        reverse_proxy backend:8000
-    }
-
-    handle /sanctum/* {
-        reverse_proxy backend:8000
-    }
-
-    handle /storage/* {
-        reverse_proxy backend:8000
-    }
-
-    handle /tenancy/assets/* {
-        reverse_proxy backend:8000
-    }
-
-    handle {
-        reverse_proxy frontend:3000
-    }
 }

@@ -189,6 +189,40 @@ ensure_cloudflare_wildcard_tls() {
   fi
 }
 
+configure_caddy_runtime() {
+  local tls_mode runtime_dir source_file
+
+  tls_mode="$(get_env_value CADDY_TLS_MODE)"
+
+  if [ -z "${tls_mode}" ] || [ "${tls_mode}" = "auto" ]; then
+    if [ -n "$(get_env_value CF_API_TOKEN)" ] || [ -n "$(get_env_value CLOUDFLARE_API_TOKEN)" ]; then
+      tls_mode="cloudflare"
+    else
+      tls_mode="on_demand"
+    fi
+  fi
+
+  runtime_dir="storage/caddy_runtime"
+  mkdir -p "${runtime_dir}"
+
+  case "${tls_mode}" in
+    cloudflare)
+      ensure_cloudflare_wildcard_tls
+      source_file="Caddyfile.cloudflare"
+      ;;
+    on_demand)
+      source_file="Caddyfile"
+      ;;
+    *)
+      echo "Unsupported CADDY_TLS_MODE '${tls_mode}'. Use 'on_demand', 'cloudflare', or leave it empty for auto." >&2
+      exit 1
+      ;;
+  esac
+
+  cp "${source_file}" "${runtime_dir}/Caddyfile"
+  echo "Configured Caddy TLS mode: ${tls_mode}"
+}
+
 show_failure_context() {
   echo "Deployment failed. Current compose status:" >&2
   compose ps || true
@@ -208,7 +242,7 @@ fi
 ensure_app_key
 ensure_reverb_credentials
 ensure_domain_defaults
-ensure_cloudflare_wildcard_tls
+configure_caddy_runtime
 
 compose build
 compose up -d --remove-orphans redis db meilisearch rembg gotenberg
