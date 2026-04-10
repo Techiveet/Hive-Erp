@@ -26,16 +26,10 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
 import { fetchCurrentTenantSubscriptions } from "@/modules/subscription/api";
 import { ModuleSubscriptionCheckoutDialog } from "@/modules/subscription/components/module-subscription-checkout-dialog";
-import { getTenantId } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantId } from "@/lib/runtime-context";
 
 const getApiUrl = () => {
-    if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-    const host = window.location.hostname;
-    const protocol = window.location.protocol;
-    if (host !== "localhost" && host !== "127.0.0.1" && host.includes(".")) {
-        return `${protocol}//${host}:8085/api/v1`; 
-    }
-    return `${protocol}//${host}:8085/api/v1`;
+    return getBackendApiRoot();
 };
 
 function CloudFilePickerModal({ isOpen, mode, onClose, onSelect }: any) {

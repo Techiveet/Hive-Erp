@@ -41,9 +41,18 @@ $allowedOrigins = array_values(array_unique(array_filter(array_map(
     ),
 ))));
 
+$rootDomain = trim(strtolower((string) env('ROOT_DOMAIN', '')));
+
+if ($rootDomain !== '' && !str_contains($rootDomain, '://')) {
+    $rootDomain = preg_replace('/:\d+$/', '', $rootDomain) ?? $rootDomain;
+}
+
 $allowedOriginPatterns = array_values(array_unique(array_filter(array_merge(
     [
         '#^http://([a-zA-Z0-9-]+\.)?localhost(:\d+)?$#',
+        $rootDomain !== '' && $rootDomain !== 'localhost' && $rootDomain !== '127.0.0.1'
+            ? '#^https?://([a-zA-Z0-9-]+\.)?' . preg_quote($rootDomain, '#') . '(:\d+)?$#'
+            : null,
     ],
     $toList(env('CORS_ALLOWED_ORIGIN_PATTERNS')),
 ))));

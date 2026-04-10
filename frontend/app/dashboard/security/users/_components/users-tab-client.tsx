@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTranslation } from "@/store/use-translation";
+import { getBackendApiRoot, getBackendStorageUrl } from "@/lib/runtime-context";
 
 import { FileManagerClient } from "@/components/dashboard/file-manager-client";
 
@@ -90,14 +91,7 @@ export function UsersTabClient(props: Props) {
   }, []);
 
   const getStorageUrl = React.useCallback((url: string | null | undefined): string | null => {
-    if (!url) return null;
-    if (url.startsWith('http') && !url.includes('localhost') && !url.includes('8085')) return url;
-    let cleanPath = url;
-    if (url.includes('/storage/')) cleanPath = url.substring(url.indexOf('/storage/') + 9);
-    cleanPath = cleanPath.replace(/^\/+/, '');
-    if (!cleanPath) return null;
-    const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-    return `http://${host}:8085/storage/${cleanPath}`;
+    return getBackendStorageUrl(url);
   }, []);
 
   const extractPathFromUrl = React.useCallback((url: string) => {
@@ -258,9 +252,10 @@ export function UsersTabClient(props: Props) {
   const impersonateMut = useMutation({
     mutationFn: async (userId: string) => {
       const token = localStorage.getItem('hive_token');
-      const host = window.location.hostname;
-      const isTenant = host !== 'localhost' && host !== '127.0.0.1';
-      const endpoint = isTenant ? `http://${host}:8085/api/v1/users/${userId}/impersonate` : `http://${host}:8085/api/v1/central/users/${userId}/impersonate`;
+      const apiRoot = getBackendApiRoot();
+      const endpoint = tenantId
+        ? `${apiRoot}/users/${userId}/impersonate`
+        : `${apiRoot}/central/users/${userId}/impersonate`;
       
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -414,7 +409,7 @@ export function UsersTabClient(props: Props) {
       setFormAvatarPath(extractPathFromUrl(rawUrl)); 
       setIsAvatarRemoved(false);
 
-      const fullPreviewUrl = rawUrl.startsWith('http') ? rawUrl : `http://${window.location.hostname}:8085${rawUrl}`;
+      const fullPreviewUrl = getBackendStorageUrl(rawUrl) || rawUrl;
       setPreviewUrl(fullPreviewUrl);
       
       setIsFileManagerOpen(false);

@@ -25,18 +25,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertsFeedSkeleton } from "@/components/ui/loading-states";
 import { usePermissions } from "@/hooks/use-permissions";
+import { getBackendApiRoot } from "@/lib/runtime-context";
 
 // --- API Helper ---
 const getApiUrl = () => {
     // 🚀 THE FIX: Check if window DOES NOT exist (SSR fallback)
-    if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-    
-    const host = window.location.hostname;
-    const protocol = window.location.protocol;
-    if (host !== "localhost" && host !== "127.0.0.1" && host.includes(".")) {
-        return `${protocol}//${host}:8085/api/v1`; 
-    }
-    return `${protocol}//${host}:8085/api/v1`;
+    return getBackendApiRoot();
 };
 
 const apiFetch = async (endpoint: string, options: RequestInit = {}) => {

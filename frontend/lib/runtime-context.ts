@@ -105,6 +105,20 @@ export const getAppOrigin = (): string => {
   return window.location.origin;
 };
 
+const shouldUseSameOriginTenantBackend = (): boolean => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const host = normalizeHost(window.location.hostname);
+
+  if (!host || !isTenantHost(host)) {
+    return false;
+  }
+
+  return !host.endsWith(".localhost");
+};
+
 const normalizeApiRoot = (value: string): string => {
   const trimmed = value.trim().replace(/\/+$/, "");
 
@@ -140,6 +154,10 @@ const normalizeApiRoot = (value: string): string => {
 };
 
 export const getBackendOrigin = (): string => {
+  if (shouldUseSameOriginTenantBackend()) {
+    return window.location.origin.replace(/\/+$/, "");
+  }
+
   const configuredApiRoot = process.env.NEXT_PUBLIC_API_URL?.trim();
 
   if (configuredApiRoot) {
@@ -161,6 +179,10 @@ export const getBackendOrigin = (): string => {
 };
 
 export const getBackendApiRoot = (): string => {
+  if (shouldUseSameOriginTenantBackend()) {
+    return `${window.location.origin.replace(/\/+$/, "")}/api/v1`;
+  }
+
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
 
   if (configured) {

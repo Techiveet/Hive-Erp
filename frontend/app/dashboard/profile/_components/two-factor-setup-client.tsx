@@ -10,6 +10,7 @@ import { ShieldCheck, ShieldAlert, Loader2, KeyRound, Copy, Check } from "lucide
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { logFrontendAction } from "@/lib/api"; 
+import { getBackendApiRoot } from "@/lib/runtime-context";
 import {
   Dialog,
   DialogContent,
@@ -35,12 +36,7 @@ export function TwoFactorSetupClient() {
   const [pendingAction, setPendingAction] = useState<"enable" | "disable" | null>(null);
 
   const getApiUrl = () => {
-    if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-    const host = window.location.hostname;
-    if (host !== "localhost" && host.endsWith(".localhost")) {
-      return `http://${host}:8085/api/v1`;
-    }
-    return "http://localhost:8085/api/v1";
+    return getBackendApiRoot();
   };
 
   const getHeaders = () => ({

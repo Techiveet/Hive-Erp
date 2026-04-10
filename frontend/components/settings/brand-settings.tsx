@@ -18,28 +18,20 @@ import { toast } from "sonner";
 import { useTranslation } from '@/store/use-translation';
 import { cn } from "@/lib/utils";
 import { logFrontendAction } from "@/lib/api";
+import { extractStorageRelativePath, getBackendOrigin, getBackendStorageUrl } from "@/lib/runtime-context";
 
 const getApiUrl = () => {
-    if (typeof window !== 'undefined') return `http://${window.location.hostname}:8085/api`;
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8085/api';
+    return `${getBackendOrigin()}/api`;
 };
 
 // 🚀 CRITICAL FIX: Bulletproof URL Helper forces port 8085 to prevent broken images on reload
 const getStorageUrl = (url: string | null | undefined) => {
-  if (!url) return '';
-  const storageIndex = url.indexOf('/storage/');
-  if (storageIndex !== -1) {
-      return `http://${window.location.hostname}:8085${url.substring(storageIndex)}`;
-  }
-  return url;
+  return getBackendStorageUrl(url) || '';
 };
 
 // Strips out everything and leaves just "/storage/..." for the database
 const extractRelativePath = (url: string | null | undefined) => {
-    if (!url) return null;
-    const storageIndex = url.indexOf('/storage/');
-    if (storageIndex !== -1) return url.substring(storageIndex);
-    return url;
+    return extractStorageRelativePath(url);
 };
 
 // ============================================================================

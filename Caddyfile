@@ -33,5 +33,23 @@ https:// {
         on_demand
     }
 
-    reverse_proxy frontend:3000
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /sanctum/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /storage/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /tenancy/assets/* {
+        reverse_proxy backend:8000
+    }
+
+    handle {
+        reverse_proxy frontend:3000
+    }
 }

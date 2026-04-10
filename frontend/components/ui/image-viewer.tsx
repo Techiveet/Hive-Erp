@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge'; 
 import { toast } from 'sonner';
+import { getBackendOrigin } from '@/lib/runtime-context';
 
 import { removeBackground } from "@imgly/background-removal";
 
@@ -50,8 +51,7 @@ const TransformButton = ({ icon: Icon, label, onClick, style, active }: any) => 
 );
 
 const getApiUrl = () => {
-  if (typeof window !== 'undefined') return `http://${window.location.hostname}:8085/api`;
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8085/api';
+  return `${getBackendOrigin()}/api`;
 };
 
 export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, onSaveEdited }: ImageViewerProps) {

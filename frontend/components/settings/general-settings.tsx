@@ -14,20 +14,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTranslation } from '@/store/use-translation';
 import { cn } from "@/lib/utils";
-import { isTenantSession } from "@/lib/runtime-context";
+import { getBackendApiRoot, isTenantSession } from "@/lib/runtime-context";
 
 // ==========================================
 // 🚀 BULLETPROOF API ROUTING & FETCH WRAPPER
 // ==========================================
 const getApiUrl = () => {
-    if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-    const host = window.location.hostname;
-    const protocol = window.location.protocol;
-    
-    if (host !== "localhost" && host !== "127.0.0.1" && host.includes(".")) {
-        return `${protocol}//${host}:8085/api/v1`; 
-    }
-    return `${protocol}//${host}:8085/api/v1`;
+    return getBackendApiRoot();
 };
 
 const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
