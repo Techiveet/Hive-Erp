@@ -18,15 +18,13 @@ import { useTranslation } from "@/store/use-translation";
 import { GlobalSearch } from "./global-search";
 import { TopbarMailIcon } from "./topbar-mail";
 import { TopbarNotificationsIcon } from "./topbar-notifications";
-import { getTenantId, isTenantSession } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantId, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PROFILE_ROUTE_PERMISSIONS } from "@/lib/route-permissions";
 
 const getApiUrl = () => {
-  if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-  const host = window.location.hostname;
-  return `http://${host}:8085/api/v1`;
+  return getBackendApiRoot();
 };
 
 const getTenantHeaders = (): Record<string, string> => {
@@ -35,7 +33,6 @@ const getTenantHeaders = (): Record<string, string> => {
 };
 
 const getTenantAwareEndpoint = (path: string) => {
-  if (typeof window === "undefined") return `http://localhost:8085/api/v1${path}`;
   const base = getApiUrl();
   return isTenantSession() ? `${base}/tenant${path}` : `${base}${path}`;
 };

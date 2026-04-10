@@ -2,6 +2,14 @@
     reverse_proxy frontend:3000
 }
 
+{$APPLE_TENANT_DOMAIN:apple.techiveet.com} {
+    reverse_proxy frontend:3000
+}
+
+{$TESLA_TENANT_DOMAIN:tesla.techiveet.com} {
+    reverse_proxy frontend:3000
+}
+
 {$BACKEND_DOMAIN:hive-backend.techiveet.com} {
     # Keep WebSocket upgrades working on the API domain for older clients.
     handle_path /app/* {

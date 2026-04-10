@@ -3,20 +3,13 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
+import { getBackendApiRoot } from "@/lib/runtime-context";
 
 export function StatusTicker() {
   const { data } = useQuery({
     queryKey: ["systemStatusTicker"],
     queryFn: async () => {
-      const host = window.location.hostname;
-      const protocol = window.location.protocol;
-      // Handle tenant vs central routing if needed, or stick to central for system status
-      const isTenant = host !== "localhost" && host !== "127.0.0.1" && host.includes(".");
-      const url = isTenant 
-        ? `${protocol}//${host}:8085/api/v1/system/status-ticker`
-        : `${protocol}//${host}:8085/api/v1/system/status-ticker`;
-
-      const res = await fetch(url);
+      const res = await fetch(`${getBackendApiRoot()}/system/status-ticker`);
       if (!res.ok) throw new Error();
       return res.json();
     },

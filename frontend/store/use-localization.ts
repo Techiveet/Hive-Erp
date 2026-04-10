@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getBackendApiRoot } from '@/lib/runtime-context';
 
 interface Language {
   id: number;
@@ -27,7 +28,7 @@ interface LocalizationState {
   publish: () => Promise<void>;
 }
 
-const getApiUrl = (endpoint: string) => `http://${window.location.hostname}:8085/api/v1${endpoint}`;
+const getApiUrl = (endpoint: string) => `${getBackendApiRoot()}${endpoint}`;
 const getHeaders = () => ({
   'Accept': 'application/json',
   'Content-Type': 'application/json',

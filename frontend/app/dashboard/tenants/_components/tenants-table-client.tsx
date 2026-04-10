@@ -31,6 +31,7 @@ import { ModuleSubscriptionSummary } from "@/modules/subscription/components/mod
 import type { TenantCustomModuleInput } from "@/modules/subscription/types";
 import { fetchTenants } from "@/modules/tenancy/api";
 import { TenantDomainManager } from "@/modules/tenancy/components/tenant-domain-manager";
+import { getBackendApiRoot } from "@/lib/runtime-context";
 import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -44,6 +45,7 @@ type Props = {
 const globalActionLock: Record<string, number> = {};
 const EMPTY_PLAN_DEFAULTS: Record<string, string[]> = {};
 const EMPTY_STRING_LIST: string[] = [];
+const DEFAULT_TENANT_ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "localhost").trim();
 
 const sanitizeCustomModules = (modules: TenantCustomModuleInput[]): TenantCustomModuleInput[] =>
     modules
@@ -314,7 +316,7 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
     const handleIdChange = (val: string) => {
         const sanitized = val.toLowerCase().replace(/[^a-z0-9-]/g, '');
         setFormId(sanitized);
-        if (!isEdit) setFormDomain(`${sanitized}.localhost`);
+        if (!isEdit) setFormDomain(sanitized ? `${sanitized}.${DEFAULT_TENANT_ROOT_DOMAIN}` : "");
     };
 
     const getPlanBadge = (plan: string) => {
@@ -414,9 +416,7 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         }
     ], [canEdit, canDelete, canSuspend, toggleStatusMut.isPending, toggleAdminMut.isPending, openView, openEdit, t]);
 
-    const apiUrl = typeof window !== 'undefined' ? `http://${window.location.hostname}:8085/api` : '';
-    // 🚀 THE FIX: Append &locale= parameter to Backend Export URL
-    const exportUrl = `${apiUrl}/v1/tenants/export?search=${encodeURIComponent(search || "")}&sortCol=${sortCol}&sortDir=${sortDir}&locale=${locale}`;
+    const exportUrl = `${getBackendApiRoot()}/tenants/export?search=${encodeURIComponent(search || "")}&sortCol=${sortCol}&sortDir=${sortDir}&locale=${locale}`;
 
     return (
         <div className="space-y-4 mt-6">
@@ -463,7 +463,7 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                                                 <SelectContent className="rounded-xl border-border/50 shadow-xl"><SelectItem value="startup">Startup</SelectItem><SelectItem value="business">Business</SelectItem><SelectItem value="enterprise">Enterprise</SelectItem><SelectItem value="overlord">Overlord</SelectItem></SelectContent>
                                             </Select>
                                         </div>
-                                        <div className="space-y-1.5 col-span-2"><Label className="text-xs uppercase tracking-widest text-muted-foreground">{t('tenants.domain', "Routing Address")}</Label><div className="relative"><Globe className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input required disabled={isEdit} value={formDomain} onChange={e => setFormDomain(e.target.value)} placeholder="acme.localhost" className="h-11 pl-9 font-mono bg-muted/30" /></div></div>
+                                        <div className="space-y-1.5 col-span-2"><Label className="text-xs uppercase tracking-widest text-muted-foreground">{t('tenants.domain', "Routing Address")}</Label><div className="relative"><Globe className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input required disabled={isEdit} value={formDomain} onChange={e => setFormDomain(e.target.value)} placeholder={`acme.${DEFAULT_TENANT_ROOT_DOMAIN}`} className="h-11 pl-9 font-mono bg-muted/30" /></div></div>
                                     </div>
                                     <div className="rounded-[1.25rem] border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
                                         Module subscriptions are managed in the dedicated subscriptions workspace. New tenants will still inherit the defaults for the selected plan.

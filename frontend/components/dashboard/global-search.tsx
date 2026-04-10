@@ -8,6 +8,7 @@ import { useTranslation } from "@/store/use-translation";
 import { useDebounce } from "@/hooks/use-debounce";
 import { usePermissions } from "@/hooks/use-permissions";
 import { canAccessDashboardRoute } from "@/lib/route-permissions";
+import { getBackendApiRoot, getTenantId } from "@/lib/runtime-context";
 
 interface SearchResultItem {
   id: string | number;
@@ -82,27 +83,14 @@ export function GlobalSearch() {
       setIsLoading(true);
       try {
         const token = localStorage.getItem('hive_token');
-
-        // 🚀 BULLETPROOF URL PARSER
-        // Grabs your env variable, or defaults to localhost.
-        let apiUrl = process.env.NEXT_PUBLIC_API_URL || `http://${window.location.hostname}:8085/api`;
-
-        // Strip any accidental trailing slashes
-        if (apiUrl.endsWith('/')) {
-            apiUrl = apiUrl.slice(0, -1);
-        }
-
-        // Ensure we are hitting the /v1 route group
-        if (apiUrl.endsWith('/api')) {
-            apiUrl = `${apiUrl}/v1`;
-        } else if (!apiUrl.includes('/v1')) {
-            apiUrl = `${apiUrl}/api/v1`;
-        }
+        const apiUrl = getBackendApiRoot();
+        const tenantId = getTenantId();
 
         const res = await fetch(`${apiUrl}/search?q=${encodeURIComponent(debouncedQuery)}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            ...(tenantId ? { 'X-Tenant': tenantId } : {}),
           }
         });
 

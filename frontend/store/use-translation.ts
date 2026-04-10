@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getBackendApiRoot } from '@/lib/runtime-context';
 
 interface TranslationState {
   locale: string;
@@ -8,7 +9,7 @@ interface TranslationState {
   t: (key: string, fallback?: string) => string;
 }
 
-const getApiUrl = (endpoint: string) => `http://${window.location.hostname}:8085/api/v1${endpoint}`;
+const getApiUrl = (endpoint: string) => `${getBackendApiRoot()}${endpoint}`;
 
 export const useTranslation = create<TranslationState>((set, get) => ({
   locale: 'en', 

@@ -6,7 +6,7 @@ import { Mail, Check, Circle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getTenantId, isTenantSession } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantId, isTenantSession } from "@/lib/runtime-context";
 import { initEcho } from "@/lib/echo";
 import { toast } from "sonner";
 import { useMailStore } from "@/store/mail-store";
@@ -20,9 +20,7 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const getApiUrl = () => {
-    if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-    const host = window.location.hostname;
-    return `http://${host}:8085/api/v1`;
+    return getBackendApiRoot();
   };
 
   const getTenantHeaders = (): Record<string, string> => {
@@ -31,7 +29,6 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
   };
 
   const getTenantAwareEndpoint = (path: string) => {
-    if (typeof window === "undefined") return `http://localhost:8085/api/v1${path}`;
     const base = getApiUrl();
     return isTenantSession() ? `${base}/tenant${path}` : `${base}${path}`;
   };

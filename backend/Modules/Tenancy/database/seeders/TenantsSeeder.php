@@ -18,6 +18,11 @@ class TenantsSeeder extends Seeder
 {
     public function run(): void
     {
+        $rootDomain = strtolower(trim((string) env('ROOT_DOMAIN', '')));
+        $defaultTenantDomain = static fn (string $tenantId): string => $rootDomain !== ''
+            ? "{$tenantId}.{$rootDomain}"
+            : "{$tenantId}.localhost";
+
         // 🚀 FIX: Updated plans to match your Controller validation
         $tenants = [
             ['id' => 'apple', 'name' => 'Apple Inc', 'plan' => 'overlord'],
@@ -43,7 +48,7 @@ class TenantsSeeder extends Seeder
 
             // 2. Ensure Domain Exists
             $tenant->domains()->firstOrCreate([
-                'domain' => $data['id'] . '.localhost',
+                'domain' => $defaultTenantDomain($data['id']),
             ]);
 
             // 3. Smart Database Check

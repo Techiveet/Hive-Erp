@@ -2,14 +2,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getBackendApiRoot } from "@/lib/runtime-context";
 
 const getApiUrl = () => {
-  if (typeof window === "undefined") return "http://localhost:8085/api/v1";
-  const host = window.location.hostname;
-  if (host !== "localhost" && host.endsWith(".localhost")) {
-    return `http://${host}:8085/api/v1`;
-  }
-  return "http://localhost:8085/api/v1";
+  return getBackendApiRoot();
 };
 
 function getFallback(name?: string) {
