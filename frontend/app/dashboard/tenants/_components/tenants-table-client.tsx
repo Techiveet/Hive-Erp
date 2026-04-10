@@ -46,6 +46,7 @@ const globalActionLock: Record<string, number> = {};
 const EMPTY_PLAN_DEFAULTS: Record<string, string[]> = {};
 const EMPTY_STRING_LIST: string[] = [];
 const DEFAULT_TENANT_ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "localhost").trim();
+const DEFAULT_TENANT_SERVER_IP = (process.env.NEXT_PUBLIC_SERVER_IP || "").trim();
 
 const sanitizeCustomModules = (modules: TenantCustomModuleInput[]): TenantCustomModuleInput[] =>
     modules
@@ -464,6 +465,9 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                                             </Select>
                                         </div>
                                         <div className="space-y-1.5 col-span-2"><Label className="text-xs uppercase tracking-widest text-muted-foreground">{t('tenants.domain', "Routing Address")}</Label><div className="relative"><Globe className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input required disabled={isEdit} value={formDomain} onChange={e => setFormDomain(e.target.value)} placeholder={`acme.${DEFAULT_TENANT_ROOT_DOMAIN}`} className="h-11 pl-9 font-mono bg-muted/30" /></div></div>
+                                        <div className="col-span-2 rounded-[1rem] border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                                            Generated tenant subdomains follow <span className="font-mono text-foreground">*.{DEFAULT_TENANT_ROOT_DOMAIN}</span>. {DEFAULT_TENANT_SERVER_IP ? <>Point that wildcard record to <span className="font-mono text-foreground">{DEFAULT_TENANT_SERVER_IP}</span>.</> : <>Point that wildcard record to your VPS public IP.</>} If the root domain or VPS changes later, update the production env and redeploy; generated fallback tenant domains will sync automatically.
+                                        </div>
                                     </div>
                                     <div className="rounded-[1.25rem] border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
                                         Module subscriptions are managed in the dedicated subscriptions workspace. New tenants will still inherit the defaults for the selected plan.

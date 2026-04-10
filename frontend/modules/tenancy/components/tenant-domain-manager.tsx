@@ -10,6 +10,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Server,
   ShieldAlert,
   ShieldCheck,
   Star,
@@ -30,6 +31,13 @@ import {
   updateTenantDomain,
   verifyTenantDomain,
 } from "@/modules/tenancy/api";
+
+const PLATFORM_ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "localhost").trim();
+const PLATFORM_SERVER_IP = (process.env.NEXT_PUBLIC_SERVER_IP || "").trim();
+const GENERATED_WILDCARD_DOMAIN =
+  PLATFORM_ROOT_DOMAIN && PLATFORM_ROOT_DOMAIN !== "localhost"
+    ? `*.${PLATFORM_ROOT_DOMAIN}`
+    : "*.localhost";
 
 type TenantDomain = {
   id: number;
@@ -208,6 +216,26 @@ export function TenantDomainManager({ tenantId, onTenantUpdated }: Props) {
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span>Primary: <span className="font-mono text-foreground">{tenant.primary_domain}</span></span>
           <span>Fallback: <span className="font-mono text-foreground">{tenant.fallback_domain}</span></span>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-[1.25rem] border border-border/50 bg-background/70 p-4">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Generated Subdomain Pattern</p>
+          <p className="mt-2 font-mono text-xs text-foreground">{GENERATED_WILDCARD_DOMAIN}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            New tenant fallback addresses follow this wildcard automatically. If the platform root domain changes later, the next production redeploy will sync those generated fallback domains for you.
+          </p>
+        </div>
+        <div className="rounded-[1.25rem] border border-border/50 bg-background/70 p-4">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Wildcard DNS Target</p>
+          <div className="mt-2 flex items-center gap-2 font-mono text-xs text-foreground">
+            <Server className="h-3.5 w-3.5 text-primary" />
+            <span>{PLATFORM_SERVER_IP || "Set SERVER_IP in production .env to surface the live VPS target here."}</span>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Keep a wildcard record like <span className="font-mono">{GENERATED_WILDCARD_DOMAIN}</span> pointed at your VPS. If you ever move the server, update <span className="font-mono">SERVER_IP</span>, redeploy, and these routing hints will stay accurate.
+          </p>
         </div>
       </div>
 

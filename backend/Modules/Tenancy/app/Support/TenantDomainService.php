@@ -10,6 +10,40 @@ use Modules\Tenancy\Models\Tenant;
 
 class TenantDomainService
 {
+    public function currentRootDomain(): string
+    {
+        $configuredRoot = $this->normalizeDomain((string) env('ROOT_DOMAIN', ''));
+
+        if ($configuredRoot !== '') {
+            return $configuredRoot;
+        }
+
+        $frontendUrl = (string) (config('app.frontend_url') ?: env('FRONTEND_URL') ?: config('app.url', 'http://localhost:3000'));
+        $host = parse_url($frontendUrl, PHP_URL_HOST);
+
+        if (is_string($host) && $host !== '') {
+            $normalizedHost = $this->normalizeDomain($host);
+
+            if (Str::startsWith($normalizedHost, 'hive.')) {
+                return Str::after($normalizedHost, 'hive.');
+            }
+
+            return $normalizedHost;
+        }
+
+        return 'localhost';
+    }
+
+    public function expectedFallbackDomain(Tenant|string $tenant): string
+    {
+        $tenantId = $tenant instanceof Tenant ? (string) $tenant->id : trim((string) $tenant);
+        $rootDomain = $this->currentRootDomain();
+
+        return $rootDomain === 'localhost'
+            ? "{$tenantId}.localhost"
+            : "{$tenantId}.{$rootDomain}";
+    }
+
     public function normalizeDomain(string $domain): string
     {
         $normalized = trim(Str::lower($domain));
@@ -38,6 +72,56 @@ class TenantDomainService
             'verification_token' => null,
             'verified_at' => now(),
         ]);
+    }
+
+    public function syncFallbackDomain(Tenant $tenant): array
+    {
+        $tenant->loadMissing('domains');
+
+        $expectedDomain = $this->expectedFallbackDomain($tenant);
+        $fallbackDomain = $this->fallbackDomain($tenant);
+
+        if ($fallbackDomain && $fallbackDomain->domain === $expectedDomain) {
+            return [
+                'status' => 'unchanged',
+                'domain' => $fallbackDomain->refresh(),
+            ];
+        }
+
+        $this->assertDomainAvailable($expectedDomain, $fallbackDomain?->id);
+
+        if ($fallbackDomain) {
+            $previousDomain = $fallbackDomain->domain;
+
+            $fallbackDomain->forceFill([
+                'domain' => $expectedDomain,
+                'verification_status' => 'verified',
+                'verification_token' => null,
+                'verified_at' => now(),
+            ])->save();
+
+            return [
+                'status' => 'updated',
+                'domain' => $fallbackDomain->refresh(),
+                'previous_domain' => $previousDomain,
+            ];
+        }
+
+        $primaryDomain = $this->primaryDomain($tenant);
+
+        $created = $tenant->domains()->create([
+            'domain' => $expectedDomain,
+            'is_primary' => $primaryDomain === null,
+            'is_fallback' => true,
+            'verification_status' => 'verified',
+            'verification_token' => null,
+            'verified_at' => now(),
+        ]);
+
+        return [
+            'status' => 'created',
+            'domain' => $created->refresh(),
+        ];
     }
 
     public function createCustomDomain(Tenant $tenant, string $domain): Domain
@@ -181,7 +265,7 @@ class TenantDomainService
             'verification_record_name' => $this->verificationRecordName($domain->domain),
             'verification_record_value' => $domain->verification_token,
             'routing_record_type' => $this->recommendedRoutingRecordType($domain->domain),
-            'routing_target' => $this->routingTarget(),
+            'routing_target' => $this->routingTarget($domain->domain),
             'is_apex' => $this->isApexDomain($domain->domain),
         ];
     }
@@ -204,8 +288,16 @@ class TenantDomainService
         return '_hive-verification.' . $this->normalizeDomain($domain);
     }
 
-    public function routingTarget(): string
+    public function routingTarget(string $domain): string
     {
+        if ($this->isApexDomain($domain)) {
+            $serverIp = $this->serverIp();
+
+            if ($serverIp !== null) {
+                return $serverIp;
+            }
+        }
+
         $frontendUrl = (string) (config('app.frontend_url') ?: env('FRONTEND_URL') ?: config('app.url', 'http://localhost:3000'));
 
         $host = parse_url($frontendUrl, PHP_URL_HOST);
@@ -264,6 +356,17 @@ class TenantDomainService
     protected function recommendedRoutingRecordType(string $domain): string
     {
         return $this->isApexDomain($domain) ? 'ALIAS_OR_A' : 'CNAME';
+    }
+
+    protected function serverIp(): ?string
+    {
+        $serverIp = trim((string) env('SERVER_IP', ''));
+
+        if ($serverIp === '') {
+            return null;
+        }
+
+        return filter_var($serverIp, FILTER_VALIDATE_IP) ? $serverIp : null;
     }
 
     protected function assertBelongsToTenant(Tenant $tenant, Domain $domain): void

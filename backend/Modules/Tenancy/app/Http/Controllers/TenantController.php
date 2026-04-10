@@ -528,6 +528,7 @@ class TenantController extends Controller implements HasMiddleware
         $tenant->loadMissing('domains');
         $primaryDomain = $tenant->primaryDomain();
         $fallbackDomain = $tenant->fallbackDomain();
+        $expectedFallbackDomain = $this->tenantDomains->expectedFallbackDomain($tenant);
 
         $currentSubscription = $this->subscriptions->currentForTenant($tenant);
         $subscriptions = $currentSubscription['module_subscriptions'];
@@ -536,9 +537,9 @@ class TenantController extends Controller implements HasMiddleware
             'id' => $tenant->id,
             'name' => $tenant->name ?? ucfirst($tenant->id),
             'plan' => $tenant->plan ?? 'Standard',
-            'domain' => $primaryDomain?->domain ?? $tenant->id . '.localhost',
-            'primary_domain' => $primaryDomain?->domain ?? $tenant->id . '.localhost',
-            'fallback_domain' => $fallbackDomain?->domain ?? $tenant->id . '.localhost',
+            'domain' => $primaryDomain?->domain ?? $expectedFallbackDomain,
+            'primary_domain' => $primaryDomain?->domain ?? $expectedFallbackDomain,
+            'fallback_domain' => $fallbackDomain?->domain ?? $expectedFallbackDomain,
             'domains' => $this->tenantDomains->domainsPayload($tenant),
             'is_active' => $tenant->is_active ?? true,
             'admin_email' => $tenant->admin_email,
