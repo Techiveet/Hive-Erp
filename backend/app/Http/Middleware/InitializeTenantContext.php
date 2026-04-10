@@ -17,6 +17,14 @@ class InitializeTenantContext
 
     public function handle(Request $request, Closure $next): Response
     {
+        if ($request->is('api/internal/caddy/allow-domain')) {
+            if ($this->tenancy->initialized) {
+                $this->tenancy->end();
+            }
+
+            return $next($request);
+        }
+
         $host = $request->getHost();
         $centralDomains = collect(config('tenancy.central_domains', []))
             ->map(fn ($domain) => explode(':', (string) $domain)[0])
