@@ -777,7 +777,17 @@ function DataTableInner<TData, TValue>({
             {showSelectionDelete && (
               <>
                 <Separator orientation="vertical" className="h-5 mx-1 border-border" />
-                <Button variant="ghost" size="sm" className="h-8 text-red-500 hover:bg-red-500/10 hover:text-red-600 font-bold" onClick={async () => { await onDeleteRows(table.getSelectedRowModel().rows.map(r => r.original as TData)); setRowSelection({}); }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-red-500 hover:bg-red-500/10 hover:text-red-600 font-bold"
+                  onClick={async () => {
+                    const deleteRows = onDeleteRows;
+                    if (!deleteRows) return;
+                    await deleteRows(table.getSelectedRowModel().rows.map(r => r.original as TData));
+                    setRowSelection({});
+                  }}
+                >
                   <Trash2 className="mr-2 h-4 w-4" /> <span className="hidden sm:inline-block">Purge</span>
                 </Button>
               </>
