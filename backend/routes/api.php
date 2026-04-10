@@ -28,7 +28,7 @@ Route::get('/internal/caddy/allow-domain', function (Request $request) {
     }
 
     return Domain::query()->where('domain', $domain)->exists()
-        ? response()->noContent()
+        ? response()->json(['allowed' => true], 200)
         : response()->json(['allowed' => false], 404);
 });
 
