@@ -432,6 +432,7 @@ done
 compose exec -T backend php artisan storage:link || true
 compose exec -T backend php artisan optimize:clear
 compose exec -T backend php artisan migrate --force
+compose exec -T backend php artisan tenants:migrate --force
 if [ "${SKIP_FALLBACK_DOMAIN_SYNC}" -eq 0 ]; then
   compose exec -T backend php artisan hive:sync-fallback-domains
 fi
