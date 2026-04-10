@@ -1,7 +1,9 @@
 <?php
 
 use Modules\Core\Http\Controllers\ApiDocumentationController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Modules\Tenancy\Models\Domain;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,6 +19,18 @@ Route::get('/docs/openapi.json', [ApiDocumentationController::class, 'spec'])->n
 Route::get('/unauthorized', function () {
     return response()->json(['message' => 'Unauthenticated.'], 401);
 })->name('login');
+
+Route::get('/internal/caddy/allow-domain', function (Request $request) {
+    $domain = strtolower(trim((string) $request->query('domain', '')));
+
+    if ($domain === '') {
+        return response()->json(['allowed' => false, 'message' => 'Missing domain.'], 400);
+    }
+
+    return Domain::query()->where('domain', $domain)->exists()
+        ? response()->noContent()
+        : response()->json(['allowed' => false], 404);
+});
 
 Route::get('/test-broadcast', function () {
     $payload = [

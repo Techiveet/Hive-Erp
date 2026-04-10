@@ -1,12 +1,10 @@
+{
+    on_demand_tls {
+        ask http://backend:8000/api/internal/caddy/allow-domain
+    }
+}
+
 {$FRONTEND_DOMAIN:hive.techiveet.com} {
-    reverse_proxy frontend:3000
-}
-
-{$APPLE_TENANT_DOMAIN:apple.techiveet.com} {
-    reverse_proxy frontend:3000
-}
-
-{$TESLA_TENANT_DOMAIN:tesla.techiveet.com} {
     reverse_proxy frontend:3000
 }
 
@@ -28,4 +26,12 @@
 {$HORIZON_DOMAIN:hive-queue.techiveet.com} {
     redir / /horizon 308
     reverse_proxy backend:8000
+}
+
+https:// {
+    tls {
+        on_demand
+    }
+
+    reverse_proxy frontend:3000
 }
