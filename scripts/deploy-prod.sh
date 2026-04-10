@@ -90,6 +90,26 @@ compose() {
   docker compose -f "${COMPOSE_FILE}" "$@"
 }
 
+cleanup_stale_recreate_containers() {
+  local stale_names=()
+  local line
+
+  while IFS= read -r line; do
+    [ -n "${line}" ] && stale_names+=("${line}")
+  done < <(
+    docker ps -a --format '{{.Names}}' \
+      | grep -E '^[0-9a-f]{12,}_(hive-(caddy|redis|db|search|ai-rembg|gotenberg|backend|queue|reverb|frontend))$' \
+      || true
+  )
+
+  if [ "${#stale_names[@]}" -eq 0 ]; then
+    return
+  fi
+
+  echo "Removing stale Compose recreate containers: ${stale_names[*]}"
+  docker rm -f "${stale_names[@]}" >/dev/null
+}
+
 get_env_value() {
   local key="$1"
   local line
@@ -387,6 +407,7 @@ if [ ! -f ".env" ]; then
 fi
 
 apply_requested_overrides
+cleanup_stale_recreate_containers
 ensure_app_key
 ensure_reverb_credentials
 ensure_domain_defaults
