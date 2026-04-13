@@ -25,6 +25,7 @@ class TenantSubscriptionOrder extends Model
         'tenant_name',
         'tenant_domain',
         'plan',
+        'business_type',
         'admin_name',
         'admin_email',
         'admin_password_encrypted',

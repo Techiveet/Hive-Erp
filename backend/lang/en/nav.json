@@ -5,6 +5,8 @@
     "audit_logs": "System Audit Logs",
     "storage": "Storage",
     "settings": "Settings",
+    "nightclub": "Lounge & Club",
+    "inventory": "Inventory",
     "profile": "Profile Settings",
     "control_hub": "Control Hub",
     "disconnect": "Disconnect Node",

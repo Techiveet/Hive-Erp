@@ -39,6 +39,30 @@ import { EmailSettings } from '@/components/settings/email-settings';
 import { PaymentSettings } from '@/components/settings/payment-settings';
 import { PlanSettings } from '@/components/settings/plan-settings';
 
+const toErrorMessage = (value: unknown, fallback = "Something went wrong."): string => {
+    if (value instanceof Error && typeof value.message === "string" && value.message.trim()) {
+        return value.message;
+    }
+
+    if (typeof value === "string" && value.trim()) {
+        return value;
+    }
+
+    if (typeof value === "object" && value !== null) {
+        const candidate = value as { message?: unknown; error?: unknown };
+
+        if (typeof candidate.message === "string" && candidate.message.trim()) {
+            return candidate.message;
+        }
+
+        if (typeof candidate.error === "string" && candidate.error.trim()) {
+            return candidate.error;
+        }
+    }
+
+    return fallback;
+};
+
 // ==========================================
 // 🚀 1. UTILITIES & FETCH HELPERS
 // ==========================================
@@ -49,8 +73,13 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
     );
     const res = await fetch(url, { ...options, headers: { ...headers, ...options.headers } });
     if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "API Request Failed");
+        const payload = await res.json().catch(() => null);
+        const message = typeof payload?.message === "string" && payload.message.trim()
+            ? payload.message
+            : typeof payload?.error === "string" && payload.error.trim()
+                ? payload.error
+                : `API request failed with status ${res.status}.`;
+        throw new Error(message);
     }
     return res.json();
 };
@@ -531,7 +560,7 @@ function GeneralSettings() {
             toast.success(t('settings.general_updated', "System Configuration Updated Successfully!"));
             queryClient.invalidateQueries({ queryKey: ['globalSystemSettings'] });
         },
-        onError: (err: any) => toast.error(err.message)
+        onError: (err: any) => toast.error(toErrorMessage(err, "Failed to update general settings."))
     });
 
     if (isLoading) return <SettingsPanelSkeleton />;

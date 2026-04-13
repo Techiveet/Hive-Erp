@@ -78,7 +78,7 @@ export default function SubscriptionsPage() {
             {t("global.clearance_denied", "Clearance Denied")}
           </h2>
           <p className="mx-auto max-w-md font-mono text-sm leading-relaxed text-muted-foreground">
-            Tenant module subscriptions are only available inside a tenant workspace with the right clearance.
+            {t("subscriptions.clearance_message", "Tenant module subscriptions are only available inside a tenant workspace with the right clearance.")}
           </p>
         </div>
       </div>
@@ -102,7 +102,7 @@ export default function SubscriptionsPage() {
             <Layers className="h-6 w-6 text-primary" /> {t("nav.subscriptions", "Module Subscriptions")}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Activate the modules your tenant wants to use, from media tools to operational addons and custom capabilities.
+            {t("subscriptions.subtitle", "Activate the modules your tenant wants to use, from media tools to operational addons and custom capabilities.")}
           </p>
         </div>
       </div>

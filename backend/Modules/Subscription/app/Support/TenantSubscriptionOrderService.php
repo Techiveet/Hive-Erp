@@ -15,6 +15,7 @@ use Modules\Subscription\Models\TenantSubscription;
 use Modules\Subscription\Models\TenantSubscriptionOrder;
 use Modules\Subscription\Notifications\DirectTransferReviewSubmitted;
 use Modules\Tenancy\Models\Tenant;
+use Modules\Tenancy\Support\TenantLandingTemplateCatalog;
 use Modules\Tenancy\Support\TenantProvisioningService;
 
 class TenantSubscriptionOrderService
@@ -23,6 +24,7 @@ class TenantSubscriptionOrderService
         protected PaymentProviderManager $payments,
         protected TenantProvisioningService $provisioningService,
         protected TenantSubscriptionService $subscriptions,
+        protected TenantLandingTemplateCatalog $landingTemplates,
     ) {
     }
 
@@ -60,6 +62,7 @@ class TenantSubscriptionOrderService
             'tenant_name' => $payload['name'],
             'tenant_domain' => $tenantDomain,
             'plan' => strtolower((string) $payload['plan']),
+            'business_type' => $this->landingTemplates->normalizeBusinessType($payload['business_type'] ?? null),
             'admin_name' => $payload['admin_name'],
             'admin_email' => strtolower((string) $payload['admin_email']),
             'admin_password_encrypted' => Crypt::encryptString((string) $payload['admin_password']),
@@ -368,6 +371,7 @@ class TenantSubscriptionOrderService
             'admin_name' => $order->admin_name,
             'admin_email' => $order->admin_email,
             'plan' => $order->plan,
+            'business_type' => $order->business_type,
             'billing_phone' => $order->billing_phone,
             'line_items' => $order->line_items ?? [],
             'total_amount_etb' => (float) $order->total_amount_etb,
@@ -538,6 +542,7 @@ class TenantSubscriptionOrderService
                 'id' => $order->tenant_id,
                 'name' => $order->tenant_name,
                 'plan' => $order->plan,
+                'business_type' => $order->business_type,
                 'domain' => $order->tenant_domain,
                 'admin_name' => $order->admin_name,
                 'admin_email' => $order->admin_email,

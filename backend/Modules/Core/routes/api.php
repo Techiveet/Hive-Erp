@@ -16,6 +16,7 @@ use Modules\Core\Http\Controllers\Settings\GeneralSettingsController;
 use Modules\Core\Http\Controllers\Settings\EmailSettingsController;
 use Modules\Core\Http\Controllers\Settings\PaymentGatewaySettingsController;
 use Modules\Core\Http\Controllers\Settings\SubscriptionPlanSettingsController;
+use Modules\Core\Http\Controllers\Settings\TenantLandingTemplateSettingsController;
 use Modules\Core\Http\Controllers\Export\ActivityLogExportController;
 use Modules\Core\Http\Controllers\Dashboard\DashboardController;
 use Modules\Core\Http\Controllers\Dashboard\SystemOperationsController;
@@ -93,6 +94,8 @@ foreach ($centralDomains as $domain) {
                 Route::post('/email', [EmailSettingsController::class, 'store'])->middleware('permission:manage_general_settings,sanctum');
                 Route::get('/payments', [PaymentGatewaySettingsController::class, 'index'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
                 Route::post('/payments', [PaymentGatewaySettingsController::class, 'store'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
+                Route::get('/landing-templates', [TenantLandingTemplateSettingsController::class, 'index'])->middleware('permission:manage_tenants|provision_tenants,sanctum');
+                Route::post('/landing-templates', [TenantLandingTemplateSettingsController::class, 'store'])->middleware('permission:manage_tenants|provision_tenants,sanctum');
                 Route::get('/direct-transfer/reviews', [DirectTransferReviewController::class, 'index'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
                 Route::post('/direct-transfer/reviews/{orderId}/approve', [DirectTransferReviewController::class, 'approve'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
                 Route::post('/direct-transfer/reviews/{orderId}/reject', [DirectTransferReviewController::class, 'reject'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');

@@ -52,7 +52,7 @@ class PaymentGatewaySettings
                 'defaults' => [
                     'enabled' => true,
                     'sandbox' => filter_var(env('ARIFPAY_SANDBOX', false), FILTER_VALIDATE_BOOLEAN),
-                    'base_url' => rtrim((string) env('ARIFPAY_BASE_URL', 'https://gateway.arifpay.net'), '/'),
+                    'base_url' => rtrim((string) env('ARIFPAY_BASE_URL', 'https://gateway.arifpay.net/api'), '/'),
                     'api_key' => (string) env('ARIFPAY_API_KEY', ''),
                     'checkout_expire_minutes' => (int) env('ARIFPAY_CHECKOUT_EXPIRE_MINUTES', 30),
                     'payment_methods' => collect(explode(',', (string) env('ARIFPAY_PAYMENT_METHODS', 'TELEBIRR_USSD,CBE,AWASH_BIRR,AMOLE,ZAMZAM')))
@@ -64,7 +64,7 @@ class PaymentGatewaySettings
                 'fields' => [
                     ['key' => 'enabled', 'label' => 'Enabled', 'type' => 'toggle', 'rules' => ['required', 'boolean']],
                     ['key' => 'sandbox', 'label' => 'Sandbox Mode', 'type' => 'toggle', 'rules' => ['required', 'boolean']],
-                    ['key' => 'base_url', 'label' => 'Gateway Base URL', 'type' => 'text', 'placeholder' => 'https://gateway.arifpay.net', 'rules' => ['required', 'url']],
+                    ['key' => 'base_url', 'label' => 'Gateway Base URL', 'type' => 'text', 'placeholder' => 'https://gateway.arifpay.net/api', 'rules' => ['required', 'url']],
                     ['key' => 'api_key', 'label' => 'API Key', 'type' => 'password', 'placeholder' => 'arifpay key', 'rules' => ['nullable', 'string', 'max:255']],
                     ['key' => 'checkout_expire_minutes', 'label' => 'Checkout Expiry (Minutes)', 'type' => 'number', 'rules' => ['required', 'integer', 'min:5', 'max:180']],
                     ['key' => 'payment_methods', 'label' => 'Allowed Payment Methods', 'type' => 'csv', 'placeholder' => 'TELEBIRR_USSD,CBE,AWASH_BIRR,AMOLE,ZAMZAM', 'rules' => ['nullable', 'array']],

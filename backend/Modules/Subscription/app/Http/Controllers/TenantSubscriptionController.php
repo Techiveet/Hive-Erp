@@ -9,6 +9,7 @@ use Modules\Subscription\Support\TenantModuleCatalog;
 use Modules\Subscription\Support\TenantSubscriptionOrderService;
 use Modules\Subscription\Support\TenantSubscriptionService;
 use Modules\Tenancy\Models\Tenant;
+use Modules\Tenancy\Support\TenantLandingTemplateCatalog;
 
 class TenantSubscriptionController extends Controller
 {
@@ -16,6 +17,7 @@ class TenantSubscriptionController extends Controller
         protected TenantSubscriptionOrderService $orders,
         protected TenantSubscriptionService $subscriptions,
         protected PaymentProviderManager $payments,
+        protected TenantLandingTemplateCatalog $landingTemplates,
     ) {
     }
 
@@ -26,6 +28,7 @@ class TenantSubscriptionController extends Controller
                 'catalog' => TenantModuleCatalog::catalog(),
                 'plan_defaults' => TenantModuleCatalog::planDefaults(),
                 'plan_pricing' => TenantModuleCatalog::planPricing(),
+                'business_types' => $this->landingTemplates->businessTypesPayload(),
                 'payment_provider' => $this->payments->activeProviderPayload(),
                 'payment_providers' => $this->payments->publicProvidersPayload(),
                 'payment_methods' => $this->payments->paymentMethods(),
@@ -63,6 +66,7 @@ class TenantSubscriptionController extends Controller
                 'catalog' => TenantModuleCatalog::catalog(),
                 'plan_defaults' => TenantModuleCatalog::planDefaults(),
                 'plan_pricing' => TenantModuleCatalog::planPricing(),
+                'business_types' => $this->landingTemplates->businessTypesPayload(),
                 'payment_provider' => $this->payments->activeProviderPayload(),
                 'payment_providers' => $this->payments->publicProvidersPayload(),
                 'payment_methods' => $this->payments->paymentMethods(),
@@ -144,6 +148,7 @@ class TenantSubscriptionController extends Controller
                 'catalog' => TenantModuleCatalog::catalog(),
                 'plan_defaults' => TenantModuleCatalog::planDefaults(),
                 'plan_pricing' => TenantModuleCatalog::planPricing(),
+                'business_types' => $this->landingTemplates->businessTypesPayload(),
                 'payment_provider' => $this->payments->activeProviderPayload(),
                 'payment_providers' => $this->payments->publicProvidersPayload(),
                 'payment_methods' => $this->payments->paymentMethods(),

@@ -1,0 +1,17 @@
+{
+    "system_alerts": "System Alerts",
+    "feed": "Feed",
+    "all_levels": "All Levels",
+    "info": "Info",
+    "warning": "Warning",
+    "critical": "Critical",
+    "search_alerts": "Search alerts...",
+    "mark_all_read": "Mark all as read",
+    "latest_events": "Latest events",
+    "node_telemetry_errors_anomalies": "Node telemetry, errors, and system anomalies.",
+    "all_alerts_read": "All alerts read",
+    "anomalies_resolved": "System anomalies resolved.",
+    "dismiss": "Dismiss",
+    "no_alerts_found": "No alerts found matching your criteria.",
+    "all_systems_operational": "All systems operational. No active alerts."
+}

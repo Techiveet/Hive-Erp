@@ -22,6 +22,7 @@ use Modules\Tenancy\Mail\TenantStatusChanged;
 use Modules\Tenancy\Models\Domain;
 use Modules\Tenancy\Models\Tenant;
 use Modules\Tenancy\Support\TenantDomainService;
+use Modules\Tenancy\Support\TenantLandingTemplateCatalog;
 use Modules\Tenancy\Support\TenantProvisioningService;
 
 class TenantController extends Controller implements HasMiddleware
@@ -32,6 +33,7 @@ class TenantController extends Controller implements HasMiddleware
         protected TenantProvisioningService $tenantProvisioningService,
         protected TenantSubscriptionService $subscriptions,
         protected TenantDomainService $tenantDomains,
+        protected TenantLandingTemplateCatalog $landingTemplates,
     ) {
     }
 
@@ -131,6 +133,8 @@ class TenantController extends Controller implements HasMiddleware
             'id' => ['required', 'string', 'alpha_dash', 'max:20', Rule::unique('tenants', 'id')],
             'name' => 'required|string|max:255',
             'plan' => ['required', 'string', Rule::in(array_keys(TenantModuleCatalog::planPricing()))],
+            'business_type' => ['required', 'string', Rule::in($this->landingTemplates->businessTypeKeys())],
+            'landing_page_template' => ['nullable', 'array'],
             'domain' => ['required', 'string', Rule::unique('domains', 'domain')],
             'admin_name' => 'required|string|max:255',
             'admin_email' => 'required|email|max:255',
@@ -339,12 +343,29 @@ class TenantController extends Controller implements HasMiddleware
         $validated = $request->validate(array_merge([
             'name' => 'sometimes|string|max:255',
             'plan' => ['sometimes', 'string', Rule::in(array_keys(TenantModuleCatalog::planPricing()))],
+            'business_type' => ['sometimes', 'string', Rule::in($this->landingTemplates->businessTypeKeys())],
+            'landing_page_template' => ['nullable', 'array'],
             'admin_name' => 'nullable|string|max:255',
             'admin_email' => 'nullable|email|max:255',
             'admin_password' => 'nullable|string|min:8',
         ], TenantModuleCatalog::validationRules()));
 
         $tenant->fill(Arr::only($validated, ['name', 'plan']));
+
+        if (array_key_exists('business_type', $validated)) {
+            $tenant->business_type = $this->landingTemplates->normalizeBusinessType($validated['business_type']);
+
+            if (!array_key_exists('landing_page_template', $validated)) {
+                $tenant->landing_page_template = $this->landingTemplates->defaultTemplate($validated['business_type']);
+            }
+        }
+
+        if (array_key_exists('landing_page_template', $validated)) {
+            $tenant->landing_page_template = $this->landingTemplates->normalizeTemplate(
+                $validated['landing_page_template'],
+                $validated['business_type'] ?? $tenant->business_type
+            );
+        }
 
         if ($tenant->isDirty()) {
             $tenant->save();
@@ -532,11 +553,18 @@ class TenantController extends Controller implements HasMiddleware
 
         $currentSubscription = $this->subscriptions->currentForTenant($tenant);
         $subscriptions = $currentSubscription['module_subscriptions'];
+        $businessType = $this->landingTemplates->normalizeBusinessType($tenant->business_type ?? null);
 
         return [
             'id' => $tenant->id,
             'name' => $tenant->name ?? ucfirst($tenant->id),
             'plan' => $tenant->plan ?? 'Standard',
+            'business_type' => $businessType,
+            'business_type_meta' => $this->landingTemplates->businessTypeMeta($businessType),
+            'landing_page_template' => $this->landingTemplates->normalizeTemplate(
+                $tenant->landing_page_template ?? null,
+                $businessType
+            ),
             'domain' => $primaryDomain?->domain ?? $expectedFallbackDomain,
             'primary_domain' => $primaryDomain?->domain ?? $expectedFallbackDomain,
             'fallback_domain' => $fallbackDomain?->domain ?? $expectedFallbackDomain,

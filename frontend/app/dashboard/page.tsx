@@ -346,7 +346,7 @@ export default function DashboardHome() {
                         )}
                         {canInviteUsers && (
                             <Button onClick={() => router.push('/dashboard/security')} variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-md disabled:opacity-50" disabled={isImpersonating}>
-                                <UserPlus className="w-4 h-4 mr-2 text-emerald-500" /> Invite Operator
+                                <UserPlus className="w-4 h-4 mr-2 text-emerald-500" /> {t('dashboard.invite_operator', 'Invite Operator')}
                             </Button>
                         )}
                         {((isCentral && canProvisionTenants) || canInviteUsers) && (canManageSystemSettings || canManageBackups) && (
@@ -354,7 +354,7 @@ export default function DashboardHome() {
                         )}
                         {canManageSystemSettings && (
                             <Button variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-md text-muted-foreground hover:text-foreground">
-                                <RefreshCw className="w-4 h-4 mr-2" /> Flush Cache
+                                <RefreshCw className="w-4 h-4 mr-2" /> {t('dashboard.flush_cache', 'Flush Cache')}
                             </Button>
                         )}
                         {isCentral && canManageBackups && (
@@ -374,7 +374,7 @@ export default function DashboardHome() {
                         CLEARANCE: {data.plan}
                     </Badge>
                     <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
-                        <ShieldCheck className="w-3 h-3 text-emerald-500" /> System Encrypted & Secured
+                        <ShieldCheck className="w-3 h-3 text-emerald-500" /> {t('dashboard.system_encrypted', 'System Encrypted & Secured')}
                     </div>
                 </div>
             </div>
@@ -382,11 +382,11 @@ export default function DashboardHome() {
             {/* STAT CARDS */}
             <div className={cn("grid gap-4 mt-8", isCentral ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-4" : "grid-cols-1 md:grid-cols-3")}>
                 {isCentral && (
-                    <StatCard title="Active Nodes" value={data.stats.active_tenants || 0} subtext={`Provisioned: ${data.stats.total_tenants}`} icon={<Server className="text-indigo-500" />} bgClass="bg-indigo-500/10" href={canViewTenants ? "/dashboard/tenants" : undefined} trend="up" />
+                    <StatCard title={t('dashboard.active_nodes', 'Active Nodes')} value={data.stats.active_tenants || 0} subtext={`${t('dashboard.provisioned', 'Provisioned')}: ${data.stats.total_tenants}`} icon={<Server className="text-indigo-500" />} bgClass="bg-indigo-500/10" href={canViewTenants ? "/dashboard/tenants" : undefined} trend="up" />
                 )}
-                <StatCard title="Active Users" value={data.stats.active_users} subtext={`Total: ${data.stats.total_users}`} icon={<Users className="text-emerald-500" />} bgClass="bg-emerald-500/10" href={canAccessSecurity ? (canViewUsers ? "/dashboard/security?tab=users" : "/dashboard/security") : undefined} trend="up" />
-                <StatCard title="Security Roles" value={data.stats.total_roles} subtext="Access Matrices" icon={<ShieldCheck className="text-amber-500" />} bgClass="bg-amber-500/10" href={canViewRoles ? "/dashboard/security?tab=roles" : undefined} trend="up" />
-                <StatCard title="Permissions" value={data.stats.total_permissions} subtext="Permission Nodes" icon={<Key className="text-blue-500" />} bgClass="bg-blue-500/10" href={canViewPermissions ? "/dashboard/security?tab=permissions" : undefined} />
+                <StatCard title={t('dashboard.active_users', 'Active Users')} value={data.stats.active_users} subtext={`${t('dashboard.total', 'Total')}: ${data.stats.total_users}`} icon={<Users className="text-emerald-500" />} bgClass="bg-emerald-500/10" href={canAccessSecurity ? (canViewUsers ? "/dashboard/security?tab=users" : "/dashboard/security") : undefined} trend="up" />
+                <StatCard title={t('dashboard.security_roles', 'Security Roles')} value={data.stats.total_roles} subtext={t('dashboard.access_matrices', 'Access Matrices')} icon={<ShieldCheck className="text-amber-500" />} bgClass="bg-amber-500/10" href={canViewRoles ? "/dashboard/security?tab=roles" : undefined} trend="up" />
+                <StatCard title={t('dashboard.permissions', 'Permissions')} value={data.stats.total_permissions} subtext={t('dashboard.permission_nodes', 'Permission Nodes')} icon={<Key className="text-blue-500" />} bgClass="bg-blue-500/10" href={canViewPermissions ? "/dashboard/security?tab=permissions" : undefined} />
             </div>
 
             {/* CENTRAL ONLY: Telemetry & Modules */}
@@ -395,7 +395,7 @@ export default function DashboardHome() {
                     <div className="md:col-span-7 lg:col-span-8 rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md h-[400px] flex flex-col">
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
-                                <ActivitySquare className="h-4 w-4 text-primary" /> System Telemetry
+                                <ActivitySquare className="h-4 w-4 text-primary" /> {t('dashboard.system_telemetry', 'System Telemetry')}
                             </div>
                             <div className="flex items-center gap-2 bg-background/50 rounded-full p-1 border border-border/50">
                                 <Button variant={timeFilter === 'live' ? 'default' : 'ghost'} size="sm" className="h-6 text-[10px] rounded-full" onClick={() => setTimeFilter('live')}>Live</Button>
@@ -475,9 +475,9 @@ export default function DashboardHome() {
                     <div className="md:col-span-8 rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md h-[400px] flex flex-col">
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
-                                <LineChartIcon className="h-4 w-4 text-emerald-500" /> Weekly Engagement
+                                <LineChartIcon className="h-4 w-4 text-emerald-500" /> {t('dashboard.weekly_engagement', 'Weekly Engagement')}
                             </div>
-                            <Badge variant="outline" className="font-mono text-[9px] bg-background">LAST 7 DAYS</Badge>
+                            <Badge variant="outline" className="font-mono text-[9px] bg-background">{t('dashboard.last_7_days', 'LAST 7 DAYS')}</Badge>
                         </div>
                         <div className="flex-1 w-full">
                             <ResponsiveContainer width="100%" height="100%">
@@ -496,7 +496,7 @@ export default function DashboardHome() {
                     <div className="md:col-span-4 rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md flex flex-col">
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
-                                <Globe className="h-4 w-4 text-blue-400" /> Traffic Origins
+                                <Globe className="h-4 w-4 text-blue-400" /> {t('dashboard.traffic_origins', 'Traffic Origins')}
                             </div>
                         </div>
                         <div className="space-y-4 flex-1">
@@ -509,7 +509,7 @@ export default function DashboardHome() {
                             {(!data.traffic_origins || data.traffic_origins.length === 0) && (
                                 <div className="text-xs text-muted-foreground text-center py-4 flex flex-col items-center justify-center h-full">
                                     <Globe className="w-8 h-8 text-muted/30 mb-2" />
-                                    No external origin data available
+                                    {t('dashboard.no_external_data', 'No external origin data available')}
                                 </div>
                             )}
                         </div>
@@ -523,21 +523,21 @@ export default function DashboardHome() {
                     <div className="rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md flex flex-col justify-between">
                         <div className="flex items-center justify-between mb-4">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
-                                <CreditCard className="h-4 w-4 text-amber-500" /> Revenue Intel
+                                <CreditCard className="h-4 w-4 text-amber-500" /> {t('dashboard.revenue_intel', 'Revenue Intel')}
                             </div>
                             <Badge variant="outline" className="font-mono text-[9px]">USD</Badge>
                         </div>
                         <div>
                             <h3 className="text-4xl font-space font-black tracking-tighter">${(data.business?.mrr || 0).toLocaleString()}</h3>
-                            <p className="text-xs text-muted-foreground mt-1">Monthly Recurring Revenue (MRR)</p>
+                            <p className="text-xs text-muted-foreground mt-1">{t('dashboard.mrr_label', 'Monthly Recurring Revenue (MRR)')}</p>
                         </div>
                         <div className="mt-6 space-y-3">
                             <div className="space-y-1">
-                                <div className="flex justify-between text-[10px] font-bold uppercase"><span>Enterprise</span><span>{data.business?.enterprise_pct || 0}%</span></div>
+                                <div className="flex justify-between text-[10px] font-bold uppercase"><span>{t('dashboard.enterprise', 'Enterprise')}</span><span>{data.business?.enterprise_pct || 0}%</span></div>
                                 <div className="h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-indigo-500 transition-all duration-1000" style={{ width: `${data.business?.enterprise_pct || 0}%` }} /></div>
                             </div>
                             <div className="space-y-1">
-                                <div className="flex justify-between text-[10px] font-bold uppercase"><span>Business</span><span>{data.business?.business_pct || 0}%</span></div>
+                                <div className="flex justify-between text-[10px] font-bold uppercase"><span>{t('dashboard.business', 'Business')}</span><span>{data.business?.business_pct || 0}%</span></div>
                                 <div className="h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${data.business?.business_pct || 0}%` }} /></div>
                             </div>
                         </div>
@@ -546,7 +546,7 @@ export default function DashboardHome() {
                     <div className="rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md">
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
-                                <HardDrive className="h-4 w-4 text-indigo-500" /> Cluster Health
+                                <HardDrive className="h-4 w-4 text-indigo-500" /> {t('dashboard.cluster_health', 'Cluster Health')}
                             </div>
                             <span className="relative flex h-2 w-2"><span className="animate-ping absolute h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative rounded-full h-2 w-2 bg-emerald-500"></span></span>
                         </div>
@@ -572,7 +572,7 @@ export default function DashboardHome() {
                     <div className="rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md flex flex-col">
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
-                                <Globe className="h-4 w-4 text-blue-400" /> Traffic Origins
+                                <Globe className="h-4 w-4 text-blue-400" /> {t('dashboard.traffic_origins', 'Traffic Origins')}
                             </div>
                         </div>
                         <div className="space-y-4 flex-1">
@@ -592,13 +592,13 @@ export default function DashboardHome() {
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
                                 <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-red-500">
-                                    <BellRing className="h-4 w-4" /> Alerts
+                                    <BellRing className="h-4 w-4" /> {t('dashboard.alerts', 'Alerts')}
                                 </div>
                                 <Badge className="bg-red-500 text-white hover:bg-red-600">{data.alerts?.length || 0}</Badge>
                             </div>
                             <Link href="/dashboard/alerts">
                                 <Button variant="ghost" size="sm" className="h-6 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground">
-                                    Show More <ChevronRight className="w-3 h-3 ml-1" />
+                                    {t('dashboard.show_more', 'Show More')} <ChevronRight className="w-3 h-3 ml-1" />
                                 </Button>
                             </Link>
                         </div>
@@ -619,7 +619,7 @@ export default function DashboardHome() {
                                 </div>
                             ))}
                             {(!data.alerts || data.alerts.length === 0) && (
-                                <div className="text-xs text-muted-foreground text-center py-8">All systems operational. No active alerts.</div>
+                                <div className="text-xs text-muted-foreground text-center py-8">{t('alerts.all_systems_operational', 'All systems operational. No active alerts.')}</div>
                             )}
                         </div>
                     </div>
@@ -628,7 +628,7 @@ export default function DashboardHome() {
                 {!isCentral && (canInviteUsers || canViewRoles || canViewPermissions) && (
                      <div className="md:col-span-4 rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md flex flex-col">
                         <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground mb-6">
-                            <Zap className="h-4 w-4 text-amber-500" /> Quick Actions
+                            <Zap className="h-4 w-4 text-amber-500" /> {t('dashboard.quick_actions', 'Quick Actions')}
                         </div>
                         <div className="flex flex-col gap-3 flex-1">
                             {canInviteUsers && (
@@ -638,7 +638,7 @@ export default function DashboardHome() {
                                     </div>
                                     <div className="text-left flex-1">
                                         <p className="text-sm font-bold">Invite Operator</p>
-                                        <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest mt-0.5">Manage Access</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest mt-0.5">{t('dashboard.manage_access', 'Manage Access')}</p>
                                     </div>
                                     <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                                 </Button>
@@ -650,8 +650,8 @@ export default function DashboardHome() {
                                         <ShieldCheck className="h-4 w-4 text-emerald-500" />
                                     </div>
                                     <div className="text-left flex-1">
-                                        <p className="text-sm font-bold">Configure Roles</p>
-                                        <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest mt-0.5">Access Matrices</p>
+                                        <p className="text-sm font-bold">{t('dashboard.configure_roles', 'Configure Roles')}</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest mt-0.5">{t('dashboard.access_matrices', 'Access Matrices')}</p>
                                     </div>
                                     <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                                 </Button>
@@ -663,8 +663,8 @@ export default function DashboardHome() {
                                         <Key className="h-4 w-4 text-blue-500" />
                                     </div>
                                     <div className="text-left flex-1">
-                                        <p className="text-sm font-bold">Review Permissions</p>
-                                        <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest mt-0.5">Capability Ledger</p>
+                                        <p className="text-sm font-bold">{t('dashboard.review_permissions', 'Review Permissions')}</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest mt-0.5">{t('dashboard.capability_ledger', 'Capability Ledger')}</p>
                                     </div>
                                     <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                                 </Button>
@@ -678,11 +678,11 @@ export default function DashboardHome() {
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-3 uppercase tracking-widest text-muted-foreground">
                                 <Activity className="h-4 w-4 text-primary" /> 
-                                {isCentral ? "Live System Audit" : "Live Node Audit"}
+                                {isCentral ? t('dashboard.live_system_audit', 'Live System Audit') : t('dashboard.live_node_audit', 'Live Node Audit')}
                             </div>
                             <Link href="/dashboard/audit-logs">
                                 <Button variant="ghost" size="sm" className="h-6 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground">
-                                    Show More <ChevronRight className="w-3 h-3 ml-1" />
+                                    {t('dashboard.show_more', 'Show More')} <ChevronRight className="w-3 h-3 ml-1" />
                                 </Button>
                             </Link>
                         </div>
@@ -721,7 +721,7 @@ export default function DashboardHome() {
                             {(!data.recent_activity || data.recent_activity.length === 0) && (
                                 <div className="text-xs text-muted-foreground text-center py-8 flex flex-col items-center">
                                     <FileText className="h-8 w-8 text-muted/30 mb-2" />
-                                    No recent audit logs found for this node.
+                                    {t('dashboard.no_audit_logs', 'No recent audit logs found for this node.')}
                                 </div>
                             )}
                         </div>
@@ -749,12 +749,13 @@ function StatCard({
     href?: string;
     trend?: string;
 }) {
+    const { t } = useTranslation();
     const content = (
         <>
             <div className={cn("absolute -right-8 -top-8 w-32 h-32 rounded-full blur-3xl opacity-20", bgClass)} />
             <div className="flex justify-between mb-4 relative z-10">
                 <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center border", bgClass)}>{icon}</div>
-                {trend === 'up' && <Badge className="bg-emerald-500/10 text-emerald-500 border-none text-[10px] animate-pulse">+ LIVE</Badge>}
+                {trend === 'up' && <Badge className="bg-emerald-500/10 text-emerald-500 border-none text-[10px] animate-pulse">+ {t('dashboard.live', 'LIVE')}</Badge>}
             </div>
             <div className="relative z-10">
                 <h3 className="text-3xl font-space font-black tracking-tighter tabular-nums">{value}</h3>
@@ -784,10 +785,11 @@ function DashboardLoader() {
 }
 
 function DashboardError({ message }: { message?: string }) {
+    const { t } = useTranslation();
     return (
         <div className="h-[60vh] flex flex-col items-center justify-center text-center space-y-4">
             <div className="w-12 h-12 bg-destructive/10 text-destructive rounded-full flex items-center justify-center font-bold">!</div>
-            <h1 className="text-xl font-space font-black">Node Connection Failed</h1>
+            <h1 className="text-xl font-space font-black">{t('dashboard.node_connection_failed', 'Node Connection Failed')}</h1>
             <p className="text-muted-foreground text-xs font-mono">{message}</p>
             <RetryButton />
         </div>

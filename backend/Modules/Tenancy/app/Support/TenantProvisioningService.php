@@ -22,6 +22,7 @@ class TenantProvisioningService
     public function __construct(
         protected TenantSubscriptionService $subscriptions,
         protected TenantDomainService $domains,
+        protected TenantLandingTemplateCatalog $landingTemplates,
     ) {
     }
 
@@ -35,6 +36,11 @@ class TenantProvisioningService
                 $tenant->plan = $payload['plan'];
                 $tenant->is_active = true;
                 $tenant->admin_email = strtolower($payload['admin_email']);
+                $tenant->business_type = $this->landingTemplates->normalizeBusinessType($payload['business_type'] ?? null);
+                $tenant->landing_page_template = $this->landingTemplates->normalizeTemplate(
+                    $payload['landing_page_template'] ?? null,
+                    $payload['business_type'] ?? null
+                );
                 $tenant->save();
 
                 return $tenant;
@@ -55,6 +61,8 @@ class TenantProvisioningService
                     'database/migrations/tenant',
                     'Modules/Identity/database/migrations/tenant',
                     'Modules/Core/database/migrations/tenant',
+                    'Modules/Inventory/database/migrations',
+                    'Modules/NightClub/database/migrations',
                 ],
             ]);
 

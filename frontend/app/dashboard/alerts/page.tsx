@@ -79,7 +79,7 @@ export default function SystemAlertsPage() {
     const dismissMut = useMutation({
         mutationFn: (id: string | number) => apiFetch(`/system/alerts/${id}`, { method: 'DELETE' }),
         onSuccess: () => {
-            toast.success("Alert dismissed.");
+            toast.success(t('alerts.toast_dismissed', 'Alert dismissed.'));
             queryClient.invalidateQueries({ queryKey: ['systemAlertsList'] });
             queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] }); // Update dashboard counters too!
         },
@@ -90,7 +90,7 @@ export default function SystemAlertsPage() {
     const dismissAllMut = useMutation({
         mutationFn: () => apiFetch(`/system/alerts/clear-all`, { method: 'POST' }),
         onSuccess: () => {
-            toast.success("All alerts have been cleared.");
+            toast.success(t('alerts.toast_cleared', 'All alerts have been cleared.'));
             queryClient.invalidateQueries({ queryKey: ['systemAlertsList'] });
             queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
         },
@@ -150,7 +150,7 @@ export default function SystemAlertsPage() {
                     items={[
                         { label: "Hive.OS", href: "/", icon: <Home className="h-4 w-4" /> }, 
                         { label: t('nav.dashboard', 'Dashboard'), href: "/dashboard" },
-                        { label: "System Alerts" }
+                        { label: t('alerts.system_alerts', 'System Alerts') }
                     ]} 
                 />
             </div>
@@ -163,8 +163,8 @@ export default function SystemAlertsPage() {
                             <BellRing className="h-6 w-6" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-space font-black tracking-tight text-foreground">System Alerts Log</h1>
-                            <p className="text-sm text-muted-foreground mt-1">Review active warnings, critical anomalies, and system notifications.</p>
+                            <h1 className="text-2xl font-space font-black tracking-tight text-foreground">{t('alerts.page_title', 'System Alerts Log')}</h1>
+                            <p className="text-sm text-muted-foreground mt-1">{t('alerts.page_desc', 'Review active warnings, critical anomalies, and system notifications.')}</p>
                         </div>
                     </div>
                     
@@ -178,25 +178,25 @@ export default function SystemAlertsPage() {
                                     disabled={alerts.length === 0 || dismissAllMut.isPending || !canManageAlerts}
                                 >
                                     {dismissAllMut.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />} 
-                                    Dismiss All
+                                    {t('alerts.dismiss_all', 'Dismiss All')}
                                 </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent className="rounded-[2rem] bg-background/95 backdrop-blur-xl border-border/50">
                                 <AlertDialogHeader>
                                     <AlertDialogTitle className="text-destructive flex items-center gap-2">
-                                        <AlertTriangle className="h-5 w-5" /> Clear All Alerts?
+                                        <AlertTriangle className="h-5 w-5" /> {t('alerts.clear_all_title', 'Clear All Alerts?')}
                                     </AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        Are you sure you want to permanently dismiss all active alerts? This action cannot be undone and will clear the system log for all operators.
+                                        {t('alerts.clear_all_desc', 'Are you sure you want to permanently dismiss all active alerts? This action cannot be undone and will clear the system log for all operators.')}
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                    <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                                    <AlertDialogCancel className="rounded-xl">{t('global.cancel', 'Cancel')}</AlertDialogCancel>
                                     <AlertDialogAction 
                                         className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90" 
                                         onClick={() => dismissAllMut.mutate()}
                                     >
-                                        Confirm Purge
+                                        {t('alerts.confirm_purge', 'Confirm Purge')}
                                     </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
@@ -207,7 +207,7 @@ export default function SystemAlertsPage() {
                 {/* Filter Tabs */}
                 <div className="flex flex-wrap items-center gap-2 mt-8 pt-6 border-t border-border/50">
                     <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground uppercase tracking-widest mr-2">
-                        <Filter className="w-4 h-4" /> Filter:
+                        <Filter className="w-4 h-4" /> {t('alerts.filter', 'Filter:')}
                     </div>
                     
                     <Button 
@@ -216,7 +216,7 @@ export default function SystemAlertsPage() {
                         onClick={() => setFilter('all')}
                         className="rounded-full font-bold tracking-wide"
                     >
-                        All Events
+                        {t('alerts.all_events', 'All Events')}
                         <Badge variant="secondary" className="ml-2 bg-background/20 text-current">{alerts.length}</Badge>
                     </Button>
                     
@@ -226,7 +226,7 @@ export default function SystemAlertsPage() {
                         onClick={() => setFilter('critical')}
                         className={cn("rounded-full font-bold tracking-wide", filter !== 'critical' && "hover:text-red-500 hover:border-red-500/50")}
                     >
-                        Critical
+                        {t('alerts.critical', 'Critical')}
                         <Badge variant="secondary" className={cn("ml-2", filter === 'critical' ? "bg-white/20 text-white" : "bg-red-500/10 text-red-500")}>{criticalCount}</Badge>
                     </Button>
                     
@@ -236,7 +236,7 @@ export default function SystemAlertsPage() {
                         onClick={() => setFilter('warning')}
                         className={cn("rounded-full font-bold tracking-wide", filter === 'warning' ? "bg-amber-500 hover:bg-amber-600 text-white" : "hover:text-amber-500 hover:border-amber-500/50")}
                     >
-                        Warnings
+                        {t('alerts.warnings', 'Warnings')}
                         <Badge variant="secondary" className={cn("ml-2", filter === 'warning' ? "bg-white/20 text-white" : "bg-amber-500/10 text-amber-500")}>{warningCount}</Badge>
                     </Button>
                     
@@ -246,7 +246,7 @@ export default function SystemAlertsPage() {
                         onClick={() => setFilter('info')}
                         className={cn("rounded-full font-bold tracking-wide", filter === 'info' ? "bg-blue-500 hover:bg-blue-600 text-white" : "hover:text-blue-500 hover:border-blue-500/50")}
                     >
-                        Info
+                        {t('alerts.info', 'Info')}
                         <Badge variant="secondary" className={cn("ml-2", filter === 'info' ? "bg-white/20 text-white" : "bg-blue-500/10 text-blue-500")}>{infoCount}</Badge>
                     </Button>
                 </div>
@@ -307,11 +307,11 @@ export default function SystemAlertsPage() {
                             <div className="h-20 w-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6">
                                 <CheckCircle2 className="h-10 w-10 text-emerald-500" />
                             </div>
-                            <h3 className="text-xl font-bold text-foreground">All Systems Operational</h3>
+                            <h3 className="text-xl font-bold text-foreground">{t('alerts.operational', 'All Systems Operational')}</h3>
                             <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
                                 {filter === 'all' 
-                                    ? "There are currently no active alerts or anomalies detected across the infrastructure." 
-                                    : `There are no active ${filter} alerts at this time.`}
+                                    ? t('alerts.no_active', 'There are currently no active alerts or anomalies detected across the infrastructure.') 
+                                    : t('alerts.no_active_filter', 'There are no active {level} alerts at this time.').replace('{level}', filter)}
                             </p>
                         </div>
                     )}

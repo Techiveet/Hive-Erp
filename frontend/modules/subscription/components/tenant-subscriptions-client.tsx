@@ -62,9 +62,9 @@ const PLAN_ORDER = ["larva", "startup", "business", "enterprise", "overlord"];
 const PLAN_MODULES_COUNT: Record<string, number> = {
   larva: 1,      // mailbox only
   startup: 4,    // mailbox + file_manager + image_editor + document_converter
-  business: 12,  // startup + video_player + media_library + analytics + audit + alerts + security + billing + inventory
-  enterprise: 16, // business + workflow_automation + api_access + api_docs + fleet_management
-  overlord: 17,  // all modules (including workflow_automation counted separately)
+  business: 13,  // business defaults + lounge_club_management
+  enterprise: 17, // enterprise defaults + lounge_club_management
+  overlord: 18,  // all catalog modules
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -627,4 +627,3 @@ export function TenantSubscriptionsClient() {
     </div>
   );
 }
-

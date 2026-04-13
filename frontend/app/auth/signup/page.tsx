@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { getAppOrigin, getBackendApiRoot } from "@/lib/runtime-context";
 import {
@@ -22,6 +23,7 @@ import {
   startPublicSubscriptionCheckout,
   fetchPublicSubscriptionOrder,
 } from "@/modules/subscription/api";
+import { FALLBACK_TENANT_BUSINESS_TYPES, resolveBusinessTypeCatalog } from "@/modules/tenancy/landing-template";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 // ─── Plan metadata ──────────────────────────────────────────────────────────
@@ -201,6 +203,7 @@ export default function TenantSignupPage() {
   // State
   const [step, setStep] = useState<Step>("plan");
   const [selectedPlan, setSelectedPlan] = useState<string>("business");
+  const [businessType, setBusinessType] = useState<string>("general");
   const [orgName, setOrgName] = useState("");
   const [tenantId, setTenantId] = useState("");
   const [adminName, setAdminName] = useState("");
@@ -253,6 +256,15 @@ export default function TenantSignupPage() {
   const catalogModules = (catalogPayload.catalog ?? []) as CatalogModule[];
   const planPricing = (catalogPayload.plan_pricing ?? {}) as Record<string, CatalogPlan>;
   const planDefaults = (catalogPayload.plan_defaults ?? {}) as Record<string, string[]>;
+  const businessTypes = useMemo(
+    () => resolveBusinessTypeCatalog(catalogPayload.business_types ?? FALLBACK_TENANT_BUSINESS_TYPES),
+    [catalogPayload.business_types]
+  );
+  const businessTypeMap = useMemo(
+    () => Object.fromEntries(businessTypes.map((option) => [option.key, option])),
+    [businessTypes]
+  );
+  const activeBusinessType = businessTypeMap[businessType] ?? businessTypes[0] ?? FALLBACK_TENANT_BUSINESS_TYPES[0];
   const planOptions = useMemo<SignupPlan[]>(() => {
     const hasLivePlans = Object.keys(planPricing).length > 0;
 
@@ -296,6 +308,12 @@ export default function TenantSignupPage() {
       setSelectedPlan(availablePlanKeys[0]);
     }
   }, [availablePlanKeys, selectedPlan]);
+
+  useEffect(() => {
+    if (!businessTypeMap[businessType]) {
+      setBusinessType((businessTypes[0] ?? FALLBACK_TENANT_BUSINESS_TYPES[0]).key);
+    }
+  }, [businessType, businessTypeMap, businessTypes]);
 
   const planMeta = planMap[selectedPlan] ?? planOptions[0] ?? { ...PLAN_META.business, key: "business", monthlyPriceEtb: fallbackAmount(PLAN_META.business) };
   const isFree = planMeta.monthlyPriceEtb <= 0;
@@ -586,6 +604,7 @@ export default function TenantSignupPage() {
       id: tenantId,
       name: orgName.trim(),
       plan: selectedPlan,
+      business_type: businessType,
       domain: workspaceHost,
       admin_name: adminName.trim(),
       admin_email: adminEmail.trim(),
@@ -855,6 +874,28 @@ export default function TenantSignupPage() {
                     )}
                   </div>
 
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Business Type *</Label>
+                    <Select value={businessType} onValueChange={setBusinessType}>
+                      <SelectTrigger className="h-12 bg-muted/30 border-border focus:ring-1 focus:ring-primary/50">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-border/50 shadow-xl">
+                        {businessTypes.map((option) => (
+                          <SelectItem key={option.key} value={option.key}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="rounded-[1.5rem] border border-border/50 bg-background/60 px-4 py-3">
+                      <p className="text-xs font-bold text-foreground">{activeBusinessType.label}</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {activeBusinessType.description}
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="border-t border-border/50 pt-6">
                     <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4">Administrator Account</p>
                     <div className="grid sm:grid-cols-2 gap-4">
@@ -961,6 +1002,7 @@ export default function TenantSignupPage() {
                 <div className="space-y-3">
                   {[
                     { label: "Plan", value: `${planMeta.label} — ${planMeta.price} ${planMeta.priceNote}` },
+                    { label: "Business Type", value: activeBusinessType.label },
                     { label: "Workspace ID", value: tenantId, mono: true },
                     { label: "Organization", value: orgName },
                     { label: "Admin", value: `${adminName} <${adminEmail}>`, mono: true },

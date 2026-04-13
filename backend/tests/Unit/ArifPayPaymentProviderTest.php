@@ -101,4 +101,44 @@ class ArifPayPaymentProviderTest extends TestCase
         $this->assertSame('txn_123', $result['transaction_id']);
         $this->assertNotNull($result['paid_at']);
     }
+
+    public function test_sync_order_reads_array_based_transaction_payload(): void
+    {
+        $gateway = $this->createMock(ArifPayGateway::class);
+        $provider = new ArifPayPaymentProvider($gateway);
+        $order = new TenantSubscriptionOrder([
+            'provider_session_id' => 'session_123',
+        ]);
+
+        $gateway->expects($this->once())
+            ->method('fetchCheckoutSession')
+            ->with('session_123')
+            ->willReturn([
+                [
+                    'transactionId' => 'txn_456',
+                    'transactionStatus' => 'SUCCESS',
+                ],
+            ]);
+
+        $result = $provider->syncOrder($order);
+
+        $this->assertSame('paid', $result['status']);
+        $this->assertSame('txn_456', $result['transaction_id']);
+        $this->assertNotNull($result['paid_at']);
+    }
+
+    public function test_ingest_notification_supports_list_payloads(): void
+    {
+        $provider = new ArifPayPaymentProvider($this->createMock(ArifPayGateway::class));
+        $order = new TenantSubscriptionOrder();
+
+        $result = $provider->ingestNotification($order, [[
+            'transactionStatus' => 'SUCCESS',
+            'transactionId' => 'txn_789',
+        ]]);
+
+        $this->assertSame('paid', $result['status']);
+        $this->assertSame('txn_789', $result['transaction_id']);
+        $this->assertNotNull($result['paid_at']);
+    }
 }

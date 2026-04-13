@@ -4,5 +4,7 @@
     "Subscription": true,
     "Core": true,
     "ActivityObserver": true,
-    "MailBox": true
+    "MailBox": true,
+    "NightClub": true,
+    "Inventory": true
 }

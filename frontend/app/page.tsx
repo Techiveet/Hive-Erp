@@ -16,7 +16,9 @@ import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { getBackendApiRoot, getBackendStorageUrl } from "@/lib/runtime-context";
+import { getBackendApiRoot, getBackendStorageUrl, getTenantHeaders, getTenantId, isTenantHost } from "@/lib/runtime-context";
+import { resolveLandingTemplate } from "@/modules/tenancy/landing-template";
+import { TenantBusinessLanding } from "@/modules/tenancy/components/tenant-business-landing";
 
 interface LandingUIProps {
   initialPortalName: string;
@@ -145,7 +147,11 @@ const PartnerSlider = ({ partners }: { partners: any[] }) => {
 };
 
 
-export default function LandingUI({ initialPortalName, initialTenantSlug, initialIsTenant }: LandingUIProps) {
+export default function LandingUI({
+  initialPortalName = "HIVE.OS",
+  initialTenantSlug = "hive",
+  initialIsTenant = false,
+}: Partial<LandingUIProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -153,6 +159,10 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
   
   // SCROLL TO TOP STATE
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const detectedTenantSlug = mounted && typeof window !== "undefined" ? (getTenantId() || initialTenantSlug) : initialTenantSlug;
+  const isTenantExperience = mounted && typeof window !== "undefined"
+    ? isTenantHost(window.location.hostname)
+    : initialIsTenant;
 
   useEffect(() => {
     setMounted(true);
@@ -167,9 +177,14 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
 
   // 🚀 FETCH PUBLIC BRAND SETTINGS
   const { data: brandData } = useQuery({
-    queryKey: ['publicBrandSettings'],
+    queryKey: ['publicBrandSettings', detectedTenantSlug, isTenantExperience],
     queryFn: async () => {
-        const res = await fetch(`${getBackendApiRoot()}/settings/brand/public`);
+        const res = await fetch(`${getBackendApiRoot()}/settings/brand/public`, {
+          headers: {
+            Accept: "application/json",
+            ...getTenantHeaders(),
+          },
+        });
         if (!res.ok) throw new Error("Failed to fetch brand settings");
         return res.json();
     },
@@ -177,7 +192,29 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
     retry: 1
   });
 
+  const { data: tenantLandingData } = useQuery({
+    queryKey: ['tenantPublicLanding', detectedTenantSlug],
+    queryFn: async () => {
+      const res = await fetch(`${getBackendApiRoot()}/tenant/public/landing`, {
+        headers: {
+          Accept: "application/json",
+          ...getTenantHeaders(),
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch tenant landing settings");
+      }
+
+      return res.json();
+    },
+    enabled: isTenantExperience,
+    staleTime: 300000,
+    retry: 1,
+  });
+
   const brandSettings = brandData?.data;
+  const tenantLandingPayload = tenantLandingData?.data;
   
   // Default to Dark Mode during hydration
   const isDark = mounted ? resolvedTheme === 'dark' : true; 
@@ -205,9 +242,11 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
       if (favUrl) link.href = favUrl;
     }
     if (brandSettings?.app_title) {
-        document.title = `${brandSettings.app_title} | Enterprise Operations`;
+        document.title = isTenantExperience
+          ? brandSettings.app_title
+          : `${brandSettings.app_title} | Enterprise Operations`;
     }
-  }, [brandSettings]);
+  }, [brandSettings, isTenantExperience]);
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -219,6 +258,10 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
 
   // Hexagon Background Logic
   useEffect(() => {
+    if (isTenantExperience) {
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -283,7 +326,7 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
         return () => window.removeEventListener('resize', handleResize);
       }
     }
-  }, [resolvedTheme]); 
+  }, [isTenantExperience, resolvedTheme]); 
 
   const partners = [
     { name: "COMMERCIAL BANK", logo: "/logos/cbe.png" },
@@ -301,6 +344,17 @@ export default function LandingUI({ initialPortalName, initialTenantSlug, initia
     { q: "Can we integrate existing legacy software?", a: "Absolutely. Hive comes with a comprehensive REST API and webhooks, allowing Techive Technology Solutions to build custom bridges to your existing software." },
     { q: "How does the multi-tenant architecture work?", a: "Each company gets its own isolated database schema. This guarantees zero data-bleed between clients while allowing us to push instantaneous system updates to everyone simultaneously." }
   ];
+
+  if (isTenantExperience) {
+    return (
+      <TenantBusinessLanding
+        brandSettings={brandSettings}
+        businessLabel={tenantLandingPayload?.business_type_meta?.label || tenantLandingPayload?.business_type || "General Business"}
+        template={resolveLandingTemplate(tenantLandingPayload?.landing_page_template)}
+        tenantName={tenantLandingPayload?.tenant?.name || brandSettings?.app_title || detectedTenantSlug || "Tenant Workspace"}
+      />
+    );
+  }
 
   return (
     <div className="relative min-h-screen w-full bg-background text-foreground font-sans selection:bg-primary/20 overflow-x-hidden">

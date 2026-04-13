@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/nightclub",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\NightClub\\": "app/",
+            "Modules\\NightClub\\Database\\Factories\\": "database/factories/",
+            "Modules\\NightClub\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\NightClub\\Tests\\": "tests/"
+        }
+    }
+}

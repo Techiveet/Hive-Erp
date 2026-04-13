@@ -1,0 +1,17 @@
+{
+    "system_alerts": "የስርዓት ማንቂያዎች",
+    "feed": "ምግብ",
+    "all_levels": "ሁሉም ደረጃዎች",
+    "info": "መረጃ",
+    "warning": "ማስጠንቀቂያ",
+    "critical": "ወሳኝ",
+    "search_alerts": "ማንቂያዎችን ይፈልጉ...",
+    "mark_all_read": "ሁሉንም እንደተነበበ ምልክት አድርግ",
+    "latest_events": "የቅርብ ጊዜ ክስተቶች",
+    "node_telemetry_errors_anomalies": "የኖድ ቴሌሜትሪ፣ ስህተቶች እና የስርዓት ችግሮች።",
+    "all_alerts_read": "ሁሉም ማንቂያዎች ተነበዋል",
+    "anomalies_resolved": "የስርዓት ችግሮች ተፈትተዋል።",
+    "dismiss": "አስወግድ",
+    "no_alerts_found": "መስፈርትዎን የሚያሟሉ ምንም ማንቂያዎች አልተገኙም።",
+    "all_systems_operational": "ሁሉም ስርዓቶች በትክክል እየሰሩ ናቸው። ምንም ንቁ ማንቂያዎች የሉም።"
+}

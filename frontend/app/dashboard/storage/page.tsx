@@ -86,16 +86,14 @@ export default function StoragePage() {
               <LockKeyhole className="h-9 w-9 text-primary" />
             </div>
             <h2 className="mt-6 text-3xl font-black tracking-tight text-foreground">
-              Media Library Subscription Required
+              {t('storage.subscription_required', 'Media Library Subscription Required')}
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
-              This tenant can only open the storage workspace after the `media_library`
-              module is activated. Subscribe once and the file manager, uploads, and shared
-              media hub will unlock immediately after payment confirmation.
+              {t('storage.subscription_desc', 'This tenant can only open the storage workspace after the `media_library` module is activated. Subscribe once and the file manager, uploads, and shared media hub will unlock immediately after payment confirmation.')}
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Button onClick={() => setCheckoutOpen(true)} className="rounded-xl px-6 font-semibold">
-                <Layers className="mr-2 h-4 w-4" /> Unlock with Checkout
+                <Layers className="mr-2 h-4 w-4" /> {t('storage.unlock_btn', 'Unlock with Checkout')}
               </Button>
             </div>
           </div>
@@ -107,8 +105,8 @@ export default function StoragePage() {
             onOpenChange={setCheckoutOpen}
             modules={[storageModule]}
             paymentMethods={paymentMethods}
-            title="Unlock the File Manager"
-            description="Activate Hive storage for this tenant. Complete checkout and your file manager unlocks automatically."
+            title={t('storage.checkout_title', 'Unlock the File Manager')}
+            description={t('storage.checkout_desc', 'Activate Hive storage for this tenant. Complete checkout and your file manager unlocks automatically.')}
           />
         ) : null}
       </>

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { Command, Menu, Search, LogOut, X, Loader2, FileType, Mail } from "lucide-react";
+import { Command, Menu, Search, LogOut, X, FileType, Mail, Boxes, ChevronDown, ChevronRight } from "lucide-react";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { DASHBOARD_NAV, DASHBOARD_SECONDARY, type NavItem } from "./nav";
@@ -74,6 +74,8 @@ export function MobileSidebar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isMounted, setIsMounted] = useState(false);
   const [isTenantNode, setIsTenantNode] = useState(false);
+  const [isModulesOpen, setIsModulesOpen] = useState(true);
+  const [isInventoryOpen, setIsInventoryOpen] = useState(true);
 
   // 🚀 PREVENT HYDRATION ERRORS
   useEffect(() => {
@@ -107,6 +109,7 @@ export function MobileSidebar() {
   };
 
   const hasAccess = (item: NavItem) => {
+    if (!isTenantNode && item.moduleId === "subscription") return false;
     // 🚀 THE FIX: Hide Tenant Management if the user is on a Tenant Node
     if (isTenantNode && item.href === '/dashboard/tenants') return false;
 
@@ -127,6 +130,17 @@ export function MobileSidebar() {
       hasAccess(item) && t(item.translationKey, item.fallbackLabel).toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery, t, hasAnyPermission, isTenantNode, isMounted]);
+
+  const moduleNavItems = filteredNav.filter((item) => item.moduleId === "inventory" || item.moduleId === "nightclub");
+  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "nightclub");
+  const inventoryModuleItems = moduleNavItems.filter((item) => item.moduleId === "inventory");
+  const nightclubModuleItems = moduleNavItems.filter((item) => item.moduleId === "nightclub");
+
+  useEffect(() => {
+    if (pathname.startsWith("/dashboard/inventory")) {
+      setIsInventoryOpen(true);
+    }
+  }, [pathname]);
 
   return (
     <Sheet>
@@ -167,18 +181,114 @@ export function MobileSidebar() {
           <ScrollArea className="flex-1 pr-2 -mr-2">
             <div className="space-y-6 pb-6">
               <nav className="space-y-1">
-                {filteredNav.map((item) => {
-                  const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
-                  const Icon = item.icon;
-                  return (
-                    <SheetClose asChild key={item.href}>
-                      <Link href={item.href} className={cn("flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200", active ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")}>
-                        <Icon className={cn("h-5 w-5", active ? "text-primary-foreground" : "text-muted-foreground")} />
-                        <span className="truncate">{t(item.translationKey, item.fallbackLabel)}</span>
-                      </Link>
-                    </SheetClose>
-                  );
-                })}
+                {searchQuery ? (
+                  filteredNav.map((item) => {
+                    const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                    const Icon = item.icon;
+                    return (
+                      <SheetClose asChild key={item.href}>
+                        <Link href={item.href} className={cn("flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200", active ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")}>
+                          <Icon className={cn("h-5 w-5", active ? "text-primary-foreground" : "text-muted-foreground")} />
+                          <span className="truncate">{t(item.translationKey, item.fallbackLabel)}</span>
+                        </Link>
+                      </SheetClose>
+                    );
+                  })
+                ) : (
+                  <>
+                    {standardNavItems.map((item) => {
+                      const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                      const Icon = item.icon;
+                      return (
+                        <SheetClose asChild key={item.href}>
+                          <Link href={item.href} className={cn("flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200", active ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")}>
+                            <Icon className={cn("h-5 w-5", active ? "text-primary-foreground" : "text-muted-foreground")} />
+                            <span className="truncate">{t(item.translationKey, item.fallbackLabel)}</span>
+                          </Link>
+                        </SheetClose>
+                      );
+                    })}
+
+                    {moduleNavItems.length > 0 && (
+                      <div className="pt-2 flex flex-col gap-1">
+                        <button
+                          onClick={() => setIsModulesOpen(!isModulesOpen)}
+                          className="flex items-center justify-between rounded-2xl px-4 py-2 text-xs font-black uppercase text-muted-foreground tracking-widest transition-colors hover:bg-muted/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Boxes className="h-4 w-4" />
+                            <span>{t('nav.modules', 'Modules')}</span>
+                          </div>
+                          {isModulesOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+
+                        {isModulesOpen && (
+                          <div className="flex flex-col gap-1">
+                            {inventoryModuleItems.length > 0 && (
+                              <div className="flex flex-col gap-1">
+                                <button
+                                  onClick={() => setIsInventoryOpen(!isInventoryOpen)}
+                                  className="flex items-center justify-between rounded-2xl px-4 py-2 text-xs font-black uppercase text-muted-foreground tracking-widest transition-colors hover:bg-muted/50"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <Boxes className="h-4 w-4" />
+                                    <span>{t("nav.inventory", "Inventory")}</span>
+                                  </div>
+                                  {isInventoryOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                </button>
+                                {isInventoryOpen && (
+                                  <div className="flex flex-col gap-1 pl-4">
+                                    {inventoryModuleItems.map((item) => {
+                                      const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                                      const Icon = item.icon;
+                                      return (
+                                        <SheetClose asChild key={item.href}>
+                                          <Link
+                                            href={item.href}
+                                            className={cn(
+                                              "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200",
+                                              active
+                                                ? "bg-primary/10 text-primary font-bold"
+                                                : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                                            )}
+                                          >
+                                            <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground")} />
+                                            <span className="truncate">{t(item.translationKey, item.fallbackLabel)}</span>
+                                          </Link>
+                                        </SheetClose>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {nightclubModuleItems.map((item) => {
+                              const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                              const Icon = item.icon;
+                              return (
+                                <SheetClose asChild key={item.href}>
+                                  <Link
+                                    href={item.href}
+                                    className={cn(
+                                      "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200",
+                                      active
+                                        ? "bg-primary/10 text-primary font-bold"
+                                        : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                                    )}
+                                  >
+                                    <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground")} />
+                                    <span className="truncate">{t(item.translationKey, item.fallbackLabel)}</span>
+                                  </Link>
+                                </SheetClose>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
 
                 {/* 🚀 APPS AND TOOLS SECTION */}
                 {!searchQuery && (

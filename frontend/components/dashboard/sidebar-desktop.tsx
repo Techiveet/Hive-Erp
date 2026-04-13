@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Loader2, Layers, ChevronDown, ChevronRight, FileType, Mail } from "lucide-react";
+import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Layers, ChevronDown, ChevronRight, FileType, Mail, Boxes } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { DASHBOARD_NAV, DASHBOARD_SECONDARY, type NavItem } from "./nav";
@@ -95,6 +95,8 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   const [isMounted, setIsMounted] = useState(false);
   const [isTenantNode, setIsTenantNode] = useState(false);
   
+  const [isModulesOpen, setIsModulesOpen] = useState(true);
+  const [isInventoryOpen, setIsInventoryOpen] = useState(true);
   // 🚀 Apps dropdown state
   const [isAppsOpen, setIsAppsOpen] = useState(false);
   const canAccessConverter = hasAnyPermission(["manage_storage"]);
@@ -129,6 +131,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   };
 
   const hasAccess = (item: NavItem) => {
+    if (!isTenantNode && item.moduleId === "subscription") return false;
     if (isTenantNode && item.href === '/dashboard/tenants') return false;
     if (!item.permissions || item.permissions.length === 0) return true;
     return hasAnyPermission(item.permissions);
@@ -147,6 +150,17 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
       hasAccess(item) && t(item.translationKey, item.fallbackLabel).toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery, t, hasAnyPermission, isTenantNode, isMounted]);
+
+  const moduleNavItems = filteredNav.filter((item) => item.moduleId === "inventory" || item.moduleId === "nightclub");
+  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "nightclub");
+  const inventoryModuleItems = moduleNavItems.filter((item) => item.moduleId === "inventory");
+  const nightclubModuleItems = moduleNavItems.filter((item) => item.moduleId === "nightclub");
+
+  useEffect(() => {
+    if (pathname.startsWith("/dashboard/inventory")) {
+      setIsInventoryOpen(true);
+    }
+  }, [pathname]);
 
   const brand = useMemo(() => {
     const isDark = resolvedTheme === 'dark';
@@ -200,22 +214,157 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
       )}
       
       <nav id="tour-sidebar-nav" className="mt-4 flex-1 space-y-2 overflow-y-auto min-h-0 py-2 no-scrollbar">
-        {filteredNav.map((item) => {
-          const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
-          const Icon = item.icon;
-          const label = t(item.translationKey, item.fallbackLabel);
+        {searchQuery ? (
+          filteredNav.map((item) => {
+            const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+            const Icon = item.icon;
+            const label = t(item.translationKey, item.fallbackLabel);
 
-          return (
-            <Link key={item.href} id={item.tourId} href={item.href} title={collapsed ? label : undefined}
-              className={cn("group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all duration-200", 
-                collapsed ? "justify-center px-0 py-3" : "", 
-                active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "text-muted-foreground font-semibold hover:bg-muted/80 hover:text-foreground border border-transparent")} 
-            >
-              <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary-foreground" : "")} />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </Link>
-          );
-        })}
+            return (
+              <Link key={item.href} id={item.tourId} href={item.href} title={collapsed ? label : undefined}
+                className={cn("group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all duration-200", 
+                  collapsed ? "justify-center px-0 py-3" : "", 
+                  active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "text-muted-foreground font-semibold hover:bg-muted/80 hover:text-foreground border border-transparent")} 
+              >
+                <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary-foreground" : "")} />
+                {!collapsed && <span className="truncate">{label}</span>}
+              </Link>
+            );
+          })
+        ) : (
+          <>
+            {standardNavItems.map((item) => {
+              const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+              const Icon = item.icon;
+              const label = t(item.translationKey, item.fallbackLabel);
+
+              return (
+                <Link key={item.href} id={item.tourId} href={item.href} title={collapsed ? label : undefined}
+                  className={cn("group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all duration-200", 
+                    collapsed ? "justify-center px-0 py-3" : "", 
+                    active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "text-muted-foreground font-semibold hover:bg-muted/80 hover:text-foreground border border-transparent")} 
+                >
+                  <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary-foreground" : "")} />
+                  {!collapsed && <span className="truncate">{label}</span>}
+                </Link>
+              );
+            })}
+
+            {moduleNavItems.length > 0 && !collapsed && (
+              <div className="mt-2 flex flex-col gap-1">
+                <button
+                  onClick={() => setIsModulesOpen(!isModulesOpen)}
+                  className="group flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/80 hover:text-foreground outline-none"
+                >
+                  <div className="flex items-center gap-3">
+                    <Boxes className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{t('nav.modules', 'Modules')}</span>
+                  </div>
+                  {isModulesOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
+                </button>
+
+                {isModulesOpen && (
+                  <div className="flex flex-col gap-1 pl-4 mt-1 animate-in slide-in-from-top-2 duration-200">
+                    {inventoryModuleItems.length > 0 && (
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => setIsInventoryOpen(!isInventoryOpen)}
+                          className="group flex items-center justify-between rounded-2xl px-3 py-2 text-sm font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground outline-none"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Boxes className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{t("nav.inventory", "Inventory")}</span>
+                          </div>
+                          {isInventoryOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
+                        </button>
+                        {isInventoryOpen && (
+                          <div className="flex flex-col gap-1 pl-4">
+                            {inventoryModuleItems.map((item) => {
+                              const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                              const Icon = item.icon;
+                              const label = t(item.translationKey, item.fallbackLabel);
+
+                              return (
+                                <Link
+                                  key={item.href}
+                                  id={item.tourId}
+                                  href={item.href}
+                                  className={cn(
+                                    "group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-all duration-200",
+                                    active
+                                      ? "bg-primary/10 text-primary font-bold"
+                                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                                  )}
+                                >
+                                  <Icon className="h-4 w-4 shrink-0" />
+                                  <span className="truncate">{label}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {nightclubModuleItems.map((item) => {
+                      const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                      const Icon = item.icon;
+                      const label = t(item.translationKey, item.fallbackLabel);
+
+                      return (
+                        <Link
+                          key={item.href}
+                          id={item.tourId}
+                          href={item.href}
+                          className={cn(
+                            "group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-all duration-200",
+                            active
+                              ? "bg-primary/10 text-primary font-bold"
+                              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                          )}
+                        >
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {moduleNavItems.length > 0 && collapsed && (
+              <div className="mt-1 flex flex-col gap-1">
+                <button
+                  onClick={() => setIsModulesOpen(!isModulesOpen)}
+                  title={t('nav.modules', 'Modules')}
+                  className="group flex items-center justify-center rounded-2xl px-0 py-3 text-sm transition-all duration-200 text-muted-foreground hover:bg-muted/80 hover:text-foreground border border-transparent"
+                >
+                  <Boxes className="h-4 w-4 shrink-0" />
+                </button>
+
+                {isModulesOpen && moduleNavItems.map((item) => {
+                  const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                  const Icon = item.icon;
+                  const label = t(item.translationKey, item.fallbackLabel);
+
+                  return (
+                    <Link key={item.href} id={item.tourId} href={item.href} title={label}
+                      className={cn(
+                        "group flex items-center justify-center rounded-2xl px-0 py-3 text-sm transition-all duration-200",
+                        active
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold"
+                          : "text-muted-foreground font-semibold hover:bg-muted/80 hover:text-foreground border border-transparent"
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary-foreground" : "")} />
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
 
         {/* 🚀 THE NEW APPS DROPDOWN */}
         {isMounted && canAccessConverter && !searchQuery && (

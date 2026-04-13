@@ -10,12 +10,14 @@ use Modules\Subscription\Support\PaymentProviderManager;
 use Modules\Subscription\Support\TenantModuleCatalog;
 use Modules\Subscription\Support\TenantSubscriptionOrderService;
 use Modules\Tenancy\Models\Tenant;
+use Modules\Tenancy\Support\TenantLandingTemplateCatalog;
 
 class TenantSubscriptionCheckoutController extends Controller
 {
     public function __construct(
         protected TenantSubscriptionOrderService $orders,
         protected PaymentProviderManager $payments,
+        protected TenantLandingTemplateCatalog $landingTemplates,
     ) {
     }
 
@@ -28,6 +30,7 @@ class TenantSubscriptionCheckoutController extends Controller
                 'catalog' => TenantModuleCatalog::catalog(),
                 'plan_defaults' => array_intersect_key(TenantModuleCatalog::planDefaults(), $activePlanPricing),
                 'plan_pricing' => $activePlanPricing,
+                'business_types' => $this->landingTemplates->businessTypesPayload(),
                 'payment_provider' => $this->payments->activeProviderPayload(),
                 'payment_providers' => $this->payments->publicProvidersPayload(),
                 'payment_methods' => $this->payments->paymentMethods(),
@@ -54,6 +57,7 @@ class TenantSubscriptionCheckoutController extends Controller
             'id' => ['required', 'string', 'alpha_dash', 'max:20'],
             'name' => ['required', 'string', 'max:255'],
             'plan' => ['required', 'string', Rule::in(TenantModuleCatalog::activePlanKeys())],
+            'business_type' => ['required', 'string', Rule::in($this->landingTemplates->businessTypeKeys())],
             'domain' => ['required', 'string', 'max:255'],
             'admin_name' => ['required', 'string', 'max:255'],
             'admin_email' => ['required', 'email', 'max:255'],
@@ -267,6 +271,7 @@ class TenantSubscriptionCheckoutController extends Controller
 
         $input['id'] = $input['id'] ?? $input['tenant_id'] ?? null;
         $input['name'] = $input['name'] ?? $input['tenant_name'] ?? null;
+        $input['business_type'] = $input['business_type'] ?? 'general';
         $input['domain'] = $input['domain'] ?? $this->defaultTenantDomain($input['id'] ?? null);
         $input['success_url_base'] = $input['success_url_base'] ?? $frontendBaseUrl;
         $input['cancel_url_base'] = $input['cancel_url_base'] ?? $frontendBaseUrl;

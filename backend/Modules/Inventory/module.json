@@ -1,0 +1,15 @@
+{
+    "name": "Inventory",
+    "alias": "inventory",
+    "description": "Tenant inventory management module.",
+    "keywords": [
+        "inventory",
+        "stock",
+        "warehouse"
+    ],
+    "priority": 0,
+    "providers": [
+        "Modules\\Inventory\\Providers\\InventoryServiceProvider"
+    ],
+    "files": []
+}

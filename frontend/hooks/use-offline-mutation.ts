@@ -83,7 +83,11 @@ export const useOfflineMutation = <
 
   const mutate = React.useCallback(
     (variables: TVariables) => {
-      void mutateAsync(variables);
+      void mutateAsync(variables).catch(() => {
+        // React Query already routes these failures through the mutation's
+        // onError callback, so swallowing here prevents an unhandled promise
+        // rejection from surfacing as a noisy runtime overlay.
+      });
     },
     [mutateAsync],
   );

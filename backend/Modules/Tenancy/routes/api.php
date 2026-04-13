@@ -4,6 +4,7 @@ use App\Http\Middleware\InitializeTenantContext;
 use Illuminate\Support\Facades\Route;
 use Modules\Tenancy\Http\Controllers\Export\TenantExportController;
 use Modules\Tenancy\Http\Controllers\TenantController;
+use Modules\Tenancy\Http\Controllers\TenantLandingController;
 
 $centralDomains = collect(array_merge(
     config('tenancy.central_domains', []),
@@ -59,6 +60,8 @@ foreach ($centralDomains as $domain) {
 Route::middleware([
     InitializeTenantContext::class,
 ])->prefix('v1')->group(function () {
+    Route::get('/tenant/public/landing', [TenantLandingController::class, 'showPublic']);
+
     Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
         // Tenant subscription routes now live in the Subscription module.
     });

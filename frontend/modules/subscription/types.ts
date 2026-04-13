@@ -1,3 +1,5 @@
+import type { TenantBusinessTypeDefinition } from "@/modules/tenancy/landing-template";
+
 export type TenantCatalogModule = {
   slug: string;
   name: string;
@@ -84,6 +86,13 @@ export type TenantPaymentProvider = {
   payment_methods?: TenantPaymentMethod[];
 };
 
+export type TenantSubscriptionCatalogPayload = {
+  catalog: TenantCatalogModule[];
+  plan_defaults: Record<string, string[]>;
+  plan_pricing: Record<string, TenantPlanPricing>;
+  business_types: TenantBusinessTypeDefinition[];
+};
+
 export type TenantWorkspaceSubscription = {
   id: string;
   tenant_id: string;
@@ -117,6 +126,7 @@ export type TenantSubscriptionOrder = {
   admin_name?: string | null;
   admin_email?: string | null;
   plan: string;
+  business_type?: string | null;
   billing_phone?: string | null;
   line_items: Array<{
     type: string;

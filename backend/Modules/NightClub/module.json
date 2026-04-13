@@ -1,0 +1,11 @@
+{
+    "name": "NightClub",
+    "alias": "nightclub",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\NightClub\\Providers\\NightClubServiceProvider"
+    ],
+    "files": []
+}

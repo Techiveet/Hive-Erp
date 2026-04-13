@@ -52,8 +52,17 @@ class TenantDomainService
         $normalized = preg_replace('#:\d+$#', '', $normalized) ?? $normalized;
         $normalized = trim($normalized, '.');
 
+        if ($normalized === '') {
+            return '';
+        }
+
         if (function_exists('idn_to_ascii')) {
-            $ascii = idn_to_ascii($normalized, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
+            try {
+                $ascii = idn_to_ascii($normalized, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
+            } catch (\ValueError) {
+                return '';
+            }
+
             if (is_string($ascii) && $ascii !== '') {
                 $normalized = Str::lower($ascii);
             }

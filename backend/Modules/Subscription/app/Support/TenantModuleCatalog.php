@@ -100,6 +100,17 @@ class TenantModuleCatalog
                 'tone' => 'lime',
                 'recommended_plans' => ['business', 'enterprise', 'overlord'],
                 'monthly_price_etb' => 649,
+                'route_hints' => ['/dashboard/inventory'],
+            ],
+            [
+                'slug' => 'lounge_club_management',
+                'name' => 'Lounge & Club Management',
+                'description' => 'Digitize VIP tables, reservations, floor operations, and service orders with direct inventory linkage.',
+                'category' => 'Hospitality',
+                'tone' => 'fuchsia',
+                'recommended_plans' => ['business', 'enterprise', 'overlord'],
+                'monthly_price_etb' => 749,
+                'route_hints' => ['/dashboard/nightclub'],
             ],
             [
                 'slug' => 'fleet_management',
@@ -320,6 +331,7 @@ class TenantModuleCatalog
                 'security_management',
                 'invoice_billing',
                 'inventory_control',
+                'lounge_club_management',
             ],
 
             // Enterprise: adds automation, APIs, fleet, and developer tools
@@ -339,6 +351,7 @@ class TenantModuleCatalog
                 'security_management',
                 'invoice_billing',
                 'inventory_control',
+                'lounge_club_management',
                 'fleet_management',
             ],
 

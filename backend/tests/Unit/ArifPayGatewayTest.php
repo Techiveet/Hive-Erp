@@ -24,6 +24,25 @@ class ArifPayGatewayTest extends TestCase
         $this->assertTrue($gateway->isConfigured());
     }
 
+    public function test_checkout_session_url_defaults_to_documented_api_path(): void
+    {
+        $settings = $this->createMock(PaymentGatewaySettings::class);
+        $settings->method('providerConfig')
+            ->with('arifpay')
+            ->willReturn([
+                'api_key' => 'arifpay_live_key',
+                'base_url' => 'https://gateway.arifpay.net',
+                'sandbox' => false,
+            ]);
+
+        $gateway = new ArifPayGateway($settings);
+
+        $this->assertSame(
+            'https://gateway.arifpay.net/api/checkout/session',
+            $gateway->checkoutSessionUrl()
+        );
+    }
+
     public function test_it_normalizes_supported_ethiopian_mobile_formats(): void
     {
         $settings = $this->createMock(PaymentGatewaySettings::class);

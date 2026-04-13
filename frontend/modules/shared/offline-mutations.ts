@@ -17,6 +17,7 @@ import {
   updateTenant,
 } from "@/modules/tenancy/api";
 import type { TenantModuleSubscriptionPayload } from "@/modules/subscription/types";
+import type { TenantLandingTemplate } from "@/modules/tenancy/landing-template";
 
 const tenantInvalidationKeys: QueryKey[] = [["tenants"]];
 const userInvalidationKeys: QueryKey[] = [["users"]];
@@ -41,6 +42,8 @@ export type TenantCreateOfflinePayload = {
   id: string;
   name: string;
   plan: string;
+  business_type: string;
+  landing_page_template: TenantLandingTemplate;
   domain: string;
   admin_name: string;
   admin_email: string;
@@ -53,6 +56,8 @@ export type TenantUpdateOfflinePayload = {
   data: {
     name: string;
     plan: string;
+    business_type: string;
+    landing_page_template: TenantLandingTemplate;
     admin_name: string;
     admin_email: string;
     admin_password: string;

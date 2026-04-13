@@ -3,8 +3,9 @@
 import * as React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { Server, PlusCircle, Pencil, Trash2, Loader2, Calendar, Globe, AlertCircle, Power, UserX, UserPlus, Mail, Eye, UserCheck, Layers } from "lucide-react";
+import { Server, PlusCircle, Pencil, Trash2, Loader2, Calendar, Globe, AlertCircle, Power, UserX, UserPlus, Mail, Eye, UserCheck, Layers, LayoutTemplate } from "lucide-react";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -29,8 +30,22 @@ import {
 import { fetchSubscriptionCatalog } from "@/modules/subscription/api";
 import { ModuleSubscriptionSummary } from "@/modules/subscription/components/module-subscription-summary";
 import type { TenantCustomModuleInput } from "@/modules/subscription/types";
+import { type VirtualFile } from "@/components/ui/code-editor";
 import { fetchTenants } from "@/modules/tenancy/api";
 import { TenantDomainManager } from "@/modules/tenancy/components/tenant-domain-manager";
+import { TenantLandingTemplateEditor } from "@/modules/tenancy/components/tenant-landing-template-editor";
+import {
+    applyLandingTemplateMeta,
+    buildTenantLandingPreviewHtml,
+    FALLBACK_TENANT_BUSINESS_TYPES,
+    FALLBACK_TENANT_LANDING_TEMPLATE,
+    formatLandingTemplateJson,
+    parseLandingTemplateJson,
+    resolveBusinessTypeCatalog,
+    resolveLandingTemplate,
+    resolveTemplateVariant,
+    type TenantLandingPreviewBranding,
+} from "@/modules/tenancy/landing-template";
 import { getBackendApiRoot } from "@/lib/runtime-context";
 import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -47,6 +62,15 @@ const EMPTY_PLAN_DEFAULTS: Record<string, string[]> = {};
 const EMPTY_STRING_LIST: string[] = [];
 const DEFAULT_TENANT_ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "localhost").trim();
 const DEFAULT_TENANT_SERVER_IP = (process.env.NEXT_PUBLIC_SERVER_IP || "").trim();
+const LANDING_TEMPLATE_FILE = "landing-template.json";
+
+const createTemplateFiles = (content: string): VirtualFile[] => [
+    {
+        name: LANDING_TEMPLATE_FILE,
+        language: "json",
+        content,
+    },
+];
 
 const sanitizeCustomModules = (modules: TenantCustomModuleInput[]): TenantCustomModuleInput[] =>
     modules
@@ -61,8 +85,24 @@ const sanitizeCustomModules = (modules: TenantCustomModuleInput[]): TenantCustom
 const areStringListsEqual = (left: string[], right: string[]): boolean =>
     left.length === right.length && left.every((value, index) => value === right[index]);
 
+const sortStringList = (values: string[]): string[] =>
+    [...values].sort((left, right) => left.localeCompare(right));
+
+const normalizeCustomModulesForCompare = (modules: TenantCustomModuleInput[]) =>
+    sanitizeCustomModules(modules)
+        .map((module) => ({
+            slug: module.slug ?? "",
+            name: module.name,
+            category: module.category ?? "Custom",
+            description: module.description ?? "",
+        }))
+        .sort((left, right) =>
+            `${left.slug}:${left.name}:${left.category}`.localeCompare(`${right.slug}:${right.name}:${right.category}`)
+        );
+
 export function TenantsTableClient({ companySettings, brandingSettings }: Props) {
     const queryClient = useQueryClient();
+    const { resolvedTheme } = useTheme();
     const { hasAnyPermission } = usePermissions();
     const { t, locale } = useTranslation(); // 🚀 Grab translator AND locale
 
@@ -93,6 +133,11 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
     const [formAdminPassword, setFormAdminPassword] = React.useState("");
     const [formSelectedModules, setFormSelectedModules] = React.useState<string[]>([]);
     const [formCustomModules, setFormCustomModules] = React.useState<TenantCustomModuleInput[]>([]);
+    const [formBusinessType, setFormBusinessType] = React.useState("general");
+    const [landingTemplateFiles, setLandingTemplateFiles] = React.useState<VirtualFile[]>(
+        createTemplateFiles(formatLandingTemplateJson(FALLBACK_TENANT_LANDING_TEMPLATE))
+    );
+    const [showLandingPreview, setShowLandingPreview] = React.useState(true);
 
     const triggerAudit = React.useCallback(async (action: string, description: string) => {
         if (typeof window === "undefined") return;
@@ -123,6 +168,157 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         () => subscriptionCatalogData?.data?.plan_defaults ?? EMPTY_PLAN_DEFAULTS,
         [subscriptionCatalogData]
     );
+    const businessTypes = React.useMemo(
+        () => resolveBusinessTypeCatalog(subscriptionCatalogData?.data?.business_types ?? FALLBACK_TENANT_BUSINESS_TYPES),
+        [subscriptionCatalogData]
+    );
+    const businessTypeMap = React.useMemo(
+        () => Object.fromEntries(businessTypes.map((option) => [option.key, option])),
+        [businessTypes]
+    );
+    const activeBusinessTypeDefinition = businessTypeMap[formBusinessType] ?? businessTypes[0] ?? FALLBACK_TENANT_BUSINESS_TYPES[0];
+    const templateVariants = activeBusinessTypeDefinition.templates ?? [];
+    const landingTemplateContent = landingTemplateFiles[0]?.content ?? formatLandingTemplateJson(activeBusinessTypeDefinition.default_template);
+    const parsedLandingTemplateState = React.useMemo(() => {
+        try {
+            return {
+                template: parseLandingTemplateJson(landingTemplateContent, activeBusinessTypeDefinition.default_template),
+                error: null as string | null,
+            };
+        } catch (error) {
+            return {
+                template: resolveLandingTemplate(activeBusinessTypeDefinition.default_template),
+                error: error instanceof Error ? error.message : "Invalid JSON",
+            };
+        }
+    }, [activeBusinessTypeDefinition.default_template, landingTemplateContent]);
+    const selectedTemplateVariant = React.useMemo(
+        () => resolveTemplateVariant(
+            activeBusinessTypeDefinition,
+            parsedLandingTemplateState.template.meta?.template_key
+        ),
+        [activeBusinessTypeDefinition, parsedLandingTemplateState.template.meta?.template_key]
+    );
+    const selectedTemplateKey = parsedLandingTemplateState.template.meta?.template_key
+        ?? activeBusinessTypeDefinition.default_template_key
+        ?? selectedTemplateVariant.key;
+    const isCustomTemplate = React.useMemo(
+        () => formatLandingTemplateJson(parsedLandingTemplateState.template) !== formatLandingTemplateJson(selectedTemplateVariant.template),
+        [parsedLandingTemplateState.template, selectedTemplateVariant.template]
+    );
+    const previewColorMode = resolvedTheme === "light" ? "light" : "dark";
+    const previewBranding = React.useMemo<TenantLandingPreviewBranding>(() => ({
+        app_title: formName || brandingSettings?.app_title || "Tenant Brand",
+        footer_text: brandingSettings?.footer_text,
+        primary_color: (brandingSettings as Record<string, any> | undefined)?.primary_color,
+        font_family: (brandingSettings as Record<string, any> | undefined)?.font_family,
+    }), [brandingSettings, formName]);
+    const landingPreviewHtml = React.useMemo(
+        () => buildTenantLandingPreviewHtml(
+            parsedLandingTemplateState.template,
+            previewBranding.app_title || "Tenant Brand",
+            activeBusinessTypeDefinition.label,
+            {
+                colorMode: previewColorMode,
+                branding: previewBranding,
+            }
+        ),
+        [activeBusinessTypeDefinition.label, parsedLandingTemplateState.template, previewBranding, previewColorMode]
+    );
+    const initialEditSnapshot = React.useMemo(() => {
+        if (!editingTenant) {
+            return null;
+        }
+
+        const originalBusinessType =
+            businessTypeMap[editingTenant.business_type] ?? businessTypes[0] ?? FALLBACK_TENANT_BUSINESS_TYPES[0];
+        const originalTemplate = resolveLandingTemplate(
+            editingTenant.landing_page_template,
+            originalBusinessType.default_template
+        );
+        const originalVariant = resolveTemplateVariant(
+            originalBusinessType,
+            originalTemplate.meta?.template_key
+        );
+
+        return {
+            name: String(editingTenant.name ?? ""),
+            plan: String(editingTenant.plan ?? "business"),
+            business_type: originalBusinessType.key,
+            landing_template: formatLandingTemplateJson(
+                applyLandingTemplateMeta(originalTemplate, {
+                    business_type: originalBusinessType.key,
+                    business_label: originalBusinessType.label,
+                    template_key: originalTemplate.meta?.template_key ?? originalVariant.key,
+                    template_label: originalTemplate.meta?.template_label ?? originalVariant.label,
+                    template_description: originalTemplate.meta?.template_description ?? originalVariant.description,
+                    is_custom: originalTemplate.meta?.is_custom
+                        ?? (formatLandingTemplateJson(originalTemplate) !== formatLandingTemplateJson(originalVariant.template)),
+                })
+            ),
+            admin_name: "",
+            admin_email: String(editingTenant.admin_email ?? ""),
+            admin_password: "",
+            enabled_modules: sortStringList(editingTenant.module_subscriptions?.enabled_modules || []),
+            custom_modules: normalizeCustomModulesForCompare(editingTenant.module_subscriptions?.custom_modules || []),
+        };
+    }, [businessTypeMap, businessTypes, editingTenant]);
+    const currentEditSnapshot = React.useMemo(() => {
+        if (!editingTenant) {
+            return null;
+        }
+
+        return {
+            name: formName,
+            plan: formPlan,
+            business_type: formBusinessType,
+            landing_template: formatLandingTemplateJson(parsedLandingTemplateState.template),
+            admin_name: formAdminName,
+            admin_email: formAdminEmail,
+            admin_password: formAdminPassword,
+            enabled_modules: sortStringList(formSelectedModules),
+            custom_modules: normalizeCustomModulesForCompare(formCustomModules),
+        };
+    }, [
+        editingTenant,
+        formAdminEmail,
+        formAdminName,
+        formAdminPassword,
+        formBusinessType,
+        formCustomModules,
+        formName,
+        formPlan,
+        formSelectedModules,
+        parsedLandingTemplateState.template,
+    ]);
+    const isEditDirty = React.useMemo(() => {
+        if (!isEdit || !initialEditSnapshot || !currentEditSnapshot) {
+            return false;
+        }
+
+        return JSON.stringify(initialEditSnapshot) !== JSON.stringify(currentEditSnapshot);
+    }, [currentEditSnapshot, initialEditSnapshot, isEdit]);
+
+    const buildPresetTemplate = React.useCallback((definition: typeof activeBusinessTypeDefinition, templateKey?: string | null) => {
+        const variant = resolveTemplateVariant(definition, templateKey);
+
+        return applyLandingTemplateMeta(variant.template, {
+            business_type: definition.key,
+            business_label: definition.label,
+            template_key: variant.key,
+            template_label: variant.label,
+            template_description: variant.description,
+            is_custom: false,
+        });
+    }, []);
+
+    const writeLandingTemplate = React.useCallback((template: unknown, fallback?: typeof FALLBACK_TENANT_LANDING_TEMPLATE) => {
+        setLandingTemplateFiles(
+            createTemplateFiles(
+                formatLandingTemplateJson(resolveLandingTemplate(template, fallback ?? FALLBACK_TENANT_LANDING_TEMPLATE))
+            )
+        );
+    }, []);
 
     const handlePlanChange = React.useCallback((nextPlan: string) => {
         setFormPlan(nextPlan);
@@ -137,6 +333,38 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         );
         setFormCustomModules([]);
     }, [isEdit, subscriptionPlanDefaults]);
+
+    const handleBusinessTypeChange = React.useCallback((nextType: string) => {
+        const definition = businessTypeMap[nextType] ?? businessTypes[0] ?? FALLBACK_TENANT_BUSINESS_TYPES[0];
+        setFormBusinessType(definition.key);
+        writeLandingTemplate(
+            buildPresetTemplate(definition, definition.default_template_key),
+            definition.default_template
+        );
+    }, [buildPresetTemplate, businessTypeMap, businessTypes, writeLandingTemplate]);
+
+    const handleTemplateVariantChange = React.useCallback((nextTemplateKey: string) => {
+        const definition = businessTypeMap[formBusinessType] ?? businessTypes[0] ?? FALLBACK_TENANT_BUSINESS_TYPES[0];
+        writeLandingTemplate(buildPresetTemplate(definition, nextTemplateKey), definition.default_template);
+    }, [buildPresetTemplate, businessTypeMap, businessTypes, formBusinessType, writeLandingTemplate]);
+
+    const handleResetTemplate = React.useCallback(() => {
+        writeLandingTemplate(
+            buildPresetTemplate(activeBusinessTypeDefinition, selectedTemplateVariant.key),
+            activeBusinessTypeDefinition.default_template
+        );
+    }, [activeBusinessTypeDefinition, buildPresetTemplate, selectedTemplateVariant.key, writeLandingTemplate]);
+
+    React.useEffect(() => {
+        if (!businessTypeMap[formBusinessType]) {
+            const definition = businessTypes[0] ?? FALLBACK_TENANT_BUSINESS_TYPES[0];
+            setFormBusinessType(definition.key);
+            writeLandingTemplate(
+                buildPresetTemplate(definition, definition.default_template_key),
+                definition.default_template
+            );
+        }
+    }, [buildPresetTemplate, businessTypeMap, businessTypes, formBusinessType, writeLandingTemplate]);
 
     const createTenantMut = useOfflineMutation<any, Error, TenantCreateOfflinePayload>({
         definition: createTenantOfflineMutationDefinition,
@@ -260,7 +488,13 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
     };
     
     const openCreate = () => {
+        const defaultBusinessType = businessTypes[0] ?? FALLBACK_TENANT_BUSINESS_TYPES[0];
         setEditingTenant(null); setFormId(""); setFormName(""); setFormPlan("business"); setFormDomain("");
+        setFormBusinessType(defaultBusinessType.key);
+        writeLandingTemplate(
+            buildPresetTemplate(defaultBusinessType, defaultBusinessType.default_template_key),
+            defaultBusinessType.default_template
+        );
         setFormAdminName(""); setFormAdminEmail(""); setFormAdminPassword("");
         setFormSelectedModules([...(subscriptionPlanDefaults.business ?? EMPTY_STRING_LIST)]);
         setFormCustomModules([]);
@@ -269,7 +503,27 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
     };
     
     const openEdit = (tenant: any) => {
+        const selectedBusinessType = businessTypeMap[tenant.business_type] ?? businessTypes[0] ?? FALLBACK_TENANT_BUSINESS_TYPES[0];
+        const existingTemplate = resolveLandingTemplate(
+            tenant.landing_page_template,
+            selectedBusinessType.default_template
+        );
+        const sourceVariant = resolveTemplateVariant(
+            selectedBusinessType,
+            existingTemplate.meta?.template_key
+        );
+        const hydratedTemplate = applyLandingTemplateMeta(existingTemplate, {
+            business_type: selectedBusinessType.key,
+            business_label: selectedBusinessType.label,
+            template_key: existingTemplate.meta?.template_key ?? sourceVariant.key,
+            template_label: existingTemplate.meta?.template_label ?? sourceVariant.label,
+            template_description: existingTemplate.meta?.template_description ?? sourceVariant.description,
+            is_custom: existingTemplate.meta?.is_custom
+                ?? (formatLandingTemplateJson(existingTemplate) !== formatLandingTemplateJson(sourceVariant.template)),
+        });
         setEditingTenant(tenant); setFormId(tenant.id); setFormName(tenant.name); setFormPlan(tenant.plan); setFormDomain(tenant.domain);
+        setFormBusinessType(selectedBusinessType.key);
+        writeLandingTemplate(hydratedTemplate, selectedBusinessType.default_template);
         setFormAdminEmail(tenant.admin_email || ""); setFormAdminName(""); setFormAdminPassword("");
         setFormSelectedModules(tenant.module_subscriptions?.enabled_modules || []);
         setFormCustomModules(tenant.module_subscriptions?.custom_modules || []);
@@ -279,12 +533,24 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (parsedLandingTemplateState.error) {
+            toast.error("Fix the landing template JSON before saving.");
+            return;
+        }
+
         if (isEdit && editingTenant) {
+            if (!isEditDirty) {
+                toast.info("No changes to update yet.");
+                return;
+            }
+
             const payload: TenantUpdateOfflinePayload = {
                 id: editingTenant.id,
                 data: {
                     name: formName,
                     plan: formPlan,
+                    business_type: formBusinessType,
+                    landing_page_template: parsedLandingTemplateState.template,
                     admin_name: formAdminName,
                     admin_email: formAdminEmail,
                     admin_password: formAdminPassword,
@@ -302,6 +568,8 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
             id: formId,
             name: formName,
             plan: formPlan,
+            business_type: formBusinessType,
+            landing_page_template: parsedLandingTemplateState.template,
             domain: formDomain,
             admin_name: formAdminName,
             admin_email: formAdminEmail,
@@ -338,6 +606,16 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         { 
             id: "plan", accessorFn: (row) => row.plan, header: t('tenants.col_plan', "Capacity Plan"), 
             cell: ({ row }) => getPlanBadge(row.original.plan) 
+        },
+        {
+            id: "business_type",
+            accessorFn: (row) => row.business_type_meta?.label || row.business_type || "General Business",
+            header: "Business Type",
+            cell: ({ row }) => (
+                <Badge variant="outline" className="border-primary/20 bg-primary/5 text-[10px] uppercase tracking-wider text-primary">
+                    {row.original.business_type_meta?.label || row.original.business_type || "General Business"}
+                </Badge>
+            ),
         },
         {
             id: "modules",
@@ -447,7 +725,7 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
 
             {/* CREATE / EDIT DIALOG */}
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if(!open) triggerAudit('viewed', 'Closed Provisioning/Reconfiguration Matrix'); }}>
-                <DialogContent className="sm:max-w-[760px] p-0 overflow-hidden rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl max-h-[90vh] flex flex-col">
+                <DialogContent className="sm:max-w-[1180px] p-0 overflow-hidden rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl max-h-[92vh] flex flex-col">
                     <div className="px-6 py-5 border-b border-border/40 bg-muted/20 shrink-0"><DialogHeader><DialogTitle className="text-xl font-space font-black">{isEdit ? t('tenants.reconfigure', "Reconfigure Node") : t('tenants.provision_new', "Provision New Node")}</DialogTitle></DialogHeader></div>
                     <div className="overflow-y-auto p-6 scrollbar-thin">
                         <form id="tenant-form" onSubmit={handleSubmit} className="space-y-6">
@@ -473,6 +751,46 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                                         Module subscriptions are managed in the dedicated subscriptions workspace. New tenants will still inherit the defaults for the selected plan.
                                     </div>
                                 </div>
+                                <div className="col-span-2 space-y-4">
+                                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1.5 border-b border-border/40 pb-2"><LayoutTemplate className="h-3.5 w-3.5" /> Business Landing</h4>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs uppercase tracking-widest text-muted-foreground">Business Type</Label>
+                                        <Select value={formBusinessType} onValueChange={handleBusinessTypeChange}>
+                                            <SelectTrigger className="h-11 bg-muted/30">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="rounded-xl border-border/50 shadow-xl">
+                                                {businessTypes.map((option) => (
+                                                    <SelectItem key={option.key} value={option.key}>
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground">
+                                            {activeBusinessTypeDefinition.description}
+                                        </p>
+                                    </div>
+                                    {parsedLandingTemplateState.error ? (
+                                        <div className="rounded-[1rem] border border-destructive/20 bg-destructive/5 px-4 py-3 text-xs text-destructive">
+                                            Preview is using the last valid preset because the JSON is invalid. Fix the editor content before saving.
+                                        </div>
+                                    ) : null}
+                                    <TenantLandingTemplateEditor
+                                        businessTypeLabel={activeBusinessTypeDefinition.label}
+                                        businessTypeDescription={activeBusinessTypeDefinition.description}
+                                        templateVariants={templateVariants}
+                                        selectedTemplateKey={selectedTemplateKey}
+                                        onTemplateVariantChange={handleTemplateVariantChange}
+                                        onResetTemplate={handleResetTemplate}
+                                        isCustomTemplate={isCustomTemplate}
+                                        files={landingTemplateFiles}
+                                        setFiles={(files) => setLandingTemplateFiles(files.slice(0, 1))}
+                                        showPreview={showLandingPreview}
+                                        setShowPreview={setShowLandingPreview}
+                                        previewHtml={landingPreviewHtml}
+                                    />
+                                </div>
                                 <div className="col-span-2 space-y-4 pt-2">
                                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1.5 border-b border-border/40 pb-2"><UserPlus className="h-3.5 w-3.5" /> {t('tenants.super_admin', "Super Admin Settings")}</h4>
                                     <div className="grid grid-cols-2 gap-4">
@@ -484,7 +802,27 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                             </div>
                         </form>
                     </div>
-                    <div className="px-6 py-4 border-t border-border/40 bg-muted/20 flex justify-end gap-3 shrink-0"><Button variant="ghost" onClick={() => setDialogOpen(false)}>{t('global.cancel', 'Cancel')}</Button><Button type="submit" form="tenant-form" disabled={isSaving} className="rounded-xl px-8 font-bold">{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isEdit ? t('global.update', "Update") : t('global.provision', "Provision")}</Button></div>
+                    <div className="px-6 py-4 border-t border-border/40 bg-muted/20 flex flex-col gap-3 shrink-0 sm:flex-row sm:items-center">
+                        <div className="text-xs text-muted-foreground sm:mr-auto">
+                            {parsedLandingTemplateState.error
+                                ? "Fix the landing template JSON before saving."
+                                : isEdit
+                                    ? (isEditDirty ? "Unsaved changes are ready to publish." : "No changes detected yet.")
+                                    : "The landing preview updates live while you edit."}
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <Button variant="ghost" type="button" onClick={() => setDialogOpen(false)}>{t('global.cancel', 'Cancel')}</Button>
+                            <Button
+                                type="submit"
+                                form="tenant-form"
+                                disabled={isSaving || !!parsedLandingTemplateState.error || (isEdit && !isEditDirty)}
+                                className="rounded-xl px-8 font-bold"
+                            >
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {isEdit ? t('global.update', "Update") : t('global.provision', "Provision")}
+                            </Button>
+                        </div>
+                    </div>
                 </DialogContent>
             </Dialog>
 
@@ -501,6 +839,12 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
                             <div>
                                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{t('tenants.view_plan', "Capacity Plan")}</p>
                                 {viewTenant?.plan && getPlanBadge(viewTenant.plan)}
+                            </div>
+                            <div>
+                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">Business Type</p>
+                                <Badge variant="outline" className="border-primary/20 bg-primary/5 text-[10px] uppercase tracking-wider text-primary">
+                                    {viewTenant?.business_type_meta?.label || viewTenant?.business_type || "General Business"}
+                                </Badge>
                             </div>
                             <div>
                                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">Subscription</p>

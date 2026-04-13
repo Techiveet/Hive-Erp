@@ -38,6 +38,7 @@ class TenantModuleSubscriptionsSeeder extends Seeder
     protected function subscriptionProfileFor(Tenant $tenant): array
     {
         $defaults = TenantModuleCatalog::defaultsForPlan($tenant->plan);
+        $businessType = strtolower((string) ($tenant->business_type ?? 'general'));
 
         return match ($tenant->id) {
             'apple' => [
@@ -64,11 +65,101 @@ class TenantModuleSubscriptionsSeeder extends Seeder
                     ],
                 ],
             ],
+            'selam-bistro' => [
+                'enabled_modules' => array_values(array_unique([
+                    ...$defaults,
+                    'inventory_control',
+                    'advanced_analytics',
+                ])),
+                'custom_modules' => [
+                    [
+                        'name' => 'Table Reservation Board',
+                        'category' => 'Hospitality',
+                        'description' => 'Coordinate bookings, floor allocation, and VIP seating from one service dashboard.',
+                    ],
+                    [
+                        'name' => 'Kitchen Pass Monitor',
+                        'category' => 'Operations',
+                        'description' => 'Track order throughput, prep timing, and ready-to-serve queues during peak hours.',
+                    ],
+                ],
+            ],
+            'nile-suites' => [
+                'enabled_modules' => array_values(array_unique([
+                    ...$defaults,
+                    'advanced_analytics',
+                    'api_access',
+                ])),
+                'custom_modules' => [
+                    [
+                        'name' => 'Property Operations Desk',
+                        'category' => 'Hospitality',
+                        'description' => 'Manage room readiness, concierge requests, and service turnaround with a premium guest lens.',
+                    ],
+                    [
+                        'name' => 'Guest Journey Concierge',
+                        'category' => 'Experience',
+                        'description' => 'Bundle transport, upgrades, and amenity requests into one polished guest workflow.',
+                    ],
+                ],
+            ],
+            'afya-clinic' => [
+                'enabled_modules' => array_values(array_unique([
+                    ...$defaults,
+                    'advanced_analytics',
+                    'api_access',
+                ])),
+                'custom_modules' => [
+                    [
+                        'name' => 'Patient Intake Flow',
+                        'category' => 'Care Delivery',
+                        'description' => 'Capture pre-visit details, triage steps, and follow-up notes in a guided intake sequence.',
+                    ],
+                    [
+                        'name' => 'Referral Coordination Hub',
+                        'category' => 'Care Delivery',
+                        'description' => 'Track specialist referrals, appointment progress, and callback readiness with less friction.',
+                    ],
+                ],
+            ],
             default => [
-                'enabled_modules' => $defaults,
-                'custom_modules' => [],
+                'enabled_modules' => match ($businessType) {
+                    'retail' => array_values(array_unique([
+                        ...$defaults,
+                        'invoice_billing',
+                        'inventory_control',
+                        'advanced_analytics',
+                    ])),
+                    'restaurant' => array_values(array_unique([
+                        ...$defaults,
+                        'inventory_control',
+                        'advanced_analytics',
+                        'lounge_club_management',
+                    ])),
+                    'hotel' => array_values(array_unique([
+                        ...$defaults,
+                        'advanced_analytics',
+                        'security_management',
+                        'lounge_club_management',
+                    ])),
+                    'clinic' => array_values(array_unique([
+                        ...$defaults,
+                        'advanced_analytics',
+                        'security_management',
+                    ])),
+                    default => $defaults,
+                },
+                'custom_modules' => match ($businessType) {
+                    'retail' => [
+                        [
+                            'name' => 'Loyalty Rewards Studio',
+                            'category' => 'Commerce',
+                            'description' => 'Launch member tiers, retention offers, and curated repeat-purchase campaigns.',
+                        ],
+                    ],
+                    default => [],
+                },
             ],
         };
     }
 }
-

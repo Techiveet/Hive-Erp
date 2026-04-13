@@ -155,11 +155,11 @@ class ArifPayGateway
 
     protected function apiBaseUrl(): string
     {
-        $root = rtrim((string) ($this->config()['base_url'] ?? 'https://gateway.arifpay.net'), '/');
+        $root = rtrim((string) ($this->config()['base_url'] ?? 'https://gateway.arifpay.net/api'), '/');
         $hasApiPath = (bool) preg_match('#/(?:v\d+|api)(?:/sandbox)?$#', $root);
 
         if (!$hasApiPath) {
-            $root .= '/v0';
+            $root .= '/api';
         }
 
         if (

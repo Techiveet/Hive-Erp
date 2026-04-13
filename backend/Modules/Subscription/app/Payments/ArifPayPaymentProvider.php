@@ -124,8 +124,8 @@ class ArifPayPaymentProvider implements PaymentProvider
     public function syncOrder(TenantSubscriptionOrder $order): array
     {
         $session = $this->gateway->fetchCheckoutSession((string) $order->provider_session_id);
-        $transaction = $session['transaction'] ?? [];
-        $status = $this->mapStatus((string) ($transaction['transactionStatus'] ?? 'PENDING'));
+        $transaction = $this->extractTransactionPayload($session);
+        $status = $this->mapStatus((string) ($transaction['transactionStatus'] ?? $transaction['status'] ?? 'PENDING'));
 
         return [
             'status' => $status,
@@ -138,6 +138,7 @@ class ArifPayPaymentProvider implements PaymentProvider
     public function ingestNotification(TenantSubscriptionOrder $order, array $payload, array $headers = []): array
     {
         $root = is_array($payload['data'] ?? null) ? $payload['data'] : $payload;
+        $root = $this->extractTransactionPayload($root);
         $transaction = is_array($root['transaction'] ?? null) ? $root['transaction'] : [];
         $status = $this->mapStatus((string) ($transaction['transactionStatus'] ?? $root['transactionStatus'] ?? $root['status'] ?? ''));
 
@@ -157,5 +158,30 @@ class ArifPayPaymentProvider implements PaymentProvider
             'CANCELLED', 'CANCELED' => 'cancelled',
             default => 'payment_processing',
         };
+    }
+
+    protected function extractTransactionPayload(array $payload): array
+    {
+        if (is_array($payload['transaction'] ?? null)) {
+            return $payload['transaction'];
+        }
+
+        if (is_array($payload['transactions'] ?? null)) {
+            foreach ($payload['transactions'] as $candidate) {
+                if (is_array($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        if (array_is_list($payload)) {
+            foreach ($payload as $candidate) {
+                if (is_array($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return $payload;
     }
 }
