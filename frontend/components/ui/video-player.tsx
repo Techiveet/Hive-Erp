@@ -51,6 +51,7 @@ export function VideoPlayer({
   const hlsRef = useRef<Hls | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pipPendingRef = useRef(false); // guard against double-firing PiP
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -215,61 +216,86 @@ export function VideoPlayer({
     const updateTracks = () => {
         const textTracks = video.textTracks;
         for (let i = 0; i < textTracks.length; i++) {
+          // Use 'showing' so native PiP window also carries the active subtitle
           textTracks[i].mode = i === activeSubtitle ? 'showing' : 'hidden';
         }
     };
+    // Run immediately, then once more after a tick to beat race conditions
     updateTracks();
-    const timer = setTimeout(updateTracks, 250); 
+    const timer = setTimeout(updateTracks, 300);
     return () => clearTimeout(timer);
   }, [activeSubtitle, localSubtitles]);
 
   useEffect(() => {
-    // Safely check if PiP method is a function on a real video element, 
-    // to strictly prevent the "requestPictureInPicture is not a function" browser error.
-    const v = document.createElement('video');
-    setCanPiP(
-      typeof document !== 'undefined' && 
-      (typeof v.requestPictureInPicture === 'function' || typeof (v as any).webkitSetPresentationMode === 'function')
-    );
-
+    // Feature-detect PiP support on mount using a real (not dummy) video element check
     const video = videoRef.current;
     if (!video) return;
-    const onEnterPiP = () => setIsPiPMode(true);
-    const onLeavePiP = () => setIsPiPMode(false);
-    
-    // Standard PiP events
+
+    const pipSupported =
+      typeof document !== 'undefined' &&
+      (document as any).pictureInPictureEnabled === true &&
+      typeof video.requestPictureInPicture === 'function';
+
+    const safariPipSupported =
+      typeof (video as any).webkitSetPresentationMode === 'function';
+
+    setCanPiP(pipSupported || safariPipSupported);
+
+    const onEnterPiP = () => { setIsPiPMode(true); pipPendingRef.current = false; };
+    const onLeavePiP = () => { setIsPiPMode(false); pipPendingRef.current = false; };
+    const onSafariPiP = (e: any) => {
+      const inPiP = e.target.webkitPresentationMode === 'picture-in-picture';
+      setIsPiPMode(inPiP);
+      pipPendingRef.current = false;
+    };
+
     video.addEventListener('enterpictureinpicture', onEnterPiP);
     video.addEventListener('leavepictureinpicture', onLeavePiP);
-    
-    // Safari PiP events
-    video.addEventListener('webkitpresentationmodechanged', (e: any) => {
-        setIsPiPMode(e.target.webkitPresentationMode === 'picture-in-picture');
-    });
+    video.addEventListener('webkitpresentationmodechanged', onSafariPiP);
 
     return () => {
       video.removeEventListener('enterpictureinpicture', onEnterPiP);
       video.removeEventListener('leavepictureinpicture', onLeavePiP);
+      video.removeEventListener('webkitpresentationmodechanged', onSafariPiP);
+      // Exit PiP if the component unmounts while PiP is active (Vimeo does this too)
+      if (document.pictureInPictureElement === video) {
+        document.exitPictureInPicture().catch(() => {});
+      }
     };
   }, []);
 
   const togglePiP = async () => {
-    if (!videoRef.current) return;
-    try {
-      if (typeof document !== 'undefined' && document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-      } else if (typeof videoRef.current.requestPictureInPicture === 'function') {
-        await videoRef.current.requestPictureInPicture();
-      } else if (typeof (videoRef.current as any).webkitSetPresentationMode === 'function') {
-        (videoRef.current as any).webkitSetPresentationMode(
-          (videoRef.current as any).webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture"
-        );
-      } else {
-        toast.error('PiP requires HTTPS/localhost, or your browser restricts it (e.g., Firefox).');
-      }
-    } catch (error) {
-      console.error("PiP failed", error);
-      toast.error('PiP requires HTTPS/localhost, or your browser restricts it (e.g., Firefox).');
+    if (!videoRef.current || pipPendingRef.current) return; // debounce
+    const video = videoRef.current;
+
+    // Safari (webkit) path
+    if (typeof (video as any).webkitSetPresentationMode === 'function') {
+      const current = (video as any).webkitPresentationMode;
+      pipPendingRef.current = true;
+      (video as any).webkitSetPresentationMode(
+        current === 'picture-in-picture' ? 'inline' : 'picture-in-picture'
+      );
+      return;
     }
+
+    // Standard W3C path
+    if (typeof document !== 'undefined' && (document as any).pictureInPictureEnabled) {
+      pipPendingRef.current = true;
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        } else {
+          await video.requestPictureInPicture();
+        }
+      } catch (err) {
+        pipPendingRef.current = false;
+        console.warn('PiP error:', err);
+        toast.error('Could not activate Picture-in-Picture. Ensure you are on HTTPS and the video has loaded.');
+      }
+      return;
+    }
+
+    toast.error('Your browser does not support Picture-in-Picture.');
   };
 
   useEffect(() => {
@@ -526,18 +552,16 @@ export function VideoPlayer({
         )}
       </div>
 
-      {/* Floating Hover PiP Button */}
-      {!hasError && (
-        <div className={cn(
-          "absolute top-6 right-6 lg:right-8 z-30 transition-all duration-300",
-          showControls ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 pointer-events-none"
-        )}>
-          <button 
-            onClick={(e) => { e.stopPropagation(); togglePiP(); }} 
-            className="flex items-center justify-center w-12 h-12 bg-[#3c3639]/80 hover:bg-[#52494e]/90 backdrop-blur-md rounded-xl transition-all shadow-xl hover:scale-105 group/pip"
-            title="Picture in Picture"
+      {/* Floating Hover PiP Button — only shown when PiP is active so user can restore the window */}
+      {canPiP && isPiPMode && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-top-2 duration-300">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); togglePiP(); }}
+            className="flex items-center gap-2 bg-primary/90 hover:bg-primary text-primary-foreground text-xs font-bold px-4 py-2 rounded-full shadow-xl transition-all hover:scale-105"
+            title="Return from Picture in Picture"
           >
-            <PictureInPicture className="h-6 w-6 text-white/90 group-hover/pip:text-white transition-colors" />
+            <PictureInPicture className="h-4 w-4" /> Playing in PiP
           </button>
         </div>
       )}
@@ -717,10 +741,23 @@ export function VideoPlayer({
                   )}
                 </div>
 
-                {/* PiP Button */}
-                <button type="button" onClick={togglePiP} className={cn("transition-colors", isPiPMode ? "text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" : "text-white hover:text-white/80")} title="Picture in Picture (i)">
-                  <PictureInPicture className="h-5 w-5" />
-                </button>
+                {/* PiP Button — always visible in controls bar, greyed out if not supported */}
+                {canPiP && (
+                  <button
+                    type="button"
+                    onClick={togglePiP}
+                    disabled={pipPendingRef.current}
+                    className={cn(
+                      "transition-all duration-200",
+                      isPiPMode
+                        ? "text-primary drop-shadow-[0_0_10px_hsl(var(--primary)/0.8)] scale-110"
+                        : "text-white/80 hover:text-white hover:scale-110"
+                    )}
+                    title={isPiPMode ? 'Exit Picture in Picture (i)' : 'Picture in Picture (i)'}
+                  >
+                    <PictureInPicture className="h-5 w-5" />
+                  </button>
+                )}
 
                 <button type="button" onClick={toggleFullscreen} className="text-white hover:text-primary transition-transform hover:scale-110 ml-1" title="Fullscreen (f)">
                   {isFullscreen ? <Minimize className="h-6 w-6" /> : <Maximize className="h-6 w-6" />}
