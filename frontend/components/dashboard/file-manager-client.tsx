@@ -4,6 +4,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Rnd } from "react-rnd";
 import {
   Folder, Star, Share2, Trash2, Clock, Settings, Search, 
   Image as ImageIcon, Video, FileText, Music, Plus, UploadCloud, 
@@ -1940,20 +1941,34 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
 
       {/* IN-TAB MINIPLAYER */}
       {miniPlayerFile && (
-        <div className="fixed bottom-6 right-6 lg:right-8 z-[200] w-80 sm:w-96 shadow-[0_30px_60px_rgba(0,0,0,0.6)] rounded-[1.5rem] overflow-hidden border border-border bg-black animate-in slide-in-from-bottom-10 fade-in duration-500 transition-all hover:scale-[1.02] group/minip">
+        <Rnd
+          default={{
+            x: typeof window !== "undefined" ? window.innerWidth - 420 : 0,
+            y: typeof window !== "undefined" ? window.innerHeight - 260 : 0,
+            width: 384,
+            height: "auto",
+          }}
+          minWidth={280}
+          maxWidth={800}
+          bounds="window"
+          className="z-[200] shadow-[0_30px_60px_rgba(0,0,0,0.8)] rounded-xl sm:rounded-[1.5rem] overflow-hidden border border-border/50 bg-black group/minip !transition-none"
+          lockAspectRatio={16/9}
+          enableResizing={{ top: true, right: true, bottom: true, left: true, topRight: true, bottomRight: true, bottomLeft: true, topLeft: true }}
+          dragHandleClassName="drag-handle"
+        >
           {/* Miniplayer Header Overlay */}
-          <div className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/80 to-transparent p-3 flex justify-between items-start opacity-0 group-hover/minip:opacity-100 transition-opacity duration-300">
-             <span className="text-[10px] font-bold text-white truncate pr-4 drop-shadow-md">{miniPlayerFile.media_details?.name}</span>
-             <div className="flex items-center gap-1.5 shrink-0">
+          <div className="drag-handle absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/90 via-black/50 to-transparent p-3 flex justify-between items-start opacity-0 group-hover/minip:opacity-100 transition-opacity duration-300 cursor-move">
+             <span className="text-[10px] sm:text-xs font-bold text-white truncate pr-4 drop-shadow-md select-none pointer-events-none">{miniPlayerFile.media_details?.name}</span>
+             <div className="flex items-center gap-1.5 shrink-0" onPointerDown={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
                  <button onClick={() => { setSelectedFile(miniPlayerFile); setMiniPlayerFile(null); }} className="h-7 w-7 bg-black/50 hover:bg-emerald-500 backdrop-blur text-white hover:text-emerald-950 rounded-lg flex items-center justify-center transition-colors shadow-sm" title="Expand"><Maximize className="h-3.5 w-3.5"/></button>
                  <button onClick={() => setMiniPlayerFile(null)} className="h-7 w-7 bg-black/50 hover:bg-destructive backdrop-blur text-white rounded-lg flex items-center justify-center transition-colors shadow-sm" title="Close Miniplayer"><X className="h-3.5 w-3.5"/></button>
              </div>
           </div>
           {/* Miniplayer Video Container */}
-          <div className="w-full aspect-video bg-black flex items-center justify-center relative">
+          <div className="w-full h-full bg-black flex items-center justify-center relative">
              {renderFilePreview(miniPlayerFile, true)}
           </div>
-        </div>
+        </Rnd>
       )}
     </div>
   );

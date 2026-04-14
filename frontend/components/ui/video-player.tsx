@@ -95,6 +95,7 @@ export function VideoPlayer({
   const seekAnimTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [localSubtitles, setLocalSubtitles] = useState<SubtitleTrack[]>([]);
+  const [activeCaptionText, setActiveCaptionText] = useState<string>('');
   const subtitlesString = JSON.stringify(subtitles);
 
   // 1. Fetch Subtitles securely using the provided Auth Token
@@ -230,12 +231,33 @@ export function VideoPlayer({
     const updateTracks = () => {
         const textTracks = video.textTracks;
         for (let i = 0; i < textTracks.length; i++) {
-          textTracks[i].mode = i === activeSubtitle ? 'showing' : 'hidden';
+          textTracks[i].mode = 'hidden'; // Always hidden to avoid native browser inconsistency
+          textTracks[i].oncuechange = null; // reset handler
+        }
+        
+        if (activeSubtitle !== -1 && textTracks[activeSubtitle]) {
+          const activeTrack = textTracks[activeSubtitle];
+          activeTrack.mode = 'hidden';
+          activeTrack.oncuechange = () => {
+             const activeCues = activeTrack.activeCues;
+             if (activeCues && activeCues.length > 0) {
+               // Render the first active cue text directly to state
+               setActiveCaptionText((activeCues[0] as VTTCue).text);
+             } else {
+               setActiveCaptionText("");
+             }
+          };
+          // Trigger once in case it already has cues
+          if (activeTrack.activeCues && activeTrack.activeCues.length > 0) {
+              setActiveCaptionText((activeTrack.activeCues[0] as VTTCue).text);
+          }
+        } else {
+          setActiveCaptionText("");
         }
     };
     updateTracks();
     const timer = setTimeout(updateTracks, 250); 
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); setActiveCaptionText(""); };
   }, [activeSubtitle, localSubtitles]);
 
   // Native PiP logic removed in favor of In-Tab Miniplayer
@@ -497,6 +519,19 @@ export function VideoPlayer({
           </div>
         )}
       </div>
+
+      {/* Custom Caption Overlay */}
+      {activeCaptionText && (
+        <div className={cn(
+          "absolute inset-x-0 flex flex-col items-center justify-end pointer-events-none z-[45] transition-opacity drop-shadow-xl p-4 sm:p-8",
+          showControls || !isPlaying ? "bottom-24" : "bottom-6",
+          isMiniplayer ? "bottom-2" : ""
+        )}>
+            <div className="bg-black/80 backdrop-blur-sm text-white font-bold text-sm md:text-lg lg:text-xl px-4 py-2 rounded-xl border border-white/10 shadow-[0_4px_25px_rgba(0,0,0,0.8)] text-center break-words max-w-[90%] whitespace-pre-wrap">
+               {activeCaptionText}
+            </div>
+        </div>
+      )}
 
       {/* Floating Hover PiP Removed in favor of Miniplayer */}
 
