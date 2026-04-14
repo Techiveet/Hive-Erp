@@ -880,6 +880,13 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   const [searchQuery, setSearchQuery] = React.useState("");
   const [showAllFiles, setShowAllFiles] = React.useState(false);
 
+  // --- Creation, Upload & Preview States (Hoisted) ---
+  const [isCreateFolderOpen, setIsCreateFolderOpen] = React.useState(false);
+  const [isUploadOpen, setIsUploadOpen] = React.useState(false);
+  const [selectedFile, setSelectedFile] = React.useState<any | null>(null); 
+  const [miniPlayerFile, setMiniPlayerFile] = React.useState<any | null>(null);
+  const [miniPlayerTime, setMiniPlayerTime] = React.useState<number>(0);
+
   // --- Advanced UI State ---
   const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = React.useState<"date" | "name" | "size">("date");
@@ -919,10 +926,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     }
   }, [hasVideoPlayer]);
 
-  // --- Creation & Upload States ---
-  const [isCreateFolderOpen, setIsCreateFolderOpen] = React.useState(false);
-  const [isUploadOpen, setIsUploadOpen] = React.useState(false);
-  const [selectedFile, setSelectedFile] = React.useState<any | null>(null); 
+  // --- Other Upload States ---
   const [folderName, setFolderName] = React.useState("");
   const [uploadBaseName, setUploadBaseName] = React.useState("");
   const [uploadFile, setUploadFile] = React.useState<File | null>(null);
@@ -1310,7 +1314,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     );
   }
 
-  const renderFilePreview = (file: any) => {
+  const renderFilePreview = (file: any, isMiniplayer: boolean = false) => {
     if (!file || !file.media_details) return null;
     const media = file.media_details;
     const mime = media.mime_type || '';
@@ -1363,9 +1367,32 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       }
 
       return (
-        <div className="flex flex-col items-center justify-center bg-black rounded-2xl h-full min-h-[400px] border border-border/50 overflow-hidden shadow-inner w-full relative">
+        <div className={cn("flex flex-col items-center justify-center bg-black h-full border border-border/50 overflow-hidden relative w-full shadow-inner", isMiniplayer ? "rounded-none h-full" : "rounded-2xl min-h-[400px]")}>
           {hlsUrl || safeUrl ? (
-             <VideoPlayer src={hlsUrl || safeUrl} poster={getStorageUrl(media.thumbnail)} className="w-full h-full" authToken={typeof window !== 'undefined' ? localStorage.getItem('hive_token') : null} watermark={<div className="flex items-center gap-2 drop-shadow-lg"><div className="h-6 w-6 bg-emerald-500 rounded-md flex items-center justify-center text-emerald-950 shadow-md"><Video className="h-3 w-3" /></div><span className="text-white font-space font-black tracking-widest text-sm opacity-90">HIVE.OS</span></div>} onNext={currentIndex < videoFiles.length - 1 ? handleNext : undefined} onPrevious={currentIndex > 0 ? handlePrev : undefined} subtitles={formattedSubtitles} videoVersions={formattedVersions} />
+             <VideoPlayer 
+                src={hlsUrl || safeUrl} 
+                poster={getStorageUrl(media.thumbnail)} 
+                className="w-full h-full" 
+                authToken={typeof window !== 'undefined' ? localStorage.getItem('hive_token') : null} 
+                watermark={!isMiniplayer ? <div className="flex items-center gap-2 drop-shadow-lg"><div className="h-6 w-6 bg-emerald-500 rounded-md flex items-center justify-center text-emerald-950 shadow-md"><Video className="h-3 w-3" /></div><span className="text-white font-space font-black tracking-widest text-sm opacity-90">HIVE.OS</span></div> : undefined} 
+                onNext={(!isMiniplayer && currentIndex < videoFiles.length - 1) ? handleNext : undefined} 
+                onPrevious={(!isMiniplayer && currentIndex > 0) ? handlePrev : undefined} 
+                subtitles={formattedSubtitles} 
+                videoVersions={formattedVersions} 
+                isMiniplayer={isMiniplayer}
+                initialTime={file.id === selectedFile?.id || file.id === miniPlayerFile?.id ? miniPlayerTime : 0}
+                onMiniplayerRequest={!isMiniplayer ? ((time) => {
+                  setMiniPlayerTime(time);
+                  setMiniPlayerFile(file);
+                  setSelectedFile(null); // Close the dialog
+                }) : undefined}
+                onMaximizeRequest={isMiniplayer ? ((time) => {
+                  setMiniPlayerTime(time);
+                  setSelectedFile(file);
+                  setMiniPlayerFile(null); // Close the miniplayer
+                }) : undefined}
+                onCloseRequest={() => setMiniPlayerFile(null)}
+             />
           ) : (<div className="text-center p-6"><Loader2 className="h-8 w-8 animate-spin text-emerald-500 mx-auto mb-4" /><p className="text-white font-bold text-sm">Processing Video...</p></div>)}
         </div>
       );
@@ -1910,6 +1937,24 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
           <DialogFooter className="border-t border-border/40 p-4 shrink-0 bg-muted/10"><Button type="button" variant="ghost" onClick={() => setIsUploadOpen(false)} disabled={uploadFileMut.isPending} className="rounded-xl">Cancel</Button><Button type="submit" form="upload-file-form" disabled={!uploadFile || uploadFileMut.isPending} className="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)] transition-all flex-1 sm:flex-none px-8">{uploadFileMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading...</> : 'Upload File'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* IN-TAB MINIPLAYER */}
+      {miniPlayerFile && (
+        <div className="fixed bottom-6 right-6 lg:right-8 z-[200] w-80 sm:w-96 shadow-[0_30px_60px_rgba(0,0,0,0.6)] rounded-[1.5rem] overflow-hidden border border-border bg-black animate-in slide-in-from-bottom-10 fade-in duration-500 transition-all hover:scale-[1.02] group/minip">
+          {/* Miniplayer Header Overlay */}
+          <div className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/80 to-transparent p-3 flex justify-between items-start opacity-0 group-hover/minip:opacity-100 transition-opacity duration-300">
+             <span className="text-[10px] font-bold text-white truncate pr-4 drop-shadow-md">{miniPlayerFile.media_details?.name}</span>
+             <div className="flex items-center gap-1.5 shrink-0">
+                 <button onClick={() => { setSelectedFile(miniPlayerFile); setMiniPlayerFile(null); }} className="h-7 w-7 bg-black/50 hover:bg-emerald-500 backdrop-blur text-white hover:text-emerald-950 rounded-lg flex items-center justify-center transition-colors shadow-sm" title="Expand"><Maximize className="h-3.5 w-3.5"/></button>
+                 <button onClick={() => setMiniPlayerFile(null)} className="h-7 w-7 bg-black/50 hover:bg-destructive backdrop-blur text-white rounded-lg flex items-center justify-center transition-colors shadow-sm" title="Close Miniplayer"><X className="h-3.5 w-3.5"/></button>
+             </div>
+          </div>
+          {/* Miniplayer Video Container */}
+          <div className="w-full aspect-video bg-black flex items-center justify-center relative">
+             {renderFilePreview(miniPlayerFile, true)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

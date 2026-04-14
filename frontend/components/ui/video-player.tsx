@@ -32,7 +32,12 @@ interface VideoPlayerProps {
   onNext?: () => void;
   subtitles?: SubtitleTrack[];
   videoVersions?: VideoVersion[];
-  authToken?: string | null; // 🚀 Added so it can securely fetch subtitles anywhere
+  authToken?: string | null; 
+  initialTime?: number;
+  isMiniplayer?: boolean;
+  onMiniplayerRequest?: (time: number) => void;
+  onMaximizeRequest?: (time: number) => void;
+  onCloseRequest?: () => void;
 }
 
 export function VideoPlayer({ 
@@ -44,7 +49,12 @@ export function VideoPlayer({
   onNext, 
   subtitles = [], 
   videoVersions = [],
-  authToken = null
+  authToken = null,
+  initialTime = 0,
+  isMiniplayer = false,
+  onMiniplayerRequest,
+  onMaximizeRequest,
+  onCloseRequest
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -74,14 +84,12 @@ export function VideoPlayer({
   const [showSpeed, setShowSpeed] = useState(false);
   const [showQuality, setShowQuality] = useState(false);
   const [showCC, setShowCC] = useState(false);
-  const [isPiPMode, setIsPiPMode] = useState(false);
 
   const [showPlayAnim, setShowPlayAnim] = useState(false);
   const [showPauseAnim, setShowPauseAnim] = useState(false);
   const [seekAnimDir, setSeekAnimDir] = useState<'forward' | 'backward' | null>(null);
   const [hoverTime, setHoverTime] = useState<string | null>(null);
   const [hoverProgress, setHoverProgress] = useState<number>(0);
-  const [canPiP, setCanPiP] = useState(false);
 
   const playAnimTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const seekAnimTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -138,6 +146,13 @@ export function VideoPlayer({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    // Apply initial time if provided
+    if (initialTime && initialTime > 0) {
+      video.currentTime = initialTime;
+      setProgress((initialTime / video.duration) * 100);
+      setCurrentTime(formatTime(initialTime));
+    }
 
     setIsBuffering(true);
     setIsPlaying(false);
@@ -223,54 +238,7 @@ export function VideoPlayer({
     return () => clearTimeout(timer);
   }, [activeSubtitle, localSubtitles]);
 
-  useEffect(() => {
-    // Safely check if PiP method is a function on a real video element, 
-    // to strictly prevent the "requestPictureInPicture is not a function" browser error.
-    const v = document.createElement('video');
-    setCanPiP(
-      typeof document !== 'undefined' && 
-      (typeof v.requestPictureInPicture === 'function' || typeof (v as any).webkitSetPresentationMode === 'function')
-    );
-
-    const video = videoRef.current;
-    if (!video) return;
-    const onEnterPiP = () => setIsPiPMode(true);
-    const onLeavePiP = () => setIsPiPMode(false);
-    
-    // Standard PiP events
-    video.addEventListener('enterpictureinpicture', onEnterPiP);
-    video.addEventListener('leavepictureinpicture', onLeavePiP);
-    
-    // Safari PiP events
-    video.addEventListener('webkitpresentationmodechanged', (e: any) => {
-        setIsPiPMode(e.target.webkitPresentationMode === 'picture-in-picture');
-    });
-
-    return () => {
-      video.removeEventListener('enterpictureinpicture', onEnterPiP);
-      video.removeEventListener('leavepictureinpicture', onLeavePiP);
-    };
-  }, []);
-
-  const togglePiP = async () => {
-    if (!videoRef.current) return;
-    try {
-      if (typeof document !== 'undefined' && document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-      } else if (typeof videoRef.current.requestPictureInPicture === 'function') {
-        await videoRef.current.requestPictureInPicture();
-      } else if (typeof (videoRef.current as any).webkitSetPresentationMode === 'function') {
-        (videoRef.current as any).webkitSetPresentationMode(
-          (videoRef.current as any).webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture"
-        );
-      } else {
-        toast.error('PiP requires HTTPS/localhost, or your browser restricts it (e.g., Firefox).');
-      }
-    } catch (error) {
-      console.error("PiP failed", error);
-      toast.error('PiP requires HTTPS/localhost, or your browser restricts it (e.g., Firefox).');
-    }
-  };
+  // Native PiP logic removed in favor of In-Tab Miniplayer
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -305,7 +273,11 @@ export function VideoPlayer({
           if (newVolDown === 0) { setIsMuted(true); videoRef.current.muted = true; }
           break;
         case 'c': e.preventDefault(); setShowCC(prev => !prev); break;
-        case 'i': e.preventDefault(); togglePiP(); break;
+        case 'i': 
+          e.preventDefault(); 
+          if (isMiniplayer && onMaximizeRequest) onMaximizeRequest(videoRef.current.currentTime);
+          else if (!isMiniplayer && onMiniplayerRequest) onMiniplayerRequest(videoRef.current.currentTime);
+          break;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -526,21 +498,7 @@ export function VideoPlayer({
         )}
       </div>
 
-      {/* Floating Hover PiP Button */}
-      {!hasError && (
-        <div className={cn(
-          "absolute top-6 right-6 lg:right-8 z-30 transition-all duration-300",
-          showControls ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 pointer-events-none"
-        )}>
-          <button 
-            onClick={(e) => { e.stopPropagation(); togglePiP(); }} 
-            className="flex items-center justify-center w-12 h-12 bg-[#3c3639]/80 hover:bg-[#52494e]/90 backdrop-blur-md rounded-xl transition-all shadow-xl hover:scale-105 group/pip"
-            title="Picture in Picture"
-          >
-            <PictureInPicture className="h-6 w-6 text-white/90 group-hover/pip:text-white transition-colors" />
-          </button>
-        </div>
-      )}
+      {/* Floating Hover PiP Removed in favor of Miniplayer */}
 
       {/* Double Click Seek Animations */}
       <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-20 pointer-events-none flex items-center justify-between px-10 sm:px-20 overflow-hidden">
@@ -717,10 +675,12 @@ export function VideoPlayer({
                   )}
                 </div>
 
-                {/* PiP Button */}
-                <button type="button" onClick={togglePiP} className={cn("transition-colors", isPiPMode ? "text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" : "text-white hover:text-white/80")} title="Picture in Picture (i)">
-                  <PictureInPicture className="h-5 w-5" />
-                </button>
+                {/* Miniplayer Toggle Button */}
+                {!isMiniplayer ? (
+                  <button type="button" onClick={() => onMiniplayerRequest && onMiniplayerRequest(videoRef.current?.currentTime || 0)} className="text-white hover:text-white/80 transition-colors" title="Miniplayer (i)">
+                    <PictureInPicture className="h-5 w-5" />
+                  </button>
+                ) : null}
 
                 <button type="button" onClick={toggleFullscreen} className="text-white hover:text-primary transition-transform hover:scale-110 ml-1" title="Fullscreen (f)">
                   {isFullscreen ? <Minimize className="h-6 w-6" /> : <Maximize className="h-6 w-6" />}
