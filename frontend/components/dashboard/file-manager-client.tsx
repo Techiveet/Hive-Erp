@@ -878,6 +878,30 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   const [activeTypeFilter, setActiveTypeFilter] = React.useState<"image" | "video" | "document" | "audio" | "archive" | "other" | null>(null);
   const [currentFolderId, setCurrentFolderId] = React.useState<number | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
+
+  // ── Authenticated download helper ─────────────────────────────────────────
+  // Fetches the file through the secure /files/{id}/download endpoint (which
+  // burns the watermark for videos) and triggers a browser Save dialog instead
+  // of opening in a new tab.
+  const downloadFile = React.useCallback(async (fileId: number, filename: string) => {
+    try {
+      const url = `${getBackendApiRoot()}/files/${fileId}/download`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Download failed');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename || 'download';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      toast.error('Download failed. Please try again.');
+    }
+  }, []);
+
   const [showAllFiles, setShowAllFiles] = React.useState(false);
 
   // --- Advanced UI State ---
@@ -1699,7 +1723,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
                                 <SimpleMenu trigger={<Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-background/80 lg:opacity-0 group-hover:opacity-100 transition-opacity"><MoreVertical className="h-4 w-4"/></Button>}>
                                   <MenuItem icon={<LinkIcon />} label="Share Link" onClick={() => shareLinkMut.mutate({type: "file", id: file.id})} />
                                   <MenuItem icon={<Edit />} label="Rename" onClick={() => setRenameTarget({type: "file", id: file.id, name: media?.name})} />
-                                  <MenuItem icon={<Download />} label="Download" onClick={() => window.open(getStorageUrl(media?.url))} />
+                                  <MenuItem icon={<Download />} label="Download" onClick={() => downloadFile(file.id, file.media_details?.name || 'download')} />
                                   <MenuItem icon={<FolderInput />} label="Move To..." onClick={() => openMoveModal([{type: "file", id: file.id}])} />
                                   <div className="h-px bg-border/50 my-1"></div>
                                   {activeFilter === "trash" ? (
@@ -1887,7 +1911,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
                 </div>
 
                 <div className="p-6 border-t border-border/50 bg-background/40 space-y-3 shrink-0 mt-auto sticky bottom-0 z-10 backdrop-blur-xl">
-                  <Button className="w-full rounded-xl shadow-md font-bold h-11 bg-emerald-500 text-emerald-950 hover:bg-emerald-400 transition-all" onClick={() => window.open(getStorageUrl(selectedFile.media_details?.url), '_blank')}><Download className="h-4 w-4 mr-2" /> Download File</Button>
+                  <Button className="w-full rounded-xl shadow-md font-bold h-11 bg-emerald-500 text-emerald-950 hover:bg-emerald-400 transition-all" onClick={() => downloadFile(selectedFile.id, selectedFile.media_details?.name || 'download')}><Download className="h-4 w-4 mr-2" /> Download File</Button>
                   {canManage && <Button variant="outline" className={cn("w-full rounded-xl h-11 transition-all font-bold border-border/50 hover:bg-muted", selectedFile.is_favorite ? "border-yellow-500 text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20" : "")} onClick={() => toggleFavoriteMut.mutate({ type: 'file', id: selectedFile.id })}><Star className={cn("h-4 w-4 mr-2 shrink-0", selectedFile.is_favorite && "fill-yellow-500")} /> <span className="truncate">{selectedFile.is_favorite ? 'Unfavorite' : 'Favorite'}</span></Button>}
                 </div>
               </div>

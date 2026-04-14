@@ -438,10 +438,10 @@ class FileManagerController extends Controller
 
         $filter = "drawtext={$fontArg}" .
                   "text='{$safeTitle}':" .
-                  "fontsize=28:" .
-                  "fontcolor=white@0.40:" .
-                  "x=w-tw-24:y=h-th-20:" .   // bottom-right corner
-                  "shadowx=1:shadowy=1:shadowcolor=black@0.5";
+                  "fontsize=18:" .
+                  "fontcolor=white@0.35:" .
+                  "x=w-tw-16:y=h-th-16:" .   // bottom-right, 16px padding (Udemy-style)
+                  "shadowx=1:shadowy=1:shadowcolor=black@0.40";
 
         // -c:a copy  → no audio re-encode (fast)
         // -preset fast -crf 23 → good quality, reasonably fast
