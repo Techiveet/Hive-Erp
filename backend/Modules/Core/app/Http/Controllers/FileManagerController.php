@@ -428,13 +428,22 @@ class FileManagerController extends Controller
         if (!is_dir($tempDir)) mkdir($tempDir, 0777, true);
         $tempOut  = $tempDir . '/' . uniqid('wm_', true) . '.mp4';
 
-        // ── FFmpeg drawtext filter – Udemy-style bottom-right, 40% opacity ──
-        // fontfile fallback list → Alpine ships DejaVu Sans
-        $fontPath = '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf';
+        // ── Resolve font path – use vendor DejaVu font (guaranteed by Composer) ──
+        // dompdf ships DejaVuSans-Bold.ttf, which is always present in the container.
+        $fontPath = base_path('vendor/dompdf/dompdf/lib/fonts/DejaVuSans-Bold.ttf');
+        // Fallback chain for system fonts (Alpine, Ubuntu, etc.)
+        if (!file_exists($fontPath)) $fontPath = '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf';
         if (!file_exists($fontPath)) $fontPath = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
-        if (!file_exists($fontPath)) $fontPath = '';
+        if (!file_exists($fontPath)) {
+            Log::warning('[Watermark] No font found – serving without watermark.');
+            return response()->file($filePath, [
+                'Content-Type'                => $mimeType,
+                'Content-Disposition'         => 'attachment; filename="' . $fileName . '"',
+                'Access-Control-Allow-Origin' => '*',
+            ]);
+        }
 
-        $fontArg = $fontPath ? "fontfile={$fontPath}:" : '';
+        $fontArg = "fontfile={$fontPath}:";
 
         $filter = "drawtext={$fontArg}" .
                   "text='{$safeTitle}':" .
