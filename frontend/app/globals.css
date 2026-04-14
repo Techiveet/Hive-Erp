@@ -275,7 +275,18 @@ body.cursor-clicking .cursor-inner {
     cursor: auto;
   }
 
-  .cursor {
-    display: none;
-  }
+}
+
+/* =========================
+   VIDEO CAPTION STYLING
+   ========================= */
+::cue {
+  background-color: rgba(8, 8, 8, 0.75);
+  color: rgb(255, 255, 255);
+  font-family: "YouTube Noto", Roboto, "Arial Unicode Ms", Arial, Helvetica, Verdana, PT Sans Caption, sans-serif;
+  font-size: 1.25rem;
+  padding: 4px 8px;
+  border-radius: 2px;
+  line-height: normal;
+  text-shadow: none;
 }
