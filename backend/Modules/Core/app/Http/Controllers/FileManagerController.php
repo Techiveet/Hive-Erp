@@ -5,10 +5,12 @@ namespace Modules\Core\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Modules\Core\Models\Folder;
 use Modules\Core\Models\FileEntry;
+use Modules\Core\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 // 🚀 Intervention Image v3 Imports
@@ -388,10 +390,95 @@ class FileManagerController extends Controller
         $media = $fileEntry->getFirstMedia('file');
         if (!$media) abort(404);
 
-        return response()->file($media->getPath(), [
-            'Content-Type' => $media->mime_type,
+        $filePath = $media->getPath();
+        $mimeType = $media->mime_type;
+        $fileName  = $media->file_name;
+
+        // ── Only watermark video files ──────────────────────────────────────
+        if (!str_starts_with($mimeType, 'video/')) {
+            return response()->file($filePath, [
+                'Content-Type'                => $mimeType,
+                'Content-Disposition'         => 'attachment; filename="' . $fileName . '"',
+                'Access-Control-Allow-Origin' => '*',
+            ]);
+        }
+
+        // ── Fetch app title from settings (cached 1 hour) ──────────────────
+        $tenantPrefix = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
+        $appTitle = Cache::remember("watermark_app_title_{$tenantPrefix}", 3600, function () {
+            return trim((string) Setting::where('key', 'app_title')->value('value')) ?: 'HIVE.OS';
+        });
+
+        // Escape special characters that FFmpeg drawtext cannot handle
+        $safeTitle = str_replace(["'", ':', '\\'], ["\\'", '\\:', '\\\\'], $appTitle);
+
+        // ── Check FFmpeg is available ───────────────────────────────────────
+        $ffmpeg = trim((string) shell_exec('which ffmpeg 2>/dev/null'));
+        if (empty($ffmpeg)) {
+            Log::warning('FFmpeg not found — serving video without watermark.');
+            return response()->file($filePath, [
+                'Content-Type'                => $mimeType,
+                'Content-Disposition'         => 'attachment; filename="' . $fileName . '"',
+                'Access-Control-Allow-Origin' => '*',
+            ]);
+        }
+
+        // ── Build temp output path ──────────────────────────────────────────
+        $tempDir  = storage_path('app/temp_watermark');
+        if (!is_dir($tempDir)) mkdir($tempDir, 0777, true);
+        $tempOut  = $tempDir . '/' . uniqid('wm_', true) . '.mp4';
+
+        // ── FFmpeg drawtext filter – Udemy-style bottom-right, 40% opacity ──
+        // fontfile fallback list → Alpine ships DejaVu Sans
+        $fontPath = '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf';
+        if (!file_exists($fontPath)) $fontPath = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
+        if (!file_exists($fontPath)) $fontPath = '';
+
+        $fontArg = $fontPath ? "fontfile={$fontPath}:" : '';
+
+        $filter = "drawtext={$fontArg}" .
+                  "text='{$safeTitle}':" .
+                  "fontsize=28:" .
+                  "fontcolor=white@0.40:" .
+                  "x=w-tw-24:y=h-th-20:" .   // bottom-right corner
+                  "shadowx=1:shadowy=1:shadowcolor=black@0.5";
+
+        // -c:a copy  → no audio re-encode (fast)
+        // -preset fast -crf 23 → good quality, reasonably fast
+        $cmd = sprintf(
+            '%s -i %s -vf %s -c:a copy -preset fast -crf 23 -y %s 2>&1',
+            escapeshellarg($ffmpeg),
+            escapeshellarg($filePath),
+            escapeshellarg($filter),
+            escapeshellarg($tempOut)
+        );
+
+        Log::info("[Watermark] Running FFmpeg for file {$id}");
+        $output = shell_exec($cmd);
+
+        if (!file_exists($tempOut) || filesize($tempOut) === 0) {
+            Log::error("[Watermark] FFmpeg failed for file {$id}: {$output}");
+            // Graceful fallback — serve without watermark
+            return response()->file($filePath, [
+                'Content-Type'                => $mimeType,
+                'Content-Disposition'         => 'attachment; filename="' . $fileName . '"',
+                'Access-Control-Allow-Origin' => '*',
+            ]);
+        }
+
+        // ── Stream the watermarked file then clean up ───────────────────────
+        return response()->streamDownload(function () use ($tempOut) {
+            $handle = fopen($tempOut, 'rb');
+            while (!feof($handle)) {
+                echo fread($handle, 8192);
+                flush();
+            }
+            fclose($handle);
+            @unlink($tempOut); // delete temp file after streaming
+        }, $fileName, [
+            'Content-Type'                => 'video/mp4',
+            'Content-Disposition'         => 'attachment; filename="' . $fileName . '"',
             'Access-Control-Allow-Origin' => '*',
-            'Access-Control-Allow-Headers' => 'Authorization, Content-Type',
         ]);
     }
 
