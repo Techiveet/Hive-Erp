@@ -231,16 +231,23 @@ export function VideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
-    const pipSupported =
-      typeof document !== 'undefined' &&
-      (document as any).pictureInPictureEnabled === true &&
-      typeof video.requestPictureInPicture === 'function';
+    // Detect PiP support. Run on mount + video load so canPiP is accurate.
+    const detectPiP = () => {
+      const pip =
+        typeof document !== 'undefined' &&
+        document.pictureInPictureEnabled &&          // works in Chrome, Firefox, Edge
+        typeof video.requestPictureInPicture === 'function' &&
+        !video.disablePictureInPicture;
 
-    const safariPipSupported =
-      typeof (video as any).webkitSetPresentationMode === 'function';
+      const webkitPip =
+        typeof (video as any).webkitSetPresentationMode === 'function'; // Safari
 
-    setCanPiP(pipSupported || safariPipSupported);
+      setCanPiP(pip || webkitPip);
+    };
 
+    detectPiP();
+    video.addEventListener('loadedmetadata', detectPiP);
+    video.addEventListener('canplay', detectPiP);
     const onEnterPiP = () => { setIsPiPMode(true); pipPendingRef.current = false; };
     const onLeavePiP = () => { setIsPiPMode(false); pipPendingRef.current = false; };
     const onSafariPiP = (e: any) => {
@@ -257,6 +264,8 @@ export function VideoPlayer({
       video.removeEventListener('enterpictureinpicture', onEnterPiP);
       video.removeEventListener('leavepictureinpicture', onLeavePiP);
       video.removeEventListener('webkitpresentationmodechanged', onSafariPiP);
+      video.removeEventListener('loadedmetadata', detectPiP);
+      video.removeEventListener('canplay', detectPiP);
       // Exit PiP if the component unmounts while PiP is active (Vimeo does this too)
       if (document.pictureInPictureElement === video) {
         document.exitPictureInPicture().catch(() => {});
@@ -265,10 +274,10 @@ export function VideoPlayer({
   }, []);
 
   const togglePiP = async () => {
-    if (!videoRef.current || pipPendingRef.current) return; // debounce
+    if (!videoRef.current || pipPendingRef.current) return;
     const video = videoRef.current;
 
-    // Safari (webkit) path
+    // Safari (webkit) path — check first so it doesn't fall into the W3C path on old Safari
     if (typeof (video as any).webkitSetPresentationMode === 'function') {
       const current = (video as any).webkitPresentationMode;
       pipPendingRef.current = true;
@@ -278,8 +287,13 @@ export function VideoPlayer({
       return;
     }
 
-    // Standard W3C path
-    if (typeof document !== 'undefined' && (document as any).pictureInPictureEnabled) {
+    // Standard W3C path — Chrome, Firefox, Edge
+    if (typeof document !== 'undefined' && document.pictureInPictureEnabled && typeof video.requestPictureInPicture === 'function') {
+      // Firefox (and Chrome) require the video to have loaded data before PiP
+      if (video.readyState < 2) {
+        toast.error('Please wait for the video to load before using Picture-in-Picture.');
+        return;
+      }
       pipPendingRef.current = true;
       try {
         if (document.pictureInPictureElement) {
@@ -287,15 +301,21 @@ export function VideoPlayer({
         } else {
           await video.requestPictureInPicture();
         }
-      } catch (err) {
+      } catch (err: any) {
         pipPendingRef.current = false;
-        console.warn('PiP error:', err);
-        toast.error('Could not activate Picture-in-Picture. Ensure you are on HTTPS and the video has loaded.');
+        console.warn('PiP error:', err?.message || err);
+        // NotAllowedError = browser blocked it (user gesture required or policy)
+        // InvalidStateError = video not ready yet
+        if (err?.name === 'NotAllowedError') {
+          toast.error('PiP was blocked. Try clicking play first, then activating Picture-in-Picture.');
+        } else {
+          toast.error('Could not activate Picture-in-Picture.');
+        }
       }
       return;
     }
 
-    toast.error('Your browser does not support Picture-in-Picture.');
+    toast.error('Picture-in-Picture is not supported in this browser.');
   };
 
   useEffect(() => {
