@@ -25,6 +25,7 @@ export interface VideoVersion {
 
 interface VideoPlayerProps {
   src: string;
+  nativeSrc?: string;          // Direct MP4/native URL used as Firefox PiP fallback
   poster?: string;
   className?: string;
   watermark?: React.ReactNode; 
@@ -32,11 +33,12 @@ interface VideoPlayerProps {
   onNext?: () => void;
   subtitles?: SubtitleTrack[];
   videoVersions?: VideoVersion[];
-  authToken?: string | null; // 🚀 Added so it can securely fetch subtitles anywhere
+  authToken?: string | null;
 }
 
 export function VideoPlayer({ 
   src, 
+  nativeSrc,
   poster, 
   className, 
   watermark, 
@@ -51,7 +53,14 @@ export function VideoPlayer({
   const hlsRef = useRef<Hls | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pipPendingRef = useRef(false); // guard against double-firing PiP
+  const pipPendingRef = useRef(false);
+  // Detect Firefox once — Firefox blocks PiP over MediaSource (HLS), so we use nativeSrc fallback
+  const isFirefox = useRef(
+    typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('firefox')
+  );
+  // Track whether we temporarily switched to nativeSrc for PiP so we can restore HLS on exit
+  const pipUsedFallbackRef = useRef(false);
+  const pipSavedTimeRef = useRef(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -136,6 +145,7 @@ export function VideoPlayer({
   }, [src, videoVersions]);
 
   // 3. Mount Video Source (HLS vs Native)
+  // Firefox cannot do PiP over MediaSource (HLS) — so we detect Firefox and serve native MP4 directly.
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -145,7 +155,10 @@ export function VideoPlayer({
     setHasError(false);
     setProgress(0);
 
-    if (src.includes('.m3u8')) {
+    const useHls = src.includes('.m3u8') && !isFirefox.current;
+    const firefoxFallbackSrc = nativeSrc || src; // Use nativeSrc if available, else src itself
+
+    if (useHls) {
       if (Hls.isSupported()) {
         const hls = new Hls({ renderTextTracksNatively: true });
         hlsRef.current = hls;
@@ -177,11 +190,14 @@ export function VideoPlayer({
            }
         });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari native HLS
         video.src = src;
         video.addEventListener('loadedmetadata', () => setIsBuffering(false));
       }
     } else {
-      video.src = src;
+      // Firefox → serve MP4/native directly; or non-HLS source
+      const targetSrc = src.includes('.m3u8') ? firefoxFallbackSrc : src;
+      video.src = targetSrc;
       video.load(); 
       const handleCanPlay = () => setIsBuffering(false);
       const handleError = () => { setIsBuffering(false); setHasError(true); };
@@ -195,7 +211,7 @@ export function VideoPlayer({
     }
 
     return () => { if (hlsRef.current) hlsRef.current.destroy(); };
-  }, [src]);
+  }, [src, nativeSrc]);
 
   // 4. Inject Subtitles
   useEffect(() => {
@@ -271,7 +287,7 @@ export function VideoPlayer({
         document.exitPictureInPicture().catch(() => {});
       }
     };
-  }, []);
+  }, [src, nativeSrc]);
 
   const togglePiP = async () => {
     if (!videoRef.current || pipPendingRef.current) return;
@@ -289,11 +305,47 @@ export function VideoPlayer({
 
     // Standard W3C path — Chrome, Firefox, Edge
     if (typeof document !== 'undefined' && document.pictureInPictureEnabled && typeof video.requestPictureInPicture === 'function') {
-      // Firefox (and Chrome) require the video to have loaded data before PiP
       if (video.readyState < 2) {
         toast.error('Please wait for the video to load before using Picture-in-Picture.');
         return;
       }
+
+      // Firefox PiP fix: if currently using HLS (MediaSource), Firefox blocks PiP.
+      // Temporarily switch to native MP4 src, seek, then request PiP.
+      if (isFirefox.current && hlsRef.current && (nativeSrc || !src.includes('.m3u8'))) {
+        const fallback = nativeSrc || src;
+        const savedTime = video.currentTime;
+        const wasPlaying = !video.paused;
+
+        pipSavedTimeRef.current = savedTime;
+        pipUsedFallbackRef.current = true;
+        pipPendingRef.current = true;
+
+        // Destroy HLS and switch to native src
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+        video.src = fallback;
+        video.load();
+
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const onCanPlay = () => { video.removeEventListener('canplay', onCanPlay); video.removeEventListener('error', onErr); resolve(); };
+            const onErr = () => { video.removeEventListener('canplay', onCanPlay); video.removeEventListener('error', onErr); reject(new Error('load failed')); };
+            video.addEventListener('canplay', onCanPlay);
+            video.addEventListener('error', onErr);
+          });
+          video.currentTime = savedTime;
+          if (wasPlaying) await video.play();
+          await video.requestPictureInPicture();
+        } catch (err: any) {
+          pipPendingRef.current = false;
+          pipUsedFallbackRef.current = false;
+          console.warn('Firefox PiP fallback error:', err?.message || err);
+          toast.error('Could not activate Picture-in-Picture.');
+        }
+        return;
+      }
+
       pipPendingRef.current = true;
       try {
         if (document.pictureInPictureElement) {
@@ -304,8 +356,6 @@ export function VideoPlayer({
       } catch (err: any) {
         pipPendingRef.current = false;
         console.warn('PiP error:', err?.message || err);
-        // NotAllowedError = browser blocked it (user gesture required or policy)
-        // InvalidStateError = video not ready yet
         if (err?.name === 'NotAllowedError') {
           toast.error('PiP was blocked. Try clicking play first, then activating Picture-in-Picture.');
         } else {

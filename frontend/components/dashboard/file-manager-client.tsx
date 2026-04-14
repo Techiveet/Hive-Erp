@@ -1365,7 +1365,18 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       return (
         <div className="flex flex-col items-center justify-center bg-black rounded-2xl h-full min-h-[400px] border border-border/50 overflow-hidden shadow-inner w-full relative">
           {hlsUrl || safeUrl ? (
-             <VideoPlayer src={hlsUrl || safeUrl} poster={getStorageUrl(media.thumbnail)} className="w-full h-full" authToken={typeof window !== 'undefined' ? localStorage.getItem('hive_token') : null} watermark={<div className="flex items-center gap-2 drop-shadow-lg"><div className="h-6 w-6 bg-emerald-500 rounded-md flex items-center justify-center text-emerald-950 shadow-md"><Video className="h-3 w-3" /></div><span className="text-white font-space font-black tracking-widest text-sm opacity-90">HIVE.OS</span></div>} onNext={currentIndex < videoFiles.length - 1 ? handleNext : undefined} onPrevious={currentIndex > 0 ? handlePrev : undefined} subtitles={formattedSubtitles} videoVersions={formattedVersions} />
+             <VideoPlayer 
+                src={hlsUrl || safeUrl}
+                nativeSrc={safeUrl}
+                poster={getStorageUrl(media.thumbnail)} 
+                className="w-full h-full" 
+                authToken={typeof window !== 'undefined' ? localStorage.getItem('hive_token') : null} 
+                watermark={<div className="flex items-center gap-2 drop-shadow-lg"><div className="h-6 w-6 bg-emerald-500 rounded-md flex items-center justify-center text-emerald-950 shadow-md"><Video className="h-3 w-3" /></div><span className="text-white font-space font-black tracking-widest text-sm opacity-90">HIVE.OS</span></div>} 
+                onNext={currentIndex < videoFiles.length - 1 ? handleNext : undefined} 
+                onPrevious={currentIndex > 0 ? handlePrev : undefined} 
+                subtitles={formattedSubtitles} 
+                videoVersions={formattedVersions} 
+             />
           ) : (<div className="text-center p-6"><Loader2 className="h-8 w-8 animate-spin text-emerald-500 mx-auto mb-4" /><p className="text-white font-bold text-sm">Processing Video...</p></div>)}
         </div>
       );
