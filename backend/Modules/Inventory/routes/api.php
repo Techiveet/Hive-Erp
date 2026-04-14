@@ -230,69 +230,27 @@ Route::middleware(['auth:sanctum'])
         Route::post('products/{id}/tags', [ProductController::class, 'syncTags'])
             ->middleware('permission:manage_inventory,sanctum')
             ->name('products.tags');
-        Route::get('warehouses', [InventoryEntityRecordController::class, 'index'])
-            ->defaults('resource', 'warehouses')
-            ->middleware('permission:view_inventory|manage_inventory,sanctum')
-            ->name('warehouses.index');
-        Route::post('warehouses', [InventoryEntityRecordController::class, 'store'])
-            ->defaults('resource', 'warehouses')
-            ->middleware('permission:manage_inventory,sanctum')
-            ->name('warehouses.store');
-        Route::get('warehouses/{id}', [InventoryEntityRecordController::class, 'show'])
-            ->defaults('resource', 'warehouses')
-            ->middleware('permission:view_inventory|manage_inventory,sanctum')
-            ->name('warehouses.show');
-        Route::match(['put', 'patch'], 'warehouses/{id}', [InventoryEntityRecordController::class, 'update'])
-            ->defaults('resource', 'warehouses')
-            ->middleware('permission:manage_inventory,sanctum')
-            ->name('warehouses.update');
-        Route::delete('warehouses/{id}', [InventoryEntityRecordController::class, 'destroy'])
-            ->defaults('resource', 'warehouses')
-            ->middleware('permission:manage_inventory,sanctum')
-            ->name('warehouses.destroy');
 
-        Route::get('shelves', [InventoryEntityRecordController::class, 'index'])
-            ->defaults('resource', 'shelves')
-            ->middleware('permission:view_inventory|manage_inventory,sanctum')
-            ->name('shelves.index');
-        Route::post('shelves', [InventoryEntityRecordController::class, 'store'])
-            ->defaults('resource', 'shelves')
-            ->middleware('permission:manage_inventory,sanctum')
-            ->name('shelves.store');
-        Route::get('shelves/{id}', [InventoryEntityRecordController::class, 'show'])
-            ->defaults('resource', 'shelves')
-            ->middleware('permission:view_inventory|manage_inventory,sanctum')
-            ->name('shelves.show');
-        Route::match(['put', 'patch'], 'shelves/{id}', [InventoryEntityRecordController::class, 'update'])
-            ->defaults('resource', 'shelves')
-            ->middleware('permission:manage_inventory,sanctum')
-            ->name('shelves.update');
-        Route::delete('shelves/{id}', [InventoryEntityRecordController::class, 'destroy'])
-            ->defaults('resource', 'shelves')
-            ->middleware('permission:manage_inventory,sanctum')
-            ->name('shelves.destroy');
+        Route::group(['middleware' => 'permission:manage_inventory,sanctum'], function () {
+            // Explicit routes using closures to ensure correct parameter mapping
+            Route::get('warehouses', [InventoryEntityRecordController::class, 'index'])->defaults('resource', 'warehouses');
+            Route::post('warehouses', [InventoryEntityRecordController::class, 'store'])->defaults('resource', 'warehouses');
+            Route::get('warehouses/{id}', fn($id) => app(InventoryEntityRecordController::class)->show('warehouses', $id));
+            Route::match(['put', 'patch'], 'warehouses/{id}', fn(\Illuminate\Http\Request $request, $id) => app(InventoryEntityRecordController::class)->update($request, 'warehouses', $id));
+            Route::delete('warehouses/{id}', fn($id) => app(InventoryEntityRecordController::class)->destroy('warehouses', $id));
 
-        Route::get('shelf-boxes', [InventoryEntityRecordController::class, 'index'])
-            ->defaults('resource', 'shelf-boxes')
-            ->middleware('permission:view_inventory|manage_inventory,sanctum')
-            ->name('shelf-boxes.index');
-        Route::get('shelf-boxes/{id}', [InventoryEntityRecordController::class, 'show'])
-            ->defaults('resource', 'shelf-boxes')
-            ->middleware('permission:view_inventory|manage_inventory,sanctum')
-            ->name('shelf-boxes.show');
-        Route::post('shelf-boxes', [InventoryEntityRecordController::class, 'store'])
-            ->defaults('resource', 'shelf-boxes')
-            ->middleware('permission:manage_inventory,sanctum')
-            ->name('shelf-boxes.store');
-        Route::match(['put', 'patch'], 'shelf-boxes/{id}', [InventoryEntityRecordController::class, 'update'])
-            ->defaults('resource', 'shelf-boxes')
-            ->middleware('permission:manage_inventory,sanctum')
-            ->name('shelf-boxes.update');
-        Route::delete('shelf-boxes/{id}', [InventoryEntityRecordController::class, 'destroy'])
-            ->defaults('resource', 'shelf-boxes')
-            ->middleware('permission:manage_inventory,sanctum')
-            ->name('shelf-boxes.destroy');
+            Route::get('shelves', [InventoryEntityRecordController::class, 'index'])->defaults('resource', 'shelves');
+            Route::post('shelves', [InventoryEntityRecordController::class, 'store'])->defaults('resource', 'shelves');
+            Route::get('shelves/{id}', fn($id) => app(InventoryEntityRecordController::class)->show('shelves', $id));
+            Route::match(['put', 'patch'], 'shelves/{id}', fn(\Illuminate\Http\Request $request, $id) => app(InventoryEntityRecordController::class)->update($request, 'shelves', $id));
+            Route::delete('shelves/{id}', fn($id) => app(InventoryEntityRecordController::class)->destroy('shelves', $id));
 
+            Route::get('shelf-boxes', [InventoryEntityRecordController::class, 'index'])->defaults('resource', 'shelf-boxes');
+            Route::post('shelf-boxes', [InventoryEntityRecordController::class, 'store'])->defaults('resource', 'shelf-boxes');
+            Route::get('shelf-boxes/{id}', fn($id) => app(InventoryEntityRecordController::class)->show('shelf-boxes', $id));
+            Route::match(['put', 'patch'], 'shelf-boxes/{id}', fn(\Illuminate\Http\Request $request, $id) => app(InventoryEntityRecordController::class)->update($request, 'shelf-boxes', $id));
+            Route::delete('shelf-boxes/{id}', fn($id) => app(InventoryEntityRecordController::class)->destroy('shelf-boxes', $id));
+        });
         Route::get('{resource}', [InventoryEntityRecordController::class, 'index'])
             ->where('resource', InventoryEntityCatalog::routeRegex())
             ->middleware('permission:view_inventory|manage_inventory,sanctum')

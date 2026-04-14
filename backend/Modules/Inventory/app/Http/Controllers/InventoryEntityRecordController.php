@@ -69,7 +69,7 @@ class InventoryEntityRecordController extends Controller
             'code' => $validated['code'] ?? null,
             'parent_id' => $validated['parent_id'] ?? null,
             'is_active' => $validated['is_active'] ?? true,
-            'payload' => $validated['payload'] ?? null,
+            'payload' => (array) ($validated['payload'] ?? []),
             'created_by_id' => auth()->id(),
             'updated_by_id' => auth()->id(),
         ]);
@@ -80,9 +80,22 @@ class InventoryEntityRecordController extends Controller
         );
     }
 
-    public function show(string $resource, $id)
+    public function show($resource, $id = null)
     {
-        $entityType = $this->resolveEntityType($resource);
+        // Parameter normalization: ensure $id is numeric and $resource is the name
+        if (!is_numeric($id) && is_numeric($resource)) {
+            $tmp = $id;
+            $id = $resource;
+            $resource = $tmp ?? request()->route('resource');
+        }
+
+        if ($id === null && is_numeric($resource)) {
+            $id = $resource;
+            $resource = request()->route('resource') ?? 'warehouses';
+        }
+
+        $entityType = $this->resolveEntityType((string) $resource);
+        $id = (int) $id;
 
         return response()->json(
             InventoryEntityRecord::query()
@@ -98,9 +111,45 @@ class InventoryEntityRecordController extends Controller
         );
     }
 
-    public function update(Request $request, string $resource, $id)
+    public function update(Request $request, $resource, $id = null)
     {
-        $entityType = $this->resolveEntityType($resource);
+        // 1. Super-Smart Parameter Recovery
+        if ($id === null && is_numeric($resource)) {
+            $id = $resource;
+            $resource = null;
+        }
+
+        // Search route parameters for a valid resource name if we don't have one
+        if ($resource === null || is_numeric($resource)) {
+            foreach ($request->route()->parameters() as $value) {
+                if (is_string($value) && InventoryEntityCatalog::entityTypeFor($value)) {
+                    $resource = $value;
+                    break;
+                }
+            }
+        }
+
+        // If still numeric/null, look at URL segments
+        if ($resource === null || is_numeric($resource)) {
+             $segments = $request->segments();
+             foreach ($segments as $segment) {
+                 if (InventoryEntityCatalog::entityTypeFor($segment)) {
+                     $resource = $segment;
+                     break;
+                 }
+             }
+        }
+
+        // Final swap check
+        if (!is_numeric($id) && is_numeric($resource)) {
+            $tmp = $id;
+            $id = $resource;
+            $resource = $tmp;
+        }
+
+        $resource = $resource ?? 'warehouses'; // Fallback
+        $entityType = $this->resolveEntityType((string) $resource);
+        $id = (int) $id;
         $record = InventoryEntityRecord::query()
             ->where('entity_type', $entityType)
             ->findOrFail($id);
@@ -123,9 +172,23 @@ class InventoryEntityRecordController extends Controller
         );
     }
 
-    public function destroy(string $resource, $id)
+    public function destroy($resource, $id = null)
     {
-        $entityType = $this->resolveEntityType($resource);
+        // Parameter normalization
+        if (!is_numeric($id) && is_numeric($resource)) {
+            $tmp = $id;
+            $id = $resource;
+            $resource = $tmp ?? request()->route('resource');
+        }
+
+        if ($id === null && is_numeric($resource)) {
+            $id = $resource;
+            $resource = request()->route('resource') ?? 'warehouses';
+        }
+
+        $entityType = $this->resolveEntityType((string) $resource);
+        $id = (int) $id;
+
         $record = InventoryEntityRecord::query()
             ->where('entity_type', $entityType)
             ->findOrFail($id);
@@ -228,9 +291,23 @@ class InventoryEntityRecordController extends Controller
         ]);
     }
 
-    public function appendLog(Request $request, string $resource, $id)
+    public function appendLog(Request $request, $resource, $id = null)
     {
-        $entityType = $this->resolveEntityType($resource);
+        // Parameter normalization
+        if (!is_numeric($id) && is_numeric($resource)) {
+            $tmp = $id;
+            $id = $resource;
+            $resource = $tmp ?? $request->route('resource');
+        }
+
+        if ($id === null && is_numeric($resource)) {
+            $id = $resource;
+            $resource = $request->route('resource') ?? 'warehouses';
+        }
+
+        $entityType = $this->resolveEntityType((string) $resource);
+        $id = (int) $id;
+
         $record = InventoryEntityRecord::query()
             ->where('entity_type', $entityType)
             ->findOrFail($id);
@@ -252,9 +329,23 @@ class InventoryEntityRecordController extends Controller
         return response()->json($log->load('createdBy:id,name,email,avatar_path'), 201);
     }
 
-    public function logs(Request $request, string $resource, $id)
+    public function logs(Request $request, $resource, $id = null)
     {
-        $entityType = $this->resolveEntityType($resource);
+        // Parameter normalization
+        if (!is_numeric($id) && is_numeric($resource)) {
+            $tmp = $id;
+            $id = $resource;
+            $resource = $tmp ?? $request->route('resource');
+        }
+
+        if ($id === null && is_numeric($resource)) {
+            $id = $resource;
+            $resource = $request->route('resource') ?? 'warehouses';
+        }
+
+        $entityType = $this->resolveEntityType((string) $resource);
+        $id = (int) $id;
+
         $record = InventoryEntityRecord::query()
             ->where('entity_type', $entityType)
             ->findOrFail($id);
@@ -269,6 +360,26 @@ class InventoryEntityRecordController extends Controller
 
     protected function resolveEntityType(string $resource): string
     {
+        // SELF-HEALING: If $resource is numeric, scan the request context
+        if (is_numeric($resource)) {
+            foreach (request()->route()->parameters() as $value) {
+                if (is_string($value) && InventoryEntityCatalog::entityTypeFor($value)) {
+                    $resource = $value;
+                    break;
+                }
+            }
+            
+            if (is_numeric($resource)) {
+                $segments = request()->segments();
+                foreach ($segments as $segment) {
+                    if (InventoryEntityCatalog::entityTypeFor($segment)) {
+                        $resource = $segment;
+                        break;
+                    }
+                }
+            }
+        }
+
         $entityType = InventoryEntityCatalog::entityTypeFor($resource);
         if ($entityType) {
             return $entityType;

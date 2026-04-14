@@ -6,7 +6,8 @@ interface TranslationState {
   dictionary: Record<string, string>;
   isReady: boolean;
   initLocale: () => Promise<void>;
-  t: (key: string, fallback?: string) => string;
+  setLocale: (newLocale: string) => Promise<void>;
+  t: (key: string, fallback?: string, replacements?: Record<string, any>) => string;
 }
 
 const getApiUrl = (endpoint: string) => `${getBackendApiRoot()}${endpoint}`;
@@ -18,31 +19,42 @@ export const useTranslation = create<TranslationState>((set, get) => ({
 
   initLocale: async () => {
     const savedLocale = typeof window !== 'undefined' ? localStorage.getItem('hive_locale') || 'en' : 'en';
+    await get().setLocale(savedLocale);
+  },
+
+  setLocale: async (newLocale: string) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hive_locale', newLocale);
+    }
     
     try {
-      const res = await fetch(getApiUrl(`/translations/${savedLocale}`), {
+      const res = await fetch(getApiUrl(`/translations/${newLocale}`), {
         headers: { 'Accept': 'application/json' }
       });
       
       if (res.ok) {
         const data = await res.json();
-        
-        // 🚀 THE FIX: Handle direct objects or nested data, no more 'data.messages'
         const cleanDictionary = data.data || data || {};
-        
-        set({ locale: savedLocale, dictionary: cleanDictionary, isReady: true });
+        set({ locale: newLocale, dictionary: cleanDictionary, isReady: true });
       } else {
-        set({ locale: savedLocale, isReady: true });
+        set({ locale: newLocale, isReady: true });
       }
     } catch (err) {
       console.error("Failed to load dictionary:", err);
-      set({ locale: savedLocale, isReady: true });
+      set({ locale: newLocale, isReady: true });
     }
   },
 
-  t: (key: string, fallback?: string) => {
+  t: (key: string, fallback?: string, replacements?: Record<string, any>) => {
     const { dictionary } = get();
-    // 🚀 It will now successfully find the translated key!
-    return dictionary[key] || fallback || key;
+    let text = dictionary[key] || fallback || key;
+    
+    if (replacements) {
+      Object.entries(replacements).forEach(([k, v]) => {
+        text = text.replace(`:${k}`, v);
+      });
+    }
+    
+    return text;
   }
 }));

@@ -1,0 +1,20 @@
+{
+    "title": "Warehouses",
+    "subtitle": "Manage physical storage locations and distribution centers.",
+    "add_btn": "Add Warehouse",
+    "search_placeholder": "Search warehouses by name or code...",
+    "col_name": "Warehouse",
+    "col_location": "Location",
+    "manage_shelves": "Manage Shelves",
+    "delete_confirm_title": "Delete Warehouse?",
+    "delete_confirm_desc": "This will permanently delete the warehouse. All associated data will be affected.",
+    "edit_title": "Edit Warehouse",
+    "create_title": "Create Warehouse",
+    "modal_desc": "Define active storage facilities.",
+    "name_label": "Warehouse Name",
+    "location_label": "Location",
+    "active_label": "Warehouse is active",
+    "name_required": "Warehouse name is required.",
+    "select_placeholder": "Select warehouse",
+    "no_warehouse": "No warehouse linked"
+}

@@ -1,0 +1,15 @@
+{
+    "title": "Inventory Tags",
+    "subtitle": "Label and filter items with custom inventory tags.",
+    "add_btn": "Add Tag",
+    "col_name": "Tag",
+    "delete_confirm_title": "Delete Tag?",
+    "delete_confirm_desc": "This will permanently delete the tag.",
+    "name_required": "Tag name is required.",
+    "edit_title": "Edit Tag",
+    "create_title": "Create Tag",
+    "modal_desc": "Keep product labels organized.",
+    "active_label": "Active tag",
+    "search_placeholder": "Search tags by name...",
+    "none_assigned": "No tags assigned."
+}

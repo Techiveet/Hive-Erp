@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { OfflineRuntime } from "@/components/providers/offline-runtime";
+import { useTranslation } from "@/store/use-translation";
 import {
   restorePersistedQueryCache,
   subscribeToPersistedQueryCache,
@@ -30,6 +31,11 @@ const createQueryClient = () =>
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(createQueryClient);
   const [isRestored, setIsRestored] = useState(false);
+  const { initLocale } = useTranslation();
+
+  useEffect(() => {
+    initLocale();
+  }, [initLocale]);
 
   useEffect(() => {
     restorePersistedQueryCache(queryClient);

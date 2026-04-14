@@ -5,6 +5,7 @@ import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Link2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "@/store/use-translation";
 
 import { DataTable } from "@/components/datatable/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, 
+  AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -104,11 +110,15 @@ const readPayloadStatus = (record: InventoryEntityRecord): "available" | "occupi
 };
 
 export default function InventoryShelfBoxesPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [tableQuery, setTableQuery] = React.useState<TableQueryState>(DEFAULT_QUERY);
   const [selectedRowIds, setSelectedRowIds] = React.useState<RowSelectionState>({});
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState<ShelfBoxForm>(DEFAULT_FORM);
+  const [assignOpen, setAssignOpen] = React.useState(false);
+  const [assignBox, setAssignBox] = React.useState<InventoryEntityRecord | null>(null);
+  const [assignForm, setAssignForm] = React.useState({ storableType: "", storableId: "" });
 
   const shelfBoxesQuery = useQuery({
     queryKey: ["inventory", "shelf-boxes", tableQuery],
@@ -156,25 +166,25 @@ export default function InventoryShelfBoxesPage() {
       return createInventoryEntityRecord("shelf-boxes", payload);
     },
     onSuccess: () => {
-      toast.success(form.id ? "Shelf box updated." : "Shelf box created.");
+      toast.success(form.id ? t("inventory.common.saved", "Shelf box updated.") : t("inventory.common.saved", "Shelf box created."));
       queryClient.invalidateQueries({ queryKey: ["inventory", "shelf-boxes"] });
       setSelectedRowIds({});
       closeModal();
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to save shelf box.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to save shelf box."));
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteInventoryEntityRecord("shelf-boxes", id),
     onSuccess: () => {
-      toast.success("Shelf box deleted.");
+      toast.success(t("inventory.common.deleted", "Shelf box deleted."));
       queryClient.invalidateQueries({ queryKey: ["inventory", "shelf-boxes"] });
       setSelectedRowIds({});
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to delete shelf box.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to delete shelf box."));
     },
   });
 
@@ -185,13 +195,23 @@ export default function InventoryShelfBoxesPage() {
         storable_id: storableId,
       }),
     onSuccess: () => {
-      toast.success("Shelf box assignment updated.");
+      toast.success(t("inventory.common.saved", "Shelf box assignment updated."));
       queryClient.invalidateQueries({ queryKey: ["inventory", "shelf-boxes"] });
+      setAssignOpen(false);
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to assign shelf box.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to assign shelf box."));
     },
   });
+
+  const openAssign = React.useCallback((box: InventoryEntityRecord) => {
+    setAssignBox(box);
+    setAssignForm({
+      storableType: readPayloadString(box, "storable_type", "product"),
+      storableId: readPayloadString(box, "storable_id", ""),
+    });
+    setAssignOpen(true);
+  }, []);
 
   const applyTableQuery = React.useCallback((nextPartial: Partial<TableQueryState>) => {
     setTableQuery((prev) => {
@@ -266,111 +286,124 @@ export default function InventoryShelfBoxesPage() {
     () => [
       {
         accessorKey: "name",
-        header: "Shelf Box",
+        header: t("inventory.shelf_boxes.col_name", "Shelf Box"),
         cell: ({ row }) => {
           const box = row.original;
           return (
             <div>
               <p className="font-semibold">{box.name}</p>
-              <p className="text-xs text-muted-foreground">{box.code || "No code"}</p>
+              <p className="text-xs text-muted-foreground">{box.code || t("inventory.common.no_code", "No code")}</p>
             </div>
           );
         },
       },
       {
         id: "shelf",
-        header: "Shelf",
+        header: t("inventory.shelves.title", "Shelf"),
         enableSorting: false,
-        cell: ({ row }) => row.original.parent?.name ?? "Unassigned",
+        cell: ({ row }) => row.original.parent?.name ?? t("inventory.common.none", "Unassigned"),
       },
       {
         id: "position",
-        header: "Position",
+        header: t("inventory.shelf_boxes.col_position", "Position"),
         enableSorting: false,
         cell: ({ row }) => `R${readPayloadString(row.original, "row", "1")} / C${readPayloadString(row.original, "column", "1")}`,
+        meta: { align: "right" as const },
       },
       {
         id: "quantity_stored",
-        header: "Stored Qty",
+        header: t("inventory.shelf_boxes.col_stored_qty", "Stored Qty"),
         enableSorting: false,
         cell: ({ row }) => readPayloadString(row.original, "quantity_stored", "0"),
+        meta: { align: "right" as const },
       },
       {
         id: "status",
-        header: "Status",
+        header: t("inventory.common.status", "Status"),
         enableSorting: false,
-        cell: ({ row }) => (
-          <Badge variant={readPayloadStatus(row.original) === "occupied" ? "default" : "outline"}>
-            {readPayloadStatus(row.original)}
-          </Badge>
-        ),
+        cell: ({ row }) => {
+          const status = readPayloadStatus(row.original);
+          return (
+            <Badge variant={status === "occupied" ? "default" : "outline"}>
+              {status === "occupied" ? t("inventory.shelf_boxes.occupied", "occupied") : t("inventory.shelf_boxes.available", "available")}
+            </Badge>
+          );
+        },
+        meta: { align: "center" as const },
       },
       {
         id: "actions",
-        header: "Actions",
+        header: t("inventory.common.actions", "Actions"),
         enableSorting: false,
         cell: ({ row }) => {
           const box = row.original;
           return (
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-start gap-2">
               <Button size="sm" variant="outline" className="rounded-full" onClick={() => openEdit(box)}>
                 <Pencil className="mr-1 h-3.5 w-3.5" />
-                Edit
+                {t("inventory.common.edit", "Edit")}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 className="rounded-full"
                 disabled={assignMutation.isPending}
-                onClick={() => {
-                  const storableType = window.prompt("Storable type (e.g. goods or product):", readPayloadString(box, "storable_type", ""));
-                  if (!storableType) return;
-                  const storableIdRaw = window.prompt("Storable ID:", readPayloadString(box, "storable_id", ""));
-                  const storableId = Number(storableIdRaw);
-                  if (!Number.isFinite(storableId) || storableId <= 0) {
-                    toast.error("A valid storable ID is required.");
-                    return;
-                  }
-                  assignMutation.mutate({ id: box.id, storableType, storableId });
-                }}
+                onClick={() => openAssign(box)}
               >
                 <Link2 className="mr-1 h-3.5 w-3.5" />
-                Assign
+                {t("inventory.shelf_boxes.assign", "Assign")}
               </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                className="rounded-full"
-                disabled={deleteMutation.isPending}
-                onClick={() => {
-                  if (!window.confirm(`Delete "${box.name}"?`)) return;
-                  deleteMutation.mutate(box.id);
-                }}
-              >
-                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                Delete
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="rounded-full"
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    {t("inventory.common.delete", "Delete")}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t("inventory.shelf_boxes.delete_confirm_title", "Delete Shelf Box?")}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("inventory.shelf_boxes.delete_confirm_desc", "This will permanently delete the box and its status.")} <strong>{box.name}</strong>.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="rounded-xl">{t("inventory.common.cancel", "Cancel")}</AlertDialogCancel>
+                    <AlertDialogAction 
+                      className="rounded-xl bg-destructive hover:bg-destructive/90"
+                      onClick={() => deleteMutation.mutate(box.id)}
+                    >
+                      {t("inventory.common.confirm", "Confirm Delete")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           );
         },
-        meta: { align: "right" as const },
+        meta: { align: "left" as const },
       },
     ],
-    [assignMutation, deleteMutation, openEdit]
+    [assignMutation, deleteMutation, openEdit, t]
   );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Shelf Boxes</h1>
+          <h1 className="text-3xl font-black tracking-tight">{t("inventory.shelf_boxes.title", "Shelf Boxes")}</h1>
           <p className="text-sm text-muted-foreground">
-            Box-level storage coordinates and assignment controls for shelf operations.
+            {t("inventory.shelf_boxes.subtitle", "Box-level storage coordinates and assignment controls.")}
           </p>
         </div>
         <Button className="rounded-full px-5" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Shelf Box
+          {t("inventory.shelf_boxes.add_btn", "Add Shelf Box")}
         </Button>
       </div>
 
@@ -387,9 +420,6 @@ export default function InventoryShelfBoxesPage() {
         onSelectionChange={(payload) => setSelectedRowIds(payload.selectedRowIds as RowSelectionState)}
         onDeleteRows={async (rows) => {
           if (rows.length === 0) return;
-          if (!window.confirm(`Delete ${rows.length} selected shelf box${rows.length === 1 ? "" : "es"}?`)) {
-            return;
-          }
           await Promise.all(rows.map((row) => deleteMutation.mutateAsync(row.id)));
           clearSelection();
         }}
@@ -402,7 +432,7 @@ export default function InventoryShelfBoxesPage() {
           applyTableQuery(DEFAULT_QUERY);
           clearSelection();
         }}
-        searchPlaceholder="Search shelf boxes by name or code..."
+        searchPlaceholder={t("inventory.shelf_boxes.search_placeholder", "Search shelf boxes by name or code...")}
         resourceName="shelf boxes"
         syncWithUrl={false}
       />
@@ -421,10 +451,10 @@ export default function InventoryShelfBoxesPage() {
           <div className="border-b border-border/40 px-6 py-5">
             <DialogHeader>
               <DialogTitle className="text-xl font-black tracking-tight">
-                {form.id ? "Edit Shelf Box" : "Create Shelf Box"}
+                {form.id ? t("inventory.shelf_boxes.edit_title", "Edit Shelf Box") : t("inventory.shelf_boxes.create_title", "Create Shelf Box")}
               </DialogTitle>
               <DialogDescription>
-                Define shelf box coordinates and optional storable assignment metadata.
+                {t("inventory.shelf_boxes.modal_desc", "Define shelf box coordinates.")}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -432,19 +462,19 @@ export default function InventoryShelfBoxesPage() {
           <div className="grid gap-4 px-6 py-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="box-name">Box Name</Label>
+                <Label htmlFor="box-name">{t("inventory.shelf_boxes.name_label", "Box Name")}</Label>
                 <Input id="box-name" value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="Box A-01" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="box-code">Code</Label>
+                <Label htmlFor="box-code">{t("inventory.common.code", "Code")}</Label>
                 <Input id="box-code" value={form.code} onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))} placeholder="BX-A01" />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="box-shelf">Shelf</Label>
+                <Label htmlFor="box-shelf">{t("inventory.shelves.title", "Shelf")}</Label>
                 <Select value={form.parent_id || "__none__"} onValueChange={(value) => setForm((prev) => ({ ...prev, parent_id: value === "__none__" ? "" : value }))}>
-                  <SelectTrigger id="box-shelf"><SelectValue placeholder="Select shelf" /></SelectTrigger>
+                  <SelectTrigger id="box-shelf"><SelectValue placeholder={t("inventory.shelves.select_placeholder", "Select shelf")} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">No shelf linked</SelectItem>
+                    <SelectItem value="__none__">{t("inventory.shelves.no_shelf", "No shelf linked")}</SelectItem>
                     {(shelvesQuery.data?.data ?? []).map((shelf) => (
                       <SelectItem key={shelf.id} value={String(shelf.id)}>{shelf.name}</SelectItem>
                     ))}
@@ -452,61 +482,131 @@ export default function InventoryShelfBoxesPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="box-row">Row</Label>
+                <Label htmlFor="box-row">{t("inventory.shelf_boxes.row_label", "Row")}</Label>
                 <Input id="box-row" type="number" min="1" value={form.row} onChange={(event) => setForm((prev) => ({ ...prev, row: event.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="box-column">Column</Label>
+                <Label htmlFor="box-column">{t("inventory.shelf_boxes.column_label", "Column")}</Label>
                 <Input id="box-column" type="number" min="1" value={form.column} onChange={(event) => setForm((prev) => ({ ...prev, column: event.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="box-qty">Quantity Stored</Label>
+                <Label htmlFor="box-qty">{t("inventory.shelf_boxes.quantity_label", "Quantity Stored")}</Label>
                 <Input id="box-qty" type="number" min="0" value={form.quantity_stored} onChange={(event) => setForm((prev) => ({ ...prev, quantity_stored: event.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="box-status">Storage Status</Label>
+                <Label htmlFor="box-status">{t("inventory.shelf_boxes.status_label", "Storage Status")}</Label>
                 <Select value={form.storage_status} onValueChange={(value) => setForm((prev) => ({ ...prev, storage_status: value as "available" | "occupied" }))}>
                   <SelectTrigger id="box-status"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="available">available</SelectItem>
-                    <SelectItem value="occupied">occupied</SelectItem>
+                    <SelectItem value="available">{t("inventory.shelf_boxes.available", "available")}</SelectItem>
+                    <SelectItem value="occupied">{t("inventory.shelf_boxes.occupied", "occupied")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="box-storable-type">Storable Type</Label>
+                <Label htmlFor="box-storable-type">{t("inventory.shelf_boxes.storable_type", "Storable Type")}</Label>
                 <Input id="box-storable-type" value={form.storable_type} onChange={(event) => setForm((prev) => ({ ...prev, storable_type: event.target.value }))} placeholder="goods / product" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="box-storable-id">Storable ID</Label>
+                <Label htmlFor="box-storable-id">{t("inventory.shelf_boxes.storable_id", "Storable ID")}</Label>
                 <Input id="box-storable-id" type="number" min="1" value={form.storable_id} onChange={(event) => setForm((prev) => ({ ...prev, storable_id: event.target.value }))} placeholder="123" />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="box-notes">Notes</Label>
+                <Label htmlFor="box-notes">{t("inventory.common.notes", "Notes")}</Label>
                 <Textarea id="box-notes" value={form.notes} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} className="min-h-[84px]" />
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Checkbox id="box-active" checked={form.is_active} onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_active: checked === true }))} />
-              <Label htmlFor="box-active" className="cursor-pointer">Shelf box is active</Label>
+              <Label htmlFor="box-active" className="cursor-pointer">{t("inventory.shelf_boxes.active_label", "Shelf box is active")}</Label>
             </div>
           </div>
 
           <DialogFooter className="border-t border-border/40 bg-muted/20 px-6 py-4">
-            <Button variant="outline" className="rounded-full" onClick={closeModal}>Cancel</Button>
+            <Button variant="outline" className="rounded-full" onClick={closeModal}>{t("inventory.common.cancel", "Cancel")}</Button>
             <Button
               className="rounded-full"
               disabled={saveMutation.isPending}
               onClick={() => {
                 if (!form.name.trim()) {
-                  toast.error("Shelf box name is required.");
+                  toast.error(t("inventory.shelf_boxes.name_required", "Shelf box name is required."));
                   return;
                 }
                 saveMutation.mutate();
               }}
             >
               {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {form.id ? "Save Shelf Box" : "Create Shelf Box"}
+              {form.id ? t("inventory.common.save", "Save Shelf Box") : t("inventory.common.create", "Create Shelf Box")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+        <DialogContent className="sm:max-w-md rounded-[2rem] border-border/60 bg-background/95 p-0 backdrop-blur-xl">
+          <div className="border-b border-border/40 px-6 py-5">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black tracking-tight">
+                {t("inventory.shelf_boxes.assign_title", "Assign Storage")}
+              </DialogTitle>
+              <DialogDescription>
+                {t("inventory.shelf_boxes.assign_desc", "Directly map a product or stock unit to this physical box.")}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="grid gap-4 px-6 py-5">
+            <div className="space-y-2">
+              <Label htmlFor="storable-type">{t("inventory.shelf_boxes.storable_type", "Storable Type")}</Label>
+              <Select 
+                value={assignForm.storableType} 
+                onValueChange={(val) => setAssignForm(prev => ({ ...prev, storableType: val }))}
+              >
+                <SelectTrigger id="storable-type" className="bg-background">
+                  <SelectValue placeholder={t("inventory.shelf_boxes.type_placeholder", "Select type...")} />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="product">{t("inventory.common.product", "Product")}</SelectItem>
+                  <SelectItem value="goods">{t("inventory.common.goods", "Goods")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="storable-id">{t("inventory.shelf_boxes.storable_id", "Storable ID")}</Label>
+              <Input
+                id="storable-id"
+                type="number"
+                value={assignForm.storableId}
+                onChange={(e) => setAssignForm(prev => ({ ...prev, storableId: e.target.value }))}
+                placeholder="e.g. 15"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-border/40 bg-muted/20 px-6 py-4 sm:justify-end">
+            <Button variant="outline" className="rounded-full" onClick={() => setAssignOpen(false)}>
+              {t("inventory.common.cancel", "Cancel")}
+            </Button>
+            <Button 
+              className="rounded-full" 
+              disabled={assignMutation.isPending}
+              onClick={() => {
+                const storableId = Number(assignForm.storableId);
+                if (!Number.isFinite(storableId) || storableId <= 0) {
+                  toast.error(t("inventory.shelf_boxes.id_required", "A valid storable ID is required."));
+                  return;
+                }
+                if (!assignBox) return;
+                assignMutation.mutate({ 
+                  id: assignBox.id, 
+                  storableType: assignForm.storableType, 
+                  storableId 
+                });
+              }}
+            >
+              {assignMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t("inventory.shelf_boxes.complete_assignment", "Complete Assignment")}
             </Button>
           </DialogFooter>
         </DialogContent>

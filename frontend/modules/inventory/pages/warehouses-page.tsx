@@ -4,7 +4,13 @@ import * as React from "react";
 import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, 
+  AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { useTranslation } from "@/store/use-translation";
 
 import { DataTable } from "@/components/datatable/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +73,8 @@ const getLocation = (record: InventoryEntityRecord): string => {
 };
 
 export default function InventoryWarehousesPage() {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const [tableQuery, setTableQuery] = React.useState<TableQueryState>(DEFAULT_QUERY);
   const [selectedRowIds, setSelectedRowIds] = React.useState<RowSelectionState>({});
@@ -103,25 +111,25 @@ export default function InventoryWarehousesPage() {
       return createInventoryEntityRecord("warehouses", payload);
     },
     onSuccess: () => {
-      toast.success(form.id ? "Warehouse updated." : "Warehouse created.");
+      toast.success(form.id ? t("inventory.common.saved", "Warehouse updated.") : t("inventory.common.saved", "Warehouse created."));
       queryClient.invalidateQueries({ queryKey: ["inventory", "warehouses"] });
       setSelectedRowIds({});
       closeModal();
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to save warehouse.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to save warehouse."));
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteInventoryEntityRecord("warehouses", id),
     onSuccess: () => {
-      toast.success("Warehouse deleted.");
+      toast.success(t("inventory.common.deleted", "Warehouse deleted."));
       queryClient.invalidateQueries({ queryKey: ["inventory", "warehouses"] });
       setSelectedRowIds({});
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to delete warehouse.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to delete warehouse."));
     },
   });
 
@@ -191,79 +199,104 @@ export default function InventoryWarehousesPage() {
     () => [
       {
         accessorKey: "name",
-        header: "Warehouse",
+        header: t("inventory.warehouses.col_name", "Warehouse"),
         cell: ({ row }) => {
           const warehouse = row.original;
           return (
             <div>
               <p className="font-semibold">{warehouse.name}</p>
-              <p className="text-xs text-muted-foreground">{warehouse.code || "No code"}</p>
+              <p className="text-xs text-muted-foreground">{warehouse.code || t("inventory.common.no_code", "No code")}</p>
             </div>
           );
         },
       },
       {
         id: "location",
-        header: "Location",
+        header: t("inventory.warehouses.col_location", "Location"),
         enableSorting: false,
         cell: ({ row }) => getLocation(row.original),
       },
       {
         accessorKey: "is_active",
-        header: "Status",
+        header: t("inventory.common.status", "Status"),
         enableSorting: false,
         cell: ({ row }) => (
           <Badge variant={row.original.is_active ? "default" : "secondary"}>
-            {row.original.is_active ? "active" : "inactive"}
+            {row.original.is_active ? t("inventory.common.active", "active") : t("inventory.common.inactive", "inactive")}
           </Badge>
         ),
       },
       {
         id: "actions",
-        header: "Actions",
+        header: t("inventory.common.actions", "Actions"),
         enableSorting: false,
         cell: ({ row }) => {
           const warehouse = row.original;
           return (
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="outline" className="rounded-full" onClick={() => openEdit(warehouse)}>
-                <Pencil className="mr-1 h-3.5 w-3.5" />
-                Edit
-              </Button>
+            <div className="flex justify-start gap-2">
               <Button
                 size="sm"
-                variant="destructive"
-                className="rounded-full"
-                disabled={deleteMutation.isPending}
-                onClick={() => {
-                  if (!window.confirm(`Delete "${warehouse.name}"?`)) return;
-                  deleteMutation.mutate(warehouse.id);
-                }}
+                variant="outline"
+                className="rounded-full bg-primary/10 text-primary hover:bg-primary/20 border-primary/20"
+                onClick={() => (window.location.href = `/dashboard/inventory/locations/shelves?warehouse_id=${warehouse.id}`)}
               >
-                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                Delete
+                {t("inventory.warehouses.manage_shelves", "Manage Shelves")}
               </Button>
+              <Button size="sm" variant="outline" className="rounded-full" onClick={() => openEdit(warehouse)}>
+                <Pencil className="mr-1 h-3.5 w-3.5" />
+                {t("inventory.common.edit", "Edit")}
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="rounded-full"
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    {t("inventory.common.delete", "Delete")}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t("inventory.warehouses.delete_confirm_title", "Delete Warehouse?")}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("inventory.warehouses.delete_confirm_desc", "This will permanently delete the warehouse. All associated data will be affected.")} <strong>{warehouse.name}</strong>.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="rounded-xl">{t("inventory.common.cancel", "Cancel")}</AlertDialogCancel>
+                    <AlertDialogAction 
+                      className="rounded-xl bg-destructive hover:bg-destructive/90"
+                      onClick={() => deleteMutation.mutate(warehouse.id)}
+                    >
+                      {t("inventory.common.confirm", "Confirm Delete")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           );
         },
-        meta: { align: "right" as const },
+        meta: { align: "left" as const },
       },
     ],
-    [deleteMutation, openEdit]
+    [deleteMutation, openEdit, t]
   );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Warehouses</h1>
+          <h1 className="text-3xl font-black tracking-tight">{t("inventory.warehouses.title", "Warehouses")}</h1>
           <p className="text-sm text-muted-foreground">
-            Warehouse setup with location metadata and export-ready datatable workflows.
+            {t("inventory.warehouses.subtitle", "Warehouse setup with location metadata and export-ready datatable workflows.")}
           </p>
         </div>
         <Button className="rounded-full px-5" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Warehouse
+          {t("inventory.warehouses.add_btn", "Add Warehouse")}
         </Button>
       </div>
 
@@ -280,9 +313,6 @@ export default function InventoryWarehousesPage() {
         onSelectionChange={(payload) => setSelectedRowIds(payload.selectedRowIds as RowSelectionState)}
         onDeleteRows={async (rows) => {
           if (rows.length === 0) return;
-          if (!window.confirm(`Delete ${rows.length} selected warehouse${rows.length === 1 ? "" : "s"}?`)) {
-            return;
-          }
           await Promise.all(rows.map((row) => deleteMutation.mutateAsync(row.id)));
           clearSelection();
         }}
@@ -295,7 +325,7 @@ export default function InventoryWarehousesPage() {
           applyTableQuery(DEFAULT_QUERY);
           clearSelection();
         }}
-        searchPlaceholder="Search warehouses by name or code..."
+        searchPlaceholder={t("inventory.warehouses.search_placeholder", "Search warehouses by name or code...")}
         resourceName="warehouses"
         syncWithUrl={false}
       />
@@ -314,17 +344,17 @@ export default function InventoryWarehousesPage() {
           <div className="border-b border-border/40 px-6 py-5">
             <DialogHeader>
               <DialogTitle className="text-xl font-black tracking-tight">
-                {form.id ? "Edit Warehouse" : "Create Warehouse"}
+                {form.id ? t("inventory.warehouses.edit_title", "Edit Warehouse") : t("inventory.warehouses.create_title", "Create Warehouse")}
               </DialogTitle>
               <DialogDescription>
-                Define active storage facilities that shelves and shelf boxes can inherit from.
+                {t("inventory.warehouses.modal_desc", "Define active storage facilities.")}
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="grid gap-4 px-6 py-5">
             <div className="space-y-2">
-              <Label htmlFor="warehouse-name">Warehouse Name</Label>
+              <Label htmlFor="warehouse-name">{t("inventory.warehouses.name_label", "Warehouse Name")}</Label>
               <Input
                 id="warehouse-name"
                 value={form.name}
@@ -334,7 +364,7 @@ export default function InventoryWarehousesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="warehouse-code">Code</Label>
+              <Label htmlFor="warehouse-code">{t("inventory.common.code", "Code")}</Label>
               <Input
                 id="warehouse-code"
                 value={form.code}
@@ -344,7 +374,7 @@ export default function InventoryWarehousesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="warehouse-location">Location</Label>
+              <Label htmlFor="warehouse-location">{t("inventory.warehouses.location_label", "Location")}</Label>
               <Input
                 id="warehouse-location"
                 value={form.location}
@@ -360,28 +390,28 @@ export default function InventoryWarehousesPage() {
                 onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_active: checked === true }))}
               />
               <Label htmlFor="warehouse-active" className="cursor-pointer">
-                Warehouse is active
+                {t("inventory.warehouses.active_label", "Warehouse is active")}
               </Label>
             </div>
           </div>
 
           <DialogFooter className="border-t border-border/40 bg-muted/20 px-6 py-4">
             <Button variant="outline" className="rounded-full" onClick={closeModal}>
-              Cancel
+              {t("inventory.common.cancel", "Cancel")}
             </Button>
             <Button
               className="rounded-full"
               disabled={saveMutation.isPending}
               onClick={() => {
                 if (!form.name.trim()) {
-                  toast.error("Warehouse name is required.");
+                  toast.error(t("inventory.warehouses.name_required", "Warehouse name is required."));
                   return;
                 }
                 saveMutation.mutate();
               }}
             >
               {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {form.id ? "Save Warehouse" : "Create Warehouse"}
+              {form.id ? t("inventory.common.save", "Save Warehouse") : t("inventory.common.create", "Create Warehouse")}
             </Button>
           </DialogFooter>
         </DialogContent>

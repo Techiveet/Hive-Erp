@@ -296,6 +296,7 @@ export default function DashboardHome() {
 
     const isCentral = data.stats.total_tenants !== undefined;
 
+
     const tooltipStyle = { 
         borderRadius: '12px', 
         backgroundColor: 'hsl(var(--background))', 
@@ -330,13 +331,14 @@ export default function DashboardHome() {
                 <Breadcrumbs items={[{ label: "Hive.OS", href: "/", icon: <Home className="h-4 w-4" /> }, { label: t('nav.dashboard', 'Dashboard') }]} />
             </div>
             
-            <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between mb-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-4 mt-2">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
                         <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
                         <span className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">NODE: <strong className="text-foreground">{tenantName}</strong></span>
                     </div>
-                    <h1 className="text-4xl font-space font-extrabold tracking-tighter">{data.company}</h1>
+                    <h1 className="text-3xl sm:text-4xl font-space font-extrabold tracking-tighter break-words max-w-full">{data.company}</h1>
+
                     
                     <div className="flex flex-wrap items-center gap-3 mt-6">
                         {isCentral && canProvisionTenants && (
@@ -369,18 +371,18 @@ export default function DashboardHome() {
                         )}
                     </div>
                 </div>
-                <div className="flex flex-col items-end gap-3">
-                    <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/5 text-primary px-4 py-1.5 font-mono text-xs uppercase tracking-widest">
-                        CLEARANCE: {data.plan}
+                <div className="flex flex-row md:flex-col items-center md:items-end gap-3 justify-between md:justify-end">
+                    <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/5 text-primary px-3 sm:px-4 py-1.5 font-mono text-[10px] sm:text-xs uppercase tracking-widest">
+                        {data.plan}
                     </Badge>
-                    <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
-                        <ShieldCheck className="w-3 h-3 text-emerald-500" /> {t('dashboard.system_encrypted', 'System Encrypted & Secured')}
+                    <div className="flex items-center gap-2 text-[10px] sm:text-xs font-mono text-muted-foreground">
+                        <ShieldCheck className="w-3 h-3 text-emerald-500" /> <span className="hidden sm:inline">{t('dashboard.system_encrypted', 'System Encrypted & Secured')}</span>
                     </div>
                 </div>
             </div>
 
             {/* STAT CARDS */}
-            <div className={cn("grid gap-4 mt-8", isCentral ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-4" : "grid-cols-1 md:grid-cols-3")}>
+            <div id="tour-body-stats" className={cn("grid gap-4 mt-8", isCentral ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3")}>
                 {isCentral && (
                     <StatCard title={t('dashboard.active_nodes', 'Active Nodes')} value={data.stats.active_tenants || 0} subtext={`${t('dashboard.provisioned', 'Provisioned')}: ${data.stats.total_tenants}`} icon={<Server className="text-indigo-500" />} bgClass="bg-indigo-500/10" href={canViewTenants ? "/dashboard/tenants" : undefined} trend="up" />
                 )}
@@ -391,8 +393,8 @@ export default function DashboardHome() {
 
             {/* CENTRAL ONLY: Telemetry & Modules */}
             {isCentral && (
-                <div className="grid gap-4 md:grid-cols-12">
-                    <div className="md:col-span-7 lg:col-span-8 rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md h-[400px] flex flex-col">
+                <div className="grid gap-4 lg:grid-cols-12">
+                    <div id="tour-body-telemetry" className="lg:col-span-7 xl:col-span-8 rounded-2xl md:rounded-[2.5rem] border border-border/50 bg-card/40 p-4 sm:p-6 backdrop-blur-md min-h-[300px] md:h-[400px] flex flex-col transition-all">
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
                                 <ActivitySquare className="h-4 w-4 text-primary" /> {t('dashboard.system_telemetry', 'System Telemetry')}
@@ -417,25 +419,25 @@ export default function DashboardHome() {
                         </div>
                     </div>
 
-                    <div className="md:col-span-5 lg:col-span-4 rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md h-[400px] flex flex-col">
+                    <div id="tour-body-modules" className="lg:col-span-5 xl:col-span-4 rounded-2xl md:rounded-[2.5rem] border border-border/50 bg-card/40 p-4 sm:p-6 backdrop-blur-md h-[350px] md:h-[400px] flex flex-col transition-all">
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
-                                <Layers className="h-4 w-4 text-emerald-500" /> Modules
+                                <Layers className="h-4 w-4 text-emerald-500" /> {t('dashboard.modules.title', 'Modules')}
                             </div>
                             <div className="flex items-center gap-1 bg-background/50 rounded-full p-1 border border-border/50">
-                                <Button variant={moduleTab === 'traffic' ? 'default' : 'ghost'} size="icon" className="h-6 w-6 rounded-full" onClick={() => setModuleTab('traffic')} title="Traffic Volume"><Activity className="h-3 w-3"/></Button>
-                                <Button variant={moduleTab === 'latency' ? 'default' : 'ghost'} size="icon" className="h-6 w-6 rounded-full" onClick={() => setModuleTab('latency')} title="Response Latency"><Clock className="h-3 w-3"/></Button>
-                                <Button variant={moduleTab === 'errors' ? 'default' : 'ghost'} size="icon" className="h-6 w-6 rounded-full" onClick={() => setModuleTab('errors')} title="Anomalies"><AlertOctagon className="h-3 w-3"/></Button>
+                                <Button variant={moduleTab === 'traffic' ? 'default' : 'ghost'} size="icon" className="h-6 w-6 rounded-full" onClick={() => setModuleTab('traffic')} title={t('dashboard.modules.traffic_volume', 'Traffic Volume')}><Activity className="h-3 w-3"/></Button>
+                                <Button variant={moduleTab === 'latency' ? 'default' : 'ghost'} size="icon" className="h-6 w-6 rounded-full" onClick={() => setModuleTab('latency')} title={t('dashboard.modules.response_latency', 'Response Latency')}><Clock className="h-3 w-3"/></Button>
+                                <Button variant={moduleTab === 'errors' ? 'default' : 'ghost'} size="icon" className="h-6 w-6 rounded-full" onClick={() => setModuleTab('errors')} title={t('dashboard.modules.anomalies', 'Anomalies')}><AlertOctagon className="h-3 w-3"/></Button>
                             </div>
                         </div>
                         <div className="flex-1 w-full relative">
                             {moduleTab === 'traffic' && (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={moduleTraffic} layout="vertical" margin={{ top: 0, right: 20, left: 50, bottom: 0 }}>
+                                    <BarChart data={moduleTraffic.map(m => ({ ...m, name: t(`dashboard.modules.${m.name.toLowerCase()}`, m.name) }))} layout="vertical" margin={{ top: 0, right: 20, left: 50, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                                         <XAxis type="number" hide />
                                         <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fontWeight: 'bold'}} />
-                                        <Tooltip cursor={{fill: 'hsl(var(--muted))', opacity: 0.4}} contentStyle={tooltipStyle} itemStyle={{ color: 'hsl(var(--foreground))' }} labelStyle={{ color: 'hsl(var(--muted-foreground))' }} formatter={(val: any) => [`${val} Req/s`, 'Volume']} />
+                                        <Tooltip cursor={{fill: 'hsl(var(--muted))', opacity: 0.4}} contentStyle={tooltipStyle} itemStyle={{ color: 'hsl(var(--foreground))' }} labelStyle={{ color: 'hsl(var(--muted-foreground))' }} formatter={(val: any) => [`${val} ${t('dashboard.modules.req_per_sec', 'Req/s')}`, t('dashboard.modules.volume_label', 'Volume')]} />
                                         <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24} isAnimationActive={false}>
                                             {moduleTraffic.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                                         </Bar>
@@ -444,11 +446,11 @@ export default function DashboardHome() {
                             )}
                             {moduleTab === 'latency' && (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={moduleLatency} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                                    <BarChart data={moduleLatency.map(m => ({ ...m, name: t(`dashboard.modules.${m.name.toLowerCase()}`, m.name) }))} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 11, fontWeight: 'bold'}} />
                                         <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                                        <Tooltip cursor={{fill: 'hsl(var(--muted))', opacity: 0.4}} contentStyle={tooltipStyle} itemStyle={{ color: 'hsl(var(--foreground))' }} labelStyle={{ color: 'hsl(var(--muted-foreground))' }} formatter={(val: any) => [`${val}ms`, 'Latency']} />
+                                        <Tooltip cursor={{fill: 'hsl(var(--muted))', opacity: 0.4}} contentStyle={tooltipStyle} itemStyle={{ color: 'hsl(var(--foreground))' }} labelStyle={{ color: 'hsl(var(--muted-foreground))' }} formatter={(val: any) => [`${val}${t('dashboard.modules.ms', 'ms')}`, t('dashboard.modules.latency_label', 'Latency')]} />
                                         <Bar dataKey="ms" radius={[4, 4, 0, 0]} barSize={32} isAnimationActive={false}>
                                             {moduleLatency.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} opacity={0.8} />)}
                                         </Bar>
@@ -458,8 +460,8 @@ export default function DashboardHome() {
                             {moduleTab === 'errors' && (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: 'hsl(var(--foreground))' }} formatter={(val: any) => [`${val} Events`, 'Anomalies']} />
-                                        <Pie data={moduleErrors} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="count" stroke="none" isAnimationActive={false}>
+                                        <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: 'hsl(var(--foreground))' }} formatter={(val: any) => [`${val} ${t('dashboard.modules.events', 'Events')}`, t('dashboard.modules.anomalies', 'Anomalies')]} />
+                                        <Pie data={moduleErrors.map(m => ({ ...m, name: t(`dashboard.modules.${m.name.toLowerCase()}`, m.name) }))} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="count" stroke="none" isAnimationActive={false}>
                                             {moduleErrors.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                                         </Pie>
                                     </PieChart>
@@ -471,8 +473,8 @@ export default function DashboardHome() {
             )}
             {/* TENANT ONLY: Engagement Chart & Traffic */}
             {!isCentral && (
-                <div className="grid gap-4 md:grid-cols-12 mt-4">
-                    <div className="md:col-span-8 rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md h-[400px] flex flex-col">
+                <div className="grid gap-4 lg:grid-cols-12 mt-4">
+                    <div className="lg:col-span-7 xl:col-span-8 rounded-2xl md:rounded-[2.5rem] border border-border/50 bg-card/40 p-4 sm:p-6 backdrop-blur-md min-h-[300px] md:h-[400px] flex flex-col transition-all">
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
                                 <LineChartIcon className="h-4 w-4 text-emerald-500" /> {t('dashboard.weekly_engagement', 'Weekly Engagement')}
@@ -519,8 +521,8 @@ export default function DashboardHome() {
 
             {/* CENTRAL ONLY: Revenue, Cluster & Origin Data Row */}
             {isCentral && (
-                <div className="grid gap-4 md:grid-cols-3">
-                    <div className="rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md flex flex-col justify-between">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="rounded-2xl md:rounded-[2.5rem] border border-border/50 bg-card/40 p-4 sm:p-6 backdrop-blur-md flex flex-col justify-between transition-all">
                         <div className="flex items-center justify-between mb-4">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
                                 <CreditCard className="h-4 w-4 text-amber-500" /> {t('dashboard.revenue_intel', 'Revenue Intel')}
@@ -543,33 +545,33 @@ export default function DashboardHome() {
                         </div>
                     </div>
 
-                    <div className="rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md">
+                    <div className="rounded-2xl md:rounded-[2.5rem] border border-border/50 bg-card/40 p-4 sm:p-6 backdrop-blur-md transition-all">
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
                                 <HardDrive className="h-4 w-4 text-indigo-500" /> {t('dashboard.cluster_health', 'Cluster Health')}
                             </div>
                             <span className="relative flex h-2 w-2"><span className="animate-ping absolute h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative rounded-full h-2 w-2 bg-emerald-500"></span></span>
                         </div>
-                        <div className="grid grid-cols-3 gap-4">
-                            <div className="flex flex-col items-center justify-center p-3 bg-background/50 rounded-2xl border border-border/40">
-                                <Database className="h-5 w-5 text-blue-500 mb-2" />
-                                <span className="text-lg font-bold font-mono">{data.cluster?.db_size || 'N/A'}</span>
-                                <span className="text-[9px] uppercase text-muted-foreground tracking-widest">PGSQL Data</span>
+                        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                            <div className="flex flex-col items-center justify-center p-2 sm:p-3 bg-background/50 rounded-xl sm:rounded-2xl border border-border/40">
+                                <Database className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 mb-1 sm:mb-2" />
+                                <span className="text-sm sm:text-lg font-bold font-mono">{data.cluster?.db_size || 'N/A'}</span>
+                                <span className="text-[8px] sm:text-[9px] uppercase text-muted-foreground tracking-widest text-center">PGSQL Data</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-3 bg-background/50 rounded-2xl border border-border/40">
-                                <Zap className="h-5 w-5 text-red-500 mb-2" />
-                                <span className="text-lg font-bold font-mono">{data.cluster?.redis_hits || 0}%</span>
-                                <span className="text-[9px] uppercase text-muted-foreground tracking-widest">Redis Hits</span>
+                            <div className="flex flex-col items-center justify-center p-2 sm:p-3 bg-background/50 rounded-xl sm:rounded-2xl border border-border/40">
+                                <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-red-500 mb-1 sm:mb-2" />
+                                <span className="text-sm sm:text-lg font-bold font-mono">{data.cluster?.redis_hits || 0}%</span>
+                                <span className="text-[8px] sm:text-[9px] uppercase text-muted-foreground tracking-widest text-center">Redis Hits</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-3 bg-background/50 rounded-2xl border border-border/40">
-                                <ActivitySquare className="h-5 w-5 text-emerald-500 mb-2" />
-                                <span className="text-lg font-bold font-mono">{data.cluster?.ws_connections || 0}</span>
-                                <span className="text-[9px] uppercase text-muted-foreground tracking-widest">WS Conns</span>
+                            <div className="flex flex-col items-center justify-center p-2 sm:p-3 bg-background/50 rounded-xl sm:rounded-2xl border border-border/40">
+                                <ActivitySquare className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 mb-1 sm:mb-2" />
+                                <span className="text-sm sm:text-lg font-bold font-mono">{data.cluster?.ws_connections || 0}</span>
+                                <span className="text-[8px] sm:text-[9px] uppercase text-muted-foreground tracking-widest text-center">WS Conns</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md flex flex-col">
+                    <div className="rounded-2xl md:rounded-[2.5rem] border border-border/50 bg-card/40 p-4 sm:p-6 backdrop-blur-md flex flex-col transition-all">
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground">
                                 <Globe className="h-4 w-4 text-blue-400" /> {t('dashboard.traffic_origins', 'Traffic Origins')}
@@ -586,9 +588,9 @@ export default function DashboardHome() {
                     </div>
                 </div>
             )}
-            <div className="grid gap-4 md:grid-cols-12 mt-4">
+            <div className="grid gap-4 lg:grid-cols-12 mt-4 pb-20 sm:pb-10">
                 {isCentral && canViewAlerts && (
-                    <div className="md:col-span-4 rounded-[2rem] border border-red-500/20 bg-gradient-to-br from-red-500/5 to-background p-6 flex flex-col overflow-hidden">
+                    <div className="lg:col-span-4 rounded-2xl md:rounded-[2.5rem] border border-red-500/20 bg-gradient-to-br from-red-500/5 to-background p-4 sm:p-6 flex flex-col overflow-hidden transition-all">
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
                                 <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-red-500">
@@ -626,7 +628,7 @@ export default function DashboardHome() {
                 )}
 
                 {!isCentral && (canInviteUsers || canViewRoles || canViewPermissions) && (
-                     <div className="md:col-span-4 rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md flex flex-col">
+                     <div className="lg:col-span-4 rounded-2xl md:rounded-[2.5rem] border border-border/50 bg-card/40 p-4 sm:p-6 backdrop-blur-md flex flex-col transition-all">
                         <div className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-muted-foreground mb-6">
                             <Zap className="h-4 w-4 text-amber-500" /> {t('dashboard.quick_actions', 'Quick Actions')}
                         </div>
@@ -674,7 +676,7 @@ export default function DashboardHome() {
                 )}
 
                 {canViewLogs && (
-                    <div className={cn("rounded-[2rem] border border-border/50 bg-card/40 p-6 backdrop-blur-md", (isCentral ? canViewAlerts : (canInviteUsers || canViewRoles || canViewPermissions)) ? "md:col-span-8" : "md:col-span-12")}>
+                    <div id="tour-body-audit" className={cn("rounded-2xl md:rounded-[2.5rem] border border-border/50 bg-card/40 p-4 sm:p-6 backdrop-blur-md transition-all", (isCentral ? canViewAlerts : (canInviteUsers || canViewRoles || canViewPermissions)) ? "lg:col-span-8" : "lg:col-span-12")}>
                         <div className="flex items-center justify-between mb-6">
                             <div className="text-sm font-bold flex items-center gap-3 uppercase tracking-widest text-muted-foreground">
                                 <Activity className="h-4 w-4 text-primary" /> 
@@ -755,26 +757,26 @@ function StatCard({
             <div className={cn("absolute -right-8 -top-8 w-32 h-32 rounded-full blur-3xl opacity-20", bgClass)} />
             <div className="flex justify-between mb-4 relative z-10">
                 <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center border", bgClass)}>{icon}</div>
-                {trend === 'up' && <Badge className="bg-emerald-500/10 text-emerald-500 border-none text-[10px] animate-pulse">+ {t('dashboard.live', 'LIVE')}</Badge>}
+                {trend === 'up' && <Badge className="bg-emerald-500/10 text-emerald-500 border-none text-[10px] animate-pulse hidden sm:flex">+ {t('dashboard.live', 'LIVE')}</Badge>}
             </div>
             <div className="relative z-10">
-                <h3 className="text-3xl font-space font-black tracking-tighter tabular-nums">{value}</h3>
+                <h3 className="text-2xl sm:text-3xl font-space font-black tracking-tighter tabular-nums">{value}</h3>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{title}</p>
-                <p className="text-[10px] text-muted-foreground font-mono mt-1">{subtext}</p>
+                <p className="text-[10px] text-muted-foreground font-mono mt-1 opacity-80">{subtext}</p>
             </div>
         </>
     );
 
     if (!href) {
         return (
-            <div className="p-6 rounded-[2rem] border border-border/50 bg-card/40 backdrop-blur-md relative overflow-hidden group block">
+            <div className="p-4 sm:p-6 rounded-2xl md:rounded-[2rem] border border-border/50 bg-card/40 backdrop-blur-md relative overflow-hidden group block transition-all shadow-lg hover:bg-card/60">
                 {content}
             </div>
         );
     }
 
     return (
-        <Link href={href} className="p-6 rounded-[2rem] border border-border/50 bg-card/40 backdrop-blur-md relative overflow-hidden group hover:border-primary/30 transition-all block">
+        <Link href={href} className="p-4 sm:p-6 rounded-2xl md:rounded-[2rem] border border-border/50 bg-card/40 backdrop-blur-md relative overflow-hidden group hover:border-primary/30 transition-all block shadow-lg hover:bg-card/60 transform active:scale-[0.98]">
             {content}
         </Link>
     );

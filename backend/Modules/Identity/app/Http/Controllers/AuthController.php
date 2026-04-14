@@ -364,6 +364,7 @@ class AuthController extends Controller
             'email' => $user->email,
             'roles' => $user->getRoleNames(),
             'permissions' => $user->getAllPermissions()->pluck('name'),
+            'has_completed_welcome_tour' => (bool) $user->has_completed_welcome_tour,
             'two_factor_enabled' => $twoFactorEnabled ?? (!empty($user->two_factor_secret) && $user->two_factor_confirmed_at !== null),
             'module_access' => $tenant
                 ? app(TenantSubscriptionService::class)->buildModuleAccess($tenant)

@@ -17,6 +17,7 @@ import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 
 // 🚀 SECURE BRAND LOGO
 const SecureSidebarLogo = ({ path, fallbackTitle, collapsed }: { path?: string, fallbackTitle?: string, collapsed: boolean }) => {
+    const { t } = useTranslation();
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
     
     useEffect(() => {
@@ -65,7 +66,7 @@ const SecureSidebarLogo = ({ path, fallbackTitle, collapsed }: { path?: string, 
             {!collapsed && (
               <div className="leading-tight">
                 <div className="text-base font-black tracking-tighter font-space truncate max-w-[160px]">{fallbackTitle || "HIVE.OS"}</div>
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">Control Hub</div>
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">{t('nav.control_hub', 'Control Hub')}</div>
               </div>
             )}
         </div>
@@ -98,7 +99,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   const [isModulesOpen, setIsModulesOpen] = useState(true);
   const [isInventoryOpen, setIsInventoryOpen] = useState(true);
   // 🚀 Apps dropdown state
-  const [isAppsOpen, setIsAppsOpen] = useState(false);
+  const [isAppsOpen, setIsAppsOpen] = useState(true);
   const canAccessConverter = hasAnyPermission(["manage_storage"]);
 
   useEffect(() => {
@@ -196,7 +197,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
       {brand}
 
       {!collapsed && (
-        <div className="px-2 mt-4 relative group shrink-0">
+        <div id="tour-sidebar-search" className="px-2 mt-4 relative group shrink-0">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <input 
             type="text"
@@ -253,6 +254,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
             {moduleNavItems.length > 0 && !collapsed && (
               <div className="mt-2 flex flex-col gap-1">
                 <button
+                  id="tour-nav-modules"
                   onClick={() => setIsModulesOpen(!isModulesOpen)}
                   className="group flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/80 hover:text-foreground outline-none"
                 >
@@ -336,6 +338,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
             {moduleNavItems.length > 0 && collapsed && (
               <div className="mt-1 flex flex-col gap-1">
                 <button
+                  id="tour-nav-modules"
                   onClick={() => setIsModulesOpen(!isModulesOpen)}
                   title={t('nav.modules', 'Modules')}
                   className="group flex items-center justify-center rounded-2xl px-0 py-3 text-sm transition-all duration-200 text-muted-foreground hover:bg-muted/80 hover:text-foreground border border-transparent"
@@ -370,16 +373,17 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
         {isMounted && canAccessConverter && !searchQuery && (
           <div className="mt-2 flex flex-col gap-1">
             <button 
+              id="tour-nav-apps"
               onClick={() => setIsAppsOpen(!isAppsOpen)}
               className={cn(
                 "group flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/80 hover:text-foreground outline-none",
                 collapsed ? "justify-center px-0 py-3" : ""
               )}
-              title={collapsed ? "Apps & Tools" : undefined}
+              title={collapsed ? t('nav.apps_tools', 'Apps & Tools') : undefined}
             >
               <div className="flex items-center gap-3">
                 <Layers className="h-4 w-4 shrink-0" />
-                {!collapsed && <span className="truncate">Apps & Tools</span>}
+                {!collapsed && <span className="truncate">{t('nav.apps_tools', 'Apps & Tools')}</span>}
               </div>
               {!collapsed && (
                 isAppsOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />
@@ -391,6 +395,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
               <div className="flex flex-col gap-1 pl-4 mt-1 animate-in slide-in-from-top-2 duration-200">
                 <Link 
                   href="/dashboard/tools/converter"
+                  id="tour-nav-converter"
                   className={cn(
                     "group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-all duration-200",
                     pathname.includes('/dashboard/tools/converter') 
@@ -399,11 +404,12 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                   )}
                 >
                   <FileType className="h-4 w-4 shrink-0" />
-                  <span className="truncate">HTML to PDF</span>
+                  <span className="truncate">{t('nav.tools_converter', 'HTML to PDF')}</span>
                 </Link>
                 
                 <Link 
                   href="/dashboard/mail"
+                  id="tour-nav-mail"
                   className={cn(
                     "group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-all duration-200",
                     pathname.includes('/dashboard/mail') 
@@ -412,7 +418,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                   )}
                 >
                   <Mail className="h-4 w-4 shrink-0" />
-                  <span className="truncate">Internal Mail</span>
+                  <span className="truncate">{t('nav.mail', 'Internal Mail')}</span>
                 </Link>
               </div>
             )}

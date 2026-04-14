@@ -61,6 +61,7 @@ foreach ($centralDomains as $domain) {
             Route::get('/user', [AuthController::class, 'user'])->middleware('permission:view_profile|edit_profile,sanctum');
             Route::post('/logout', [AuthController::class, 'logout']);
             Route::post('/profile/update', [ProfileController::class, 'updateProfile'])->middleware('permission:edit_profile,sanctum');
+            Route::post('/profile/tour-complete', [ProfileController::class, 'completeWelcomeTour'])->middleware('permission:edit_profile,sanctum');
             Route::get('/profile/avatar', [ProfileController::class, 'getAvatar'])->middleware('permission:view_profile|edit_profile,sanctum');
 
             Route::prefix('2fa')->group(function () {
@@ -149,6 +150,8 @@ Route::middleware([
         Route::post('/tenant/logout', [AuthController::class, 'logout']);
         Route::post('/profile/update', [ProfileController::class, 'updateProfile'])->middleware('permission:edit_profile,sanctum');
         Route::post('/tenant/profile/update', [ProfileController::class, 'updateProfile'])->middleware('permission:edit_profile,sanctum');
+        Route::post('/profile/tour-complete', [ProfileController::class, 'completeWelcomeTour'])->middleware('permission:edit_profile,sanctum');
+        Route::post('/tenant/profile/tour-complete', [ProfileController::class, 'completeWelcomeTour'])->middleware('permission:edit_profile,sanctum');
         Route::get('/profile/avatar', [ProfileController::class, 'getAvatar'])->middleware('permission:view_profile|edit_profile,sanctum');
         Route::get('/tenant/profile/avatar', [ProfileController::class, 'getAvatar'])->middleware('permission:view_profile|edit_profile,sanctum');
 

@@ -1,0 +1,20 @@
+{
+    "title": "Suppliers",
+    "subtitle": "Manage vendors and supply chain partners.",
+    "add_btn": "Add Supplier",
+    "col_name": "Supplier",
+    "deactivate": "Deactivate",
+    "deactivate_confirm_btn": "Confirm Deactivation",
+    "deactivate_confirm_title": "Deactivate Supplier?",
+    "deactivate_confirm_desc": "This will temporarily disable the supplier.",
+    "delete_confirm_title": "Delete Supplier?",
+    "delete_confirm_desc": "This will permanently delete the supplier.",
+    "name_required": "Supplier name is required.",
+    "edit_title": "Edit Supplier",
+    "create_title": "Create Supplier",
+    "modal_desc": "Capture complete supplier data.",
+    "name_label": "Supplier Name",
+    "code_label": "Supplier Code",
+    "active_label": "Active supplier",
+    "search_placeholder": "Search suppliers by name or email..."
+}

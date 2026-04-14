@@ -5,11 +5,17 @@ import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "@/store/use-translation";
 
 import { DataTable } from "@/components/datatable/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, 
+  AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -65,6 +71,7 @@ const DEFAULT_FORM: SupplierForm = {
 };
 
 export default function InventorySuppliersPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [tableQuery, setTableQuery] = React.useState<TableQueryState>(DEFAULT_QUERY);
   const [selectedRowIds, setSelectedRowIds] = React.useState<RowSelectionState>({});
@@ -101,37 +108,37 @@ export default function InventorySuppliersPage() {
       return createInventorySupplier(payload);
     },
     onSuccess: () => {
-      toast.success(form.id ? "Supplier updated." : "Supplier created.");
+      toast.success(form.id ? t("inventory.common.saved", "Supplier updated.") : t("inventory.common.saved", "Supplier created."));
       queryClient.invalidateQueries({ queryKey: ["inventory", "suppliers"] });
       setSelectedRowIds({});
       closeModal();
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to save supplier.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to save supplier."));
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteInventorySupplier,
     onSuccess: () => {
-      toast.success("Supplier deleted.");
+      toast.success(t("inventory.common.deleted", "Supplier deleted."));
       queryClient.invalidateQueries({ queryKey: ["inventory", "suppliers"] });
       setSelectedRowIds({});
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to delete supplier.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to delete supplier."));
     },
   });
 
   const deactivateMutation = useMutation({
     mutationFn: deactivateInventorySupplier,
     onSuccess: () => {
-      toast.success("Supplier deactivated.");
+      toast.success(t("inventory.common.saved", "Supplier deactivated."));
       queryClient.invalidateQueries({ queryKey: ["inventory", "suppliers"] });
       setSelectedRowIds({});
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to change supplier status.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to change supplier status."));
     },
   });
 
@@ -203,104 +210,140 @@ export default function InventorySuppliersPage() {
     () => [
       {
         accessorKey: "name",
-        header: "Supplier",
+        header: t("inventory.suppliers.col_name", "Supplier"),
         cell: ({ row }) => {
           const supplier = row.original;
           return (
             <div>
               <p className="font-semibold">{supplier.name}</p>
-              <p className="text-xs text-muted-foreground">{supplier.code || "No supplier code"}</p>
+              <p className="text-xs text-muted-foreground">{supplier.code || t("inventory.suppliers.no_code", "No supplier code")}</p>
             </div>
           );
         },
       },
       {
         accessorKey: "email",
-        header: "Email",
+        header: t("inventory.common.email", "Email"),
         cell: ({ row }) => row.original.email || "-",
       },
       {
         accessorKey: "phone",
-        header: "Phone",
+        header: t("inventory.common.phone", "Phone"),
         cell: ({ row }) => row.original.phone || "-",
       },
       {
         accessorKey: "products_count",
-        header: "Products",
+        header: t("inventory.common.products", "Products"),
         enableSorting: false,
         cell: ({ row }) => row.original.products_count ?? 0,
+        meta: { align: "right" as const },
       },
       {
         accessorKey: "is_active",
-        header: "Status",
+        header: t("inventory.common.status", "Status"),
         enableSorting: false,
         cell: ({ row }) => (
           <Badge variant={row.original.is_active ? "default" : "secondary"}>
-            {row.original.is_active ? "active" : "inactive"}
+            {row.original.is_active ? t("inventory.common.active", "active") : t("inventory.common.inactive", "inactive")}
           </Badge>
         ),
+        meta: { align: "center" as const },
       },
       {
         id: "actions",
-        header: "Actions",
+        header: t("inventory.common.actions", "Actions"),
         enableSorting: false,
         cell: ({ row }) => {
           const supplier = row.original;
           return (
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-start gap-2">
               <Button size="sm" variant="outline" className="rounded-full" onClick={() => openEdit(supplier)}>
                 <Pencil className="mr-1 h-3.5 w-3.5" />
-                Edit
+                {t("inventory.common.edit", "Edit")}
               </Button>
               {supplier.is_active ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-full"
-                  disabled={deactivateMutation.isPending}
-                  onClick={() => {
-                    if (!window.confirm(`Deactivate "${supplier.name}"?`)) return;
-                    deactivateMutation.mutate(supplier.id);
-                  }}
-                >
-                  <Power className="mr-1 h-3.5 w-3.5" />
-                  Deactivate
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-full"
+                      disabled={deactivateMutation.isPending}
+                    >
+                      <Power className="mr-1 h-3.5 w-3.5" />
+                      {t("inventory.common.deactivate", "Deactivate")}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t("inventory.suppliers.deactivate_confirm_title", "Deactivate Supplier?")}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t("inventory.suppliers.deactivate_confirm_desc", "This will temporarily disable the supplier. You can reactivate them later.")} <strong>{supplier.name}</strong>.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="rounded-xl">{t("inventory.common.cancel", "Cancel")}</AlertDialogCancel>
+                      <AlertDialogAction 
+                        className="rounded-xl"
+                        onClick={() => deactivateMutation.mutate(supplier.id)}
+                      >
+                        {t("inventory.common.confirm", "Confirm Deactivation")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               ) : null}
-              <Button
-                size="sm"
-                variant="destructive"
-                className="rounded-full"
-                disabled={deleteMutation.isPending}
-                onClick={() => {
-                  if (!window.confirm(`Delete "${supplier.name}"?`)) return;
-                  deleteMutation.mutate(supplier.id);
-                }}
-              >
-                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                Delete
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="rounded-full"
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    {t("inventory.common.delete", "Delete")}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t("inventory.suppliers.delete_confirm_title", "Delete Supplier?")}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("inventory.suppliers.delete_confirm_desc", "This will permanently delete the supplier. This action cannot be undone.")} <strong>{supplier.name}</strong>.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="rounded-xl">{t("inventory.common.cancel", "Cancel")}</AlertDialogCancel>
+                    <AlertDialogAction 
+                      className="rounded-xl bg-destructive hover:bg-destructive/90"
+                      onClick={() => deleteMutation.mutate(supplier.id)}
+                    >
+                      {t("inventory.common.confirm", "Confirm Delete")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           );
         },
-        meta: { align: "right" as const },
+        meta: { align: "left" as const },
       },
     ],
-    [deactivateMutation, deleteMutation, openEdit]
+    [deactivateMutation, deleteMutation, openEdit, t]
   );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Suppliers</h1>
+          <h1 className="text-3xl font-black tracking-tight">{t("inventory.suppliers.title", "Suppliers")}</h1>
           <p className="text-sm text-muted-foreground">
-            Supplier management with datatable selection, exports, and status controls.
+            {t("inventory.suppliers.subtitle", "Supplier management with datatable selection, exports, and status controls.")}
           </p>
         </div>
         <Button className="rounded-full px-5" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Supplier
+          {t("inventory.suppliers.add_btn", "Add Supplier")}
         </Button>
       </div>
 
@@ -317,9 +360,6 @@ export default function InventorySuppliersPage() {
         onSelectionChange={(payload) => setSelectedRowIds(payload.selectedRowIds as RowSelectionState)}
         onDeleteRows={async (rows) => {
           if (rows.length === 0) return;
-          if (!window.confirm(`Delete ${rows.length} selected supplier${rows.length === 1 ? "" : "s"}?`)) {
-            return;
-          }
           await Promise.all(rows.map((row) => deleteMutation.mutateAsync(row.id)));
           clearSelection();
         }}
@@ -332,7 +372,7 @@ export default function InventorySuppliersPage() {
           applyTableQuery(DEFAULT_QUERY);
           clearSelection();
         }}
-        searchPlaceholder="Search suppliers by name, code, email, or phone..."
+        searchPlaceholder={t("inventory.suppliers.search_placeholder", "Search suppliers...")}
         resourceName="suppliers"
         syncWithUrl={false}
       />
@@ -351,10 +391,10 @@ export default function InventorySuppliersPage() {
           <div className="border-b border-border/40 px-6 py-5">
             <DialogHeader>
               <DialogTitle className="text-xl font-black tracking-tight">
-                {form.id ? "Edit Supplier" : "Create Supplier"}
+                {form.id ? t("inventory.suppliers.edit_title", "Edit Supplier") : t("inventory.suppliers.create_title", "Create Supplier")}
               </DialogTitle>
               <DialogDescription>
-                Capture complete supplier master data for catalog and procurement workflows.
+                {t("inventory.suppliers.modal_desc", "Capture complete supplier master data.")}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -362,7 +402,7 @@ export default function InventorySuppliersPage() {
           <div className="grid gap-4 px-6 py-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="supplier-name">Supplier Name</Label>
+                <Label htmlFor="supplier-name">{t("inventory.suppliers.name_label", "Supplier Name")}</Label>
                 <Input
                   id="supplier-name"
                   value={form.name}
@@ -371,7 +411,7 @@ export default function InventorySuppliersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="supplier-code">Supplier Code</Label>
+                <Label htmlFor="supplier-code">{t("inventory.common.code", "Code")}</Label>
                 <Input
                   id="supplier-code"
                   value={form.code}
@@ -380,7 +420,7 @@ export default function InventorySuppliersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="supplier-email">Email</Label>
+                <Label htmlFor="supplier-email">{t("inventory.common.email", "Email")}</Label>
                 <Input
                   id="supplier-email"
                   type="email"
@@ -390,7 +430,7 @@ export default function InventorySuppliersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="supplier-phone">Phone</Label>
+                <Label htmlFor="supplier-phone">{t("inventory.common.phone", "Phone")}</Label>
                 <Input
                   id="supplier-phone"
                   value={form.phone}
@@ -401,7 +441,7 @@ export default function InventorySuppliersPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="supplier-address">Address</Label>
+              <Label htmlFor="supplier-address">{t("inventory.common.address", "Address")}</Label>
               <textarea
                 id="supplier-address"
                 className="min-h-[90px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -418,28 +458,28 @@ export default function InventorySuppliersPage() {
                 onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_active: checked === true }))}
               />
               <Label htmlFor="supplier-active" className="cursor-pointer">
-                Active supplier
+                {t("inventory.suppliers.active_label", "Active supplier")}
               </Label>
             </div>
           </div>
 
           <DialogFooter className="border-t border-border/40 bg-muted/20 px-6 py-4">
             <Button variant="outline" className="rounded-full" onClick={closeModal}>
-              Cancel
+              {t("inventory.common.cancel", "Cancel")}
             </Button>
             <Button
               className="rounded-full"
               disabled={saveMutation.isPending}
               onClick={() => {
                 if (!form.name.trim()) {
-                  toast.error("Supplier name is required.");
+                  toast.error(t("inventory.suppliers.name_required", "Supplier name is required."));
                   return;
                 }
                 saveMutation.mutate();
               }}
             >
               {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {form.id ? "Save Supplier" : "Create Supplier"}
+              {form.id ? t("inventory.common.save", "Save Supplier") : t("inventory.common.create", "Create Supplier")}
             </Button>
           </DialogFooter>
         </DialogContent>

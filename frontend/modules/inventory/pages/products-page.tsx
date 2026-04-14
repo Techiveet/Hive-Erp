@@ -9,7 +9,13 @@ import { toast } from "sonner";
 
 import { DataTable } from "@/components/datatable/data-table";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, 
+  AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/store/use-translation";
 import {
   bulkDeleteInventoryProducts,
   bulkUpdateInventoryProductsStatus,
@@ -42,6 +48,7 @@ const STATUS_OPTIONS: ProductStatus[] = ["draft", "published", "archived"];
 
 export default function InventoryProductsPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const [statusFilter, setStatusFilter] = React.useState<string>("");
   const [tableQuery, setTableQuery] = React.useState<TableQueryState>(DEFAULT_QUERY);
@@ -77,11 +84,11 @@ export default function InventoryProductsPage() {
     mutationFn: deleteInventoryProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory", "products"] });
-      toast.success("Product deleted.");
+      toast.success(t("inventory.common.deleted", "Product deleted."));
       clearSelection();
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to delete product.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to delete product."));
     },
   });
 
@@ -89,11 +96,11 @@ export default function InventoryProductsPage() {
     mutationFn: (ids: number[]) => bulkDeleteInventoryProducts(ids),
     onSuccess: (payload) => {
       queryClient.invalidateQueries({ queryKey: ["inventory", "products"] });
-      toast.success(`${payload.deleted_count} product(s) deleted.`);
+      toast.success(`${payload.deleted_count} ${t("inventory.products.bulk_deleted_msg", "product(s) deleted.")}`);
       clearSelection();
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to delete selected products.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to delete selected products."));
     },
   });
 
@@ -102,11 +109,11 @@ export default function InventoryProductsPage() {
       bulkUpdateInventoryProductsStatus(ids, status),
     onSuccess: (payload) => {
       queryClient.invalidateQueries({ queryKey: ["inventory", "products"] });
-      toast.success(`${payload.updated_count} product(s) updated to ${payload.status}.`);
+      toast.success(t("inventory.common.saved", "Status updated."));
       clearSelection();
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to update status for selected products.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to update status."));
     },
   });
 
@@ -152,8 +159,8 @@ export default function InventoryProductsPage() {
     setModalOpen(true);
   }, []);
 
-  const openEdit = React.useCallback((product: ProductRecord) => {
-    setEditingProductId(product.id);
+  const openEdit = React.useCallback((id: number) => {
+    setEditingProductId(id);
     setModalOpen(true);
   }, []);
 
@@ -165,123 +172,119 @@ export default function InventoryProductsPage() {
   const handleBulkStatus = React.useCallback(
     (status: ProductStatus) => {
       if (selectedIds.length === 0) {
-        toast.error("Select at least one product first.");
+        toast.error(t("inventory.common.select_at_least_one", "Select at least one product first."));
         return;
       }
 
       bulkStatusMutation.mutate({ ids: selectedIds, status });
     },
-    [bulkStatusMutation, selectedIds]
+    [bulkStatusMutation, selectedIds, t]
   );
 
   const handleBulkDelete = React.useCallback(
     async (ids: number[]) => {
       if (ids.length === 0) {
-        toast.error("Select at least one product first.");
+        toast.error(t("inventory.common.select_at_least_one", "Select at least one product first."));
         return;
       }
-
-      if (!window.confirm(`Delete ${ids.length} selected product(s)?`)) {
-        return;
-      }
-
       await bulkDeleteMutation.mutateAsync(ids);
     },
-    [bulkDeleteMutation]
+    [bulkDeleteMutation, t]
   );
 
   const columns = React.useMemo<ColumnDef<ProductRecord>[]>(
     () => [
       {
         accessorKey: "name",
-        header: "Product",
-        cell: ({ row }) => {
-          const product = row.original;
-          return (
-            <div className="min-w-[220px]">
-              <Link
-                href={`/dashboard/inventory/catalog/products/${product.id}`}
-                className="font-semibold hover:underline"
-              >
-                {product.name}
-              </Link>
-              <p className="text-xs text-muted-foreground">
-                {product.category?.name ?? "Uncategorized"}
-              </p>
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: "sku",
-        header: "SKU",
-        cell: ({ row }) => <span className="font-mono text-xs">{row.original.sku}</span>,
-      },
-      {
-        accessorKey: "stock_code",
-        header: "Stock Code",
-        cell: ({ row }) => <span className="font-mono text-xs">{row.original.stock_code || "-"}</span>,
-      },
-      {
-        accessorKey: "unit",
-        header: "Unit",
-        cell: ({ row }) => row.original.unit || "-",
-      },
-      {
-        accessorKey: "quantity",
-        header: "Stock Qty",
+        header: t("inventory.products.col_name", "Product"),
         cell: ({ row }) => (
-          <span>
-            {Number(row.original.quantity)} / reorder {row.original.reorder_point}
-          </span>
+          <div>
+            <Link
+              href={`/dashboard/inventory/catalog/products/${row.original.id}`}
+              className="font-bold text-primary hover:underline"
+            >
+              {row.original.name}
+            </Link>
+            <div className="text-xs text-muted-foreground">{row.original.sku}</div>
+          </div>
         ),
       },
       {
-        accessorKey: "unit_price",
-        header: "Unit Price",
-        cell: ({ row }) => Number(row.original.unit_price).toFixed(2),
+        accessorKey: "quantity",
+        header: t("inventory.products.col_qty", "Quantity"),
+        cell: ({ row }) => <span className="font-mono">{row.original.quantity}</span>,
+        meta: { align: "right" as const },
+      },
+      {
+        accessorKey: "sale_price",
+        header: t("inventory.products.col_price", "Price"),
+        cell: ({ row }) => (
+          <span className="font-mono font-bold">
+            {Number(row.original.unit_price || 0).toFixed(2)}
+          </span>
+        ),
+        meta: { align: "right" as const },
       },
       {
         accessorKey: "status",
-        header: "Status",
+        header: t("inventory.products.col_status", "Status"),
         cell: ({ row }) => {
-          const status = row.original.status;
-          const variant = status === "published" ? "default" : status === "archived" ? "secondary" : "outline";
-          return <Badge variant={variant}>{status}</Badge>;
+          const status = row.original.status as ProductStatus;
+          return (
+            <Badge
+              variant={status === "published" ? "default" : "outline"}
+              className="capitalize"
+            >
+              {t(`inventory.common.${status}`, status)}
+            </Badge>
+          );
         },
+        meta: { align: "center" as const },
       },
       {
         id: "actions",
-        header: "Actions",
+        header: t("inventory.common.actions", "Actions"),
         enableSorting: false,
         cell: ({ row }) => {
           const product = row.original;
           return (
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="outline" className="rounded-full" onClick={() => openEdit(product)}>
+            <div className="flex justify-start gap-2">
+              <Button size="sm" variant="outline" className="rounded-full" onClick={() => openEdit(product.id)}>
                 <Pencil className="mr-1 h-3.5 w-3.5" />
-                Edit
+                {t("inventory.common.edit", "Edit")}
               </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                className="rounded-full"
-                disabled={deleteMutation.isPending}
-                onClick={() => {
-                  if (!window.confirm(`Delete "${product.name}"?`)) return;
-                  deleteMutation.mutate(product.id);
-                }}
-              >
-                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                Delete
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="destructive" className="rounded-full" disabled={deleteMutation.isPending}>
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    {t("inventory.common.delete", "Delete")}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t("inventory.common.confirm", "Delete Product?")}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("inventory.products.delete_selected_desc", "This will permanently delete the selected item.")}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="rounded-xl">{t("inventory.common.cancel", "Cancel")}</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="rounded-xl bg-destructive hover:bg-destructive/90"
+                      onClick={() => deleteMutation.mutate(product.id)}
+                    >
+                      {t("inventory.common.confirm", "Confirm Delete")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           );
         },
-        meta: { align: "right" as const },
+        meta: { align: "left" as const },
       },
     ],
-    [deleteMutation, openEdit]
+    [deleteMutation, openEdit, t]
   );
 
   const exportUrl = React.useMemo(() => {
@@ -297,34 +300,34 @@ export default function InventoryProductsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Products</h1>
+          <h1 className="text-3xl font-black tracking-tight">{t("inventory.products.title", "Product Catalog")}</h1>
           <p className="text-sm text-muted-foreground">
-            Catalog, stock, and bulk workflows powered by the shared DataTable.
+            {t("inventory.products.subtitle", "Manage your product inventory, pricing, and stock levels.")}
           </p>
         </div>
         <Button className="rounded-full px-5" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Product
+          {t("inventory.products.add_btn", "Create Product")}
         </Button>
       </div>
 
       <section className="rounded-3xl border border-border/50 bg-card/50 p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("inventory.common.status", "Status")}</label>
             <select
-              className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
+              className="h-9 w-full rounded-full border border-border/50 bg-background/50 px-3 text-xs focus:outline-none sm:w-[180px]"
               value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value);
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
                 applyTableQuery({ page: 1 });
                 clearSelection();
               }}
             >
-              <option value="">All statuses</option>
+              <option value="">{t("inventory.common.all_statuses", "All statuses")}</option>
               {STATUS_OPTIONS.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {t(`inventory.common.${status}`, status)}
                 </option>
               ))}
             </select>
@@ -337,7 +340,7 @@ export default function InventoryProductsPage() {
               disabled={selectedIds.length === 0 || bulkStatusMutation.isPending}
               onClick={() => handleBulkStatus("draft")}
             >
-              Mark Draft
+              {t("inventory.products.mark_draft", "Mark Draft")}
             </Button>
             <Button
               variant="outline"
@@ -345,7 +348,7 @@ export default function InventoryProductsPage() {
               disabled={selectedIds.length === 0 || bulkStatusMutation.isPending}
               onClick={() => handleBulkStatus("published")}
             >
-              Mark Published
+              {t("inventory.products.mark_published", "Mark Published")}
             </Button>
             <Button
               variant="outline"
@@ -353,19 +356,39 @@ export default function InventoryProductsPage() {
               disabled={selectedIds.length === 0 || bulkStatusMutation.isPending}
               onClick={() => handleBulkStatus("archived")}
             >
-              Mark Archived
+              {t("inventory.products.mark_archived", "Mark Archived")}
             </Button>
-            <Button
-              variant="destructive"
-              className="rounded-full"
-              disabled={selectedIds.length === 0 || bulkDeleteMutation.isPending}
-              onClick={() => {
-                void handleBulkDelete(selectedIds);
-              }}
-            >
-              {bulkDeleteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Delete Selected
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  className="rounded-xl shadow-lg shadow-red-500/20"
+                  disabled={selectedIds.length === 0 || bulkDeleteMutation.isPending}
+                >
+                  {bulkDeleteMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {t("inventory.common.delete_selected", "Delete Selected")}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t("inventory.products.delete_selected_title", "Delete Selected Products?")}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t("inventory.products.delete_selected_desc", "This will permanently delete the selected products. This action cannot be undone.")}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="rounded-xl">{t("inventory.common.cancel", "Cancel")}</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="rounded-xl bg-destructive hover:bg-destructive/90"
+                    onClick={() => handleBulkDelete(selectedIds)}
+                  >
+                    {t("inventory.common.confirm", "Confirm Delete")}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </section>
@@ -395,7 +418,7 @@ export default function InventoryProductsPage() {
           applyTableQuery(DEFAULT_QUERY);
           clearSelection();
         }}
-        searchPlaceholder="Search by name, SKU, or stock code..."
+        searchPlaceholder={t("inventory.products.search_placeholder", "Search by name, SKU, or stock code...")}
         resourceName="products"
         syncWithUrl={false}
       />

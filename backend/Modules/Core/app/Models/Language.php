@@ -9,7 +9,7 @@ class Language extends Model
 {
     use Searchable;
 
-    protected $fillable = ['name', 'code', 'is_default'];
+    protected $fillable = ['name', 'code', 'is_default', 'is_active'];
 
     // 🚀 THE FIX: Define the relationship to Translations
     public function translations()

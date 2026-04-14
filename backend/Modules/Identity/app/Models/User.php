@@ -24,6 +24,7 @@ class User extends Authenticatable
         'password',
         'is_active',
         'avatar_path',
+        'has_completed_welcome_tour',
         'two_factor_secret',
         'two_factor_recovery_codes',
         'two_factor_confirmed_at',

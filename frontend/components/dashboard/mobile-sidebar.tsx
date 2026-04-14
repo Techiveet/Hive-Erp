@@ -52,14 +52,14 @@ const SecureMobileLogo = ({ path, fallbackTitle }: { path?: string, fallbackTitl
         return () => { isMounted = false; };
     }, [path]);
 
-    if (blobUrl) return <img src={blobUrl} alt="Logo" className="h-8 w-auto object-contain" />;
-    
+    const { t } = useTranslation();
     return (
         <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/30">
                 <Command className="h-5 w-5" />
             </div>
             <div className="text-sm font-black font-space uppercase tracking-wider truncate max-w-[160px]">{fallbackTitle || "HIVE.OS"}</div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">{t('nav.control_hub', 'Control Hub')}</div>
         </div>
     );
 };
@@ -150,7 +150,7 @@ export function MobileSidebar() {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[86vw] max-w-[340px] rounded-r-[2rem] border border-white/10 bg-background/90 p-4 shadow-2xl backdrop-blur-xl flex flex-col z-[100]">
-        <SheetHeader className="sr-only"><SheetTitle>Dashboard navigation</SheetTitle></SheetHeader>
+        <SheetHeader className="sr-only"><SheetTitle>{t('nav.dashboard_nav', 'Dashboard navigation')}</SheetTitle></SheetHeader>
         <div className="glass-panel flex-1 rounded-[1.6rem] p-4 bg-card/50 border border-border/50 shadow-inner flex flex-col overflow-hidden">
           
           <div className="mb-3 flex items-center justify-between text-foreground shrink-0 min-w-0">
@@ -294,7 +294,7 @@ export function MobileSidebar() {
                 {!searchQuery && (
                   <div className="pt-2 flex flex-col gap-1">
                     <div className="flex items-center gap-3 px-4 py-2 mt-4 text-xs font-black uppercase text-muted-foreground tracking-widest">
-                      Apps & Tools
+                      {t('nav.apps_tools', 'Apps & Tools')}
                     </div>
                     
                     <SheetClose asChild>
@@ -303,7 +303,7 @@ export function MobileSidebar() {
                         className={cn("flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200", pathname.includes('/dashboard/tools/converter') ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")}
                       >
                         <FileType className={cn("h-5 w-5", pathname.includes('/dashboard/tools/converter') ? "text-primary-foreground" : "text-muted-foreground")} />
-                        <span className="truncate">HTML to PDF</span>
+                        <span className="truncate">{t('nav.tools_converter', 'HTML to PDF')}</span>
                       </Link>
                     </SheetClose>
 
@@ -313,7 +313,7 @@ export function MobileSidebar() {
                         className={cn("flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200", pathname.includes('/dashboard/mail') ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")}
                       >
                         <Mail className={cn("h-5 w-5", pathname.includes('/dashboard/mail') ? "text-primary-foreground" : "text-muted-foreground")} />
-                        <span className="truncate">Internal Mail</span>
+                        <span className="truncate">{t('nav.mail', 'Internal Mail')}</span>
                       </Link>
                     </SheetClose>
                   </div>
@@ -323,7 +323,7 @@ export function MobileSidebar() {
               {(filteredSecondary.length > 0 || !searchQuery) && isMounted && (
                 <div className="space-y-1">
                   <div className="px-4 text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-3">
-                    {t('nav.settings', 'System Preferences')}
+                    {t('nav.system_preferences', 'System Preferences')}
                   </div>
                   {filteredSecondary.map((item) => {
                     const active = pathname === item.href;

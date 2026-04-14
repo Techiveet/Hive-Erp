@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge"; 
 import { useQuery } from "@tanstack/react-query";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { useTranslation } from "@/store/use-translation";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { logFrontendAction } from "@/lib/api"; 
 import { clearHiveSession } from "@/lib/auth-sync";
@@ -21,12 +22,13 @@ import { initializeSessionActivity } from "@/lib/session-activity";
 export default function LoginPage() {
   const router = useRouter();
   
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [portalName, setPortalName] = useState("HIVE.OS CENTRAL");
+  const [portalName, setPortalName] = useState(t('auth.login.central_portal', 'HIVE.OS CENTRAL'));
   const [isTenant, setIsTenant] = useState(false);
 
   const viewLogged = useRef(false);
@@ -45,7 +47,7 @@ export default function LoginPage() {
   const brandSettings = brandData?.data;
   const authBackgroundUrl = getBackendStorageUrl(brandSettings?.auth_background_image);
   const displayPortalName = brandSettings?.app_title || portalName;
-  const authWelcomeMessage = brandSettings?.auth_welcome_message || "Authenticate your identity to decrypt your management workspace.";
+  const authWelcomeMessage = t('auth.login.welcome_desc', brandSettings?.auth_welcome_message || 'Authenticate your identity to decrypt your management workspace.');
 
   useEffect(() => {
     if (!viewLogged.current) {
@@ -62,7 +64,7 @@ export default function LoginPage() {
     const host = window.location.hostname;
     if (isTenantHost(host)) {
       const tenantLabel = (getTenantId() || host).toUpperCase();
-      setPortalName(`${tenantLabel} NODE`);
+      setPortalName(`${tenantLabel} ${t('auth.login.node_label', 'NODE')}`);
       setIsTenant(true);
     }
   }, []);
@@ -154,8 +156,8 @@ export default function LoginPage() {
 
         <div className="w-full max-w-sm mx-auto space-y-10 mt-12 lg:mt-0">
           <div className="space-y-3">
-            <Badge variant="outline" className="font-mono text-[10px] tracking-widest border-primary/30 text-primary bg-primary/5 px-3">ESTABLISHING UPLINK...</Badge>
-            <h1 className="text-4xl font-space font-black tracking-tighter sm:text-5xl">Command <span className="text-primary">Access</span></h1>
+            <Badge variant="outline" className="font-mono text-[10px] tracking-widest border-primary/30 text-primary bg-primary/5 px-3">{t('auth.login.establishing_uplink', 'ESTABLISHING UPLINK...')}</Badge>
+            <h1 className="text-4xl font-space font-black tracking-tighter sm:text-5xl">{t('auth.login.command', 'Command')} <span className="text-primary">{t('auth.login.access', 'Access')}</span></h1>
             <p className="text-muted-foreground text-sm max-w-[320px]">{authWelcomeMessage}</p>
           </div>
 
@@ -169,16 +171,16 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-4">
               <div className="grid gap-2">
-                <Label htmlFor="email" className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground ml-1">System Identifier</Label>
+                <Label htmlFor="email" className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground ml-1">{t('auth.login.system_identifier', 'System Identifier')}</Label>
                 <div className="relative group">
                   <Fingerprint className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                  <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@hive.corp" disabled={loading} className="pl-10 h-12 bg-muted/30 border-border focus:ring-1 focus:ring-primary/50 transition-all font-mono" />
+                  <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('auth.login.identifier_placeholder', 'user@hive.corp')} disabled={loading} className="pl-10 h-12 bg-muted/30 border-border focus:ring-1 focus:ring-primary/50 transition-all font-mono" />
                 </div>
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center justify-between ml-1">
-                   <Label htmlFor="password" className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Encryption Key</Label>
-                   <Link href="#" className="font-mono text-[9px] uppercase tracking-tighter text-primary/60 hover:text-primary transition-colors">Forgot Key?</Link>
+                   <Label htmlFor="password" className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{t('auth.login.encryption_key', 'Encryption Key')}</Label>
+                   <Link href="#" className="font-mono text-[9px] uppercase tracking-tighter text-primary/60 hover:text-primary transition-colors">{t('auth.login.forgot_key', 'Forgot Key?')}</Link>
                 </div>
                 <div className="relative group">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -199,7 +201,7 @@ export default function LoginPage() {
               </div>
             </div>
             <Button type="submit" disabled={loading} className="w-full bg-primary text-primary-foreground font-space font-bold uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all h-14 group rounded-xl">
-              {loading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> VERIFYING...</> : <span className="flex items-center gap-2">Initiate Handshake <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" /></span>}
+              {loading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t('auth.login.verifying', 'VERIFYING...')}</> : <span className="flex items-center gap-2">{t('auth.login.initiate_handshake', 'Initiate Handshake')} <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" /></span>}
             </Button>
           </form>
         </div>
@@ -218,7 +220,7 @@ export default function LoginPage() {
            <div className="absolute inset-[-40px] bg-primary/10 blur-[100px] rounded-full animate-pulse" />
            <div className="relative bg-card/40 backdrop-blur-xl border border-primary/20 p-1 rounded-3xl shadow-2xl overflow-hidden group">
               <div className="bg-background/80 rounded-[22px] p-8 border border-border/50 flex flex-col items-center text-center">
-                <h3 className="font-space font-bold text-xl tracking-tight mb-2 uppercase">{isTenant ? "Tenant Node Gateway" : "Master Cluster Gateway"}</h3>
+                <h3 className="font-space font-bold text-xl tracking-tight mb-2 uppercase">{isTenant ? t('auth.login.tenant_gateway', 'Tenant Node Gateway') : t('auth.login.master_gateway', 'Master Cluster Gateway')}</h3>
                 <p className="text-xs text-muted-foreground font-mono">{displayPortalName}</p>
               </div>
            </div>

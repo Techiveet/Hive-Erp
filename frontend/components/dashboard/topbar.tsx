@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, LogOut, Maximize, Minimize, HelpCircle, Globe, Check, Loader2 } from "lucide-react";
+import { Search, LogOut, Maximize, Minimize, HelpCircle, Loader2 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -15,6 +15,7 @@ import { MobileSidebar } from "./mobile-sidebar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useTour } from "@/components/providers/tour-provider";
 import { useTranslation } from "@/store/use-translation";
+import { LanguageSwitcher } from "../layout/language-switcher";
 import { GlobalSearch } from "./global-search";
 import { TopbarMailIcon } from "./topbar-mail";
 import { TopbarNotificationsIcon } from "./topbar-notifications";
@@ -102,7 +103,6 @@ export function DashboardTopbar() {
   const queryClient = useQueryClient();
   const [localUser, setLocalUser] = useState<Record<string, any> | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [currentLocale, setCurrentLocale] = useState('en');
 
   const { startTour } = useTour();
   const { t } = useTranslation();
@@ -132,9 +132,6 @@ export function DashboardTopbar() {
     const storedUser = localStorage.getItem("hive_user");
     if (storedUser) setLocalUser(JSON.parse(storedUser));
 
-    const storedLocale = localStorage.getItem("hive_locale") || 'en';
-    setCurrentLocale(storedLocale);
-
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
@@ -154,27 +151,45 @@ export function DashboardTopbar() {
     }
   };
 
-  const handleLanguageChange = (code: string) => {
-    localStorage.setItem("hive_locale", code);
-    setCurrentLocale(code);
-    window.location.reload();
-  };
-
   const triggerMasterTour = () => {
     const possibleSteps = [
+        // Sidebar Navigation
         { target: '#tour-sidebar-brand', title: t('tour.sidebar_brand_title', 'HIVE.OS Control Hub'), content: t('tour.sidebar_brand_desc', 'This is your central command console.'), placement: 'right' as const },
-        { target: '#tour-nav-overview', title: t('nav.dashboard', 'Dashboard'), content: 'View real-time telemetry, revenue, and active staff metrics.', placement: 'right' as const },
-        { target: '#tour-nav-tenants', title: t('nav.tenants', 'Node Management'), content: 'Provision, monitor, and configure active tenant databases.', placement: 'right' as const },
-        { target: '#tour-nav-security', title: t('nav.security', 'Identity & Access'), content: 'Manage operator clearances, roles, and granular security.', placement: 'right' as const },
-        { target: '#tour-nav-audit', title: t('nav.audit_logs', 'WORM Audit Ledger'), content: 'Every system action is cryptographically sealed here.', placement: 'right' as const },
-        { target: '#tour-nav-storage', title: t('nav.storage', 'Storage Infrastructure'), content: 'Monitor tenant-aware file systems and volume capacities.', placement: 'right' as const },
-        { target: '#tour-nav-settings', title: t('nav.settings', 'Global Preferences'), content: 'Configure deep system parameters and UI themes.', placement: 'right' as const },
-        { target: '#tour-topbar-search', title: 'Global Command Search', content: 'Instantly locate node configurations or specific system logs.', placement: 'bottom' as const },
-        { target: '#tour-topbar-language', title: 'Interface Language', content: 'Switch the dashboard matrix to your preferred language.', placement: 'bottom' as const },
-        { target: '#tour-topbar-theme', title: 'Interface Theme', content: 'Toggle between light mode and dark mode.', placement: 'bottom' as const },
-        { target: '#tour-topbar-fullscreen', title: 'Focus Mode', content: 'Expand the dashboard to fill your entire screen.', placement: 'bottom' as const },
-        { target: '#tour-topbar-notifications', title: 'System Alerts', content: 'View real-time security alerts and task notifications.', placement: 'bottom' as const },
-        { target: '#tour-topbar-profile', title: t('tour.topbar_profile_title', 'Operator Profile'), content: t('tour.topbar_profile_desc', 'Manage your settings and safely disconnect your node.'), placement: 'bottom-end' as const }
+        { target: '#tour-sidebar-search', title: t('tour.sidebar_search_title', 'Sidebar Search'), content: t('tour.sidebar_search_desc', 'Quickly find and filter navigation menus.'), placement: 'right' as const },
+        { target: '#tour-nav-overview', title: t('nav.dashboard', 'Dashboard'), content: t('tour.overview_desc', 'View real-time telemetry, revenue, and active staff metrics.'), placement: 'right' as const },
+        { target: '#tour-nav-audit', title: t('nav.audit_logs', 'WORM Audit Ledger'), content: t('tour.audit_desc', 'Every system action is cryptographically sealed here.'), placement: 'right' as const },
+        { target: '#tour-nav-security', title: t('nav.security', 'Identity & Access'), content: t('tour.security_desc', 'Manage operator clearances, roles, and granular security.'), placement: 'right' as const },
+        { target: '#tour-nav-tenants', title: t('nav.tenants', 'Node Management'), content: t('tour.tenants_desc', 'Provision, monitor, and configure active tenant databases.'), placement: 'right' as const },
+        { target: '#tour-nav-landing-templates', title: t('nav.landing_templates', 'Landing Templates'), content: t('tour.landing_templates_desc', 'Configure global landing templates and themes for tenants.'), placement: 'right' as const },
+        
+        // Modules Group
+        { target: '#tour-nav-modules', title: t('tour.modules_group_title', 'Feature Modules'), content: t('tour.modules_group_desc', 'Explore core operational modules like Inventory Logistics and Service Operations.'), placement: 'right' as const },
+        { target: '#tour-nav-inventory', title: t('nav.inventory', 'Supply Chain Matrix'), content: t('tour.inventory_desc', 'Manage assets, products, and warehouse logistics with tenant-aware precision.'), placement: 'right' as const },
+        { target: '#tour-nav-nightclub', title: t('nav.nightclub', 'Service Operations'), content: t('tour.nightclub_desc', 'Real-time table management, reservations, and service orders for lounges.'), placement: 'right' as const },
+        
+        // Apps & Tools Group
+        { target: '#tour-nav-apps', title: t('tour.apps_group_title', 'Apps & Tools'), content: t('tour.apps_group_desc', 'Access utility applications like Document Processing and internal Secure Comms.'), placement: 'right' as const },
+        { target: '#tour-nav-converter', title: t('tour.converter_title', 'Asset Processing'), content: t('tour.converter_desc', 'Convert and digitize documents into high-fidelity PDF formats.'), placement: 'right' as const },
+        { target: '#tour-nav-mail', title: t('tour.mail_title', 'Secure Comms'), content: t('tour.mail_desc', 'Internal encrypted messaging between system operators.'), placement: 'right' as const },
+        
+        // Secondary Navigation
+        { target: '#tour-nav-storage', title: t('nav.storage', 'Storage Infrastructure'), content: t('tour.storage_desc', 'Monitor tenant-aware file systems and volume capacities.'), placement: 'right' as const },
+        { target: '#tour-nav-settings', title: t('nav.settings', 'Global Preferences'), content: t('tour.settings_desc', 'Configure deep system parameters and UI themes.'), placement: 'right' as const },
+        { target: '#tour-nav-api-docs', title: t('nav.api_docs', 'API Docs'), content: t('tour.api_docs_desc', 'Explore the live API schema to integrate external applications.'), placement: 'right' as const },
+        
+        // Topbar Actions
+        { target: '#tour-topbar-search', title: t('tour.topbar_search_title', 'Global Command Search'), content: t('tour.topbar_search_desc', 'Instantly locate node configurations or specific system logs.'), placement: 'bottom' as const },
+        { target: '#tour-topbar-language', title: t('tour.topbar_language_title', 'Interface Language'), content: t('tour.topbar_language_desc', 'Switch the dashboard matrix to your preferred language.'), placement: 'bottom' as const },
+        { target: '#tour-topbar-theme', title: t('tour.topbar_theme_title', 'Interface Theme'), content: t('tour.topbar_theme_desc', 'Toggle between light mode and dark mode.'), placement: 'bottom' as const },
+        { target: '#tour-topbar-fullscreen', title: t('tour.topbar_fullscreen_title', 'Focus Mode'), content: t('tour.topbar_fullscreen_desc', 'Expand the dashboard to fill your entire screen.'), placement: 'bottom' as const },
+        { target: '#tour-topbar-notifications', title: t('tour.topbar_notifications_title', 'System Alerts'), content: t('tour.topbar_notifications_desc', 'View real-time security alerts and task notifications.'), placement: 'bottom' as const },
+        { target: '#tour-topbar-profile', title: t('tour.topbar_profile_title', 'Operator Profile'), content: t('tour.topbar_profile_desc', 'Manage your settings and safely disconnect your node.'), placement: 'bottom-end' as const },
+        
+        // Dashboard Body Elements
+        { target: '#tour-body-stats', title: t('tour.body_stats_title', 'System Metrics'), content: t('tour.body_stats_desc', 'Instant overview of active nodes, users, roles, and core capabilities.'), placement: 'bottom' as const },
+        { target: '#tour-body-telemetry', title: t('tour.body_telemetry_title', 'Live Telemetry'), content: t('tour.body_telemetry_desc', 'Real-time performance graph tracking system requests and overall network health.'), placement: 'right' as const },
+        { target: '#tour-body-modules', title: t('tour.body_modules_title', 'Module Health'), content: t('tour.body_modules_desc', 'Status, latency, and throughput metrics for active microservices.'), placement: 'left' as const },
+        { target: '#tour-body-audit', title: t('tour.body_audit_title', 'Audit Ledger'), content: t('tour.body_audit_desc', 'Live stream of cryptographically sealed actions performed across the network.'), placement: 'top' as const }
     ];
 
     const activeSteps = possibleSteps.filter(step => document.querySelector(step.target));
@@ -187,15 +202,15 @@ export function DashboardTopbar() {
       : "OP";
 
   return (
-    <header className="sticky top-0 z-40 mb-4">
-      <div className="relative rounded-[2rem]">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/70 via-background/35 to-transparent rounded-[2rem]" />
+    <header className="sticky top-0 z-40 mb-4 px-2 sm:px-0">
+      <div className="relative rounded-2xl md:rounded-[2rem]">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/70 via-background/35 to-transparent rounded-2xl md:rounded-[2rem]" />
 
-        <div className="glass-panel rounded-[2rem] px-4 py-3 backdrop-blur-2xl border border-border/50 bg-card/40 md:px-5 relative z-10">
-          <div className="flex items-center justify-between gap-3">
+        <div className="glass-panel rounded-2xl md:rounded-[2rem] px-3 py-2 md:px-5 md:py-3 backdrop-blur-2xl border border-border/50 bg-card/40 relative z-10 shadow-lg">
+          <div className="flex items-center justify-between gap-2 md:gap-3">
 
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="lg:hidden shrink-0">
+            <div className="flex min-w-0 items-center gap-2 md:gap-3">
+              <div className="lg:hidden shrink-0 scale-90 sm:scale-100">
                 <MobileSidebar />
               </div>
               <div id="tour-topbar-search" className="hidden lg:flex lg:items-center">
@@ -203,79 +218,48 @@ export function DashboardTopbar() {
               </div>
             </div>
 
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
 
               <Button
                 id="tour-topbar-help"
                 variant="ghost"
-                className="h-10 px-3 rounded-xl shrink-0 text-primary bg-primary/10 hover:bg-primary/20 font-bold hidden sm:flex items-center gap-2 transition-all"
+                className="h-10 px-3 rounded-xl shrink-0 text-primary bg-primary/10 hover:bg-primary/20 font-bold hidden md:flex items-center gap-2 transition-all transform active:scale-95"
                 onClick={triggerMasterTour}
               >
                 <HelpCircle className="h-4 w-4" /> {t('topbar.system_tour', 'System Tour')}
               </Button>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    id="tour-topbar-language"
-                    variant="ghost"
-                    className="h-10 w-10 rounded-xl p-0 shrink-0 text-muted-foreground hover:text-foreground hidden sm:flex items-center justify-center relative"
-                  >
-                    <Globe className="h-5 w-5" />
-                    <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[8px] font-black uppercase px-1 rounded-sm tracking-widest shadow-sm">
-                      {currentLocale}
-                    </span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="w-48 z-[100] rounded-2xl border-border/60 shadow-xl p-2">
-                  <DropdownMenuLabel className="font-space font-bold text-xs uppercase tracking-widest text-muted-foreground">
-                    {t('topbar.select_language', 'Select Language')}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {[
-                    { code: "en", name: "English" },
-                    { code: "am", name: "Amharic" },
-                  ].map((lang) => (
-                    <DropdownMenuItem
-                      key={lang.code}
-                      onClick={() => handleLanguageChange(lang.code)}
-                      className={`cursor-pointer font-medium rounded-xl py-2 mb-1 flex items-center justify-between transition-colors ${currentLocale === lang.code ? 'bg-primary/10 text-primary' : ''}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{lang.name}</span>
-                      </div>
-                      {currentLocale === lang.code && <Check className="h-4 w-4" />}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-0.5 sm:gap-1">
+                <LanguageSwitcher id="tour-topbar-language" />
 
-              <div id="tour-topbar-theme" className="px-1 hidden sm:block">
-                <ThemeToggle />
+                <div id="tour-topbar-theme" className="px-0.5 hidden sm:block">
+                  <ThemeToggle />
+                </div>
+
+                <Button
+                  id="tour-topbar-fullscreen"
+                  variant="ghost"
+                  className="h-10 w-10 rounded-xl p-0 shrink-0 text-muted-foreground hover:text-foreground hidden sm:flex items-center justify-center transform active:scale-95 transition-transform"
+                  onClick={toggleFullscreen}
+                >
+                  {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+                </Button>
               </div>
 
-              <Button
-                id="tour-topbar-fullscreen"
-                variant="ghost"
-                className="h-10 w-10 rounded-xl p-0 shrink-0 text-muted-foreground hover:text-foreground hidden sm:flex items-center justify-center"
-                onClick={toggleFullscreen}
-              >
-                {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-              </Button>
-
-              <TopbarNotificationsIcon activeUser={activeUser} />
-
-              <TopbarMailIcon activeUser={activeUser} />
+              <div className="flex items-center gap-0.5 sm:gap-1">
+                <TopbarNotificationsIcon activeUser={activeUser} />
+                <TopbarMailIcon activeUser={activeUser} />
+              </div>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button id="tour-topbar-profile" variant="ghost" className="h-10 rounded-xl px-2 hover:bg-muted/50 transition-colors">
+                  <Button id="tour-topbar-profile" variant="ghost" className="h-10 rounded-xl px-1 sm:px-2 hover:bg-muted/50 transition-colors transform active:scale-95">
                     <Avatar className="h-8 w-8 border border-border/50 shrink-0 shadow-sm bg-muted flex items-center justify-center overflow-hidden ring-2 ring-transparent transition-all group-hover:ring-primary/20">
                       <SecureTopbarAvatar user={activeUser} fallbackInitials={userInitials} canViewProfile={canViewProfile} />
                     </Avatar>
-                    <div className="ml-2 hidden text-left sm:block">
-                      <div className="text-xs font-bold leading-4 truncate max-w-[120px]">{activeUser?.name || "Operator"}</div>
-                      <div className="text-[10px] text-muted-foreground font-mono leading-4 truncate max-w-[120px]">
+                    <div className="ml-2 hidden text-left md:block">
+                      <div className="text-xs font-bold leading-4 truncate max-w-[100px] lg:max-w-[150px]">{activeUser?.name || "Operator"}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono leading-4 truncate max-w-[100px] lg:max-w-[150px]">
                         {activeUser?.email || "sys@hive.os"}
                       </div>
                     </div>

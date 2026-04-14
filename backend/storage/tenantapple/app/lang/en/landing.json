@@ -1,0 +1,177 @@
+{
+    "nav": {
+        "modules": "Modules",
+        "payments": "Payments",
+        "mobility": "Smart Mobility",
+        "payroll": "Payroll",
+        "architecture": "Architecture",
+        "pricing": "Pricing",
+        "signin": "Sign In",
+        "deploy": "Deploy Node"
+    },
+    "hero": {
+        "connected_node": "CONNECTED NODE",
+        "dev_by": "DEVELOPED BY TECHIVE TECHNOLOGY SOLUTIONS",
+        "unified_mgmt": "Unified Management",
+        "dashboard": "Dashboard",
+        "unify_ops": "Unify Your",
+        "enterprise_ops": "Enterprise Operations",
+        "access_node": "Access the central node for :appTitle. Oversee HR, track freight logistics, and manage financial ledgers in real-time.",
+        "hive_desc": "Hive is the comprehensive ERP solution built for scalable businesses in Ethiopia. Connect your Finance, HR, and Supply Chain with local tax and banking integrations."
+    },
+    "partners": {
+        "title": "Ecosystem Integrations & Partners",
+        "cbe": "COMMERCIAL BANK",
+        "telebirr": "TELEBIRR",
+        "chapa": "CHAPA",
+        "safaricom": "SAFARICOM",
+        "arifpay": "ARIFPAY",
+        "insa": "INSA SECURED",
+        "ethiotelecom": "ETHIO TELECOM"
+    },
+    "preview": {
+        "system_modules": "System Modules",
+        "gl": "General Ledger",
+        "synced": "SYNCED",
+        "freight": "Freight & Fleet",
+        "active": "ACTIVE",
+        "payroll_proc": "Payroll Proc.",
+        "pending": "PENDING",
+        "server_status": "SERVER STATUS",
+        "optimal": "OPTIMAL"
+    },
+    "executive_summary": {
+        "title": "Executive Summary",
+        "real_time": "REAL-TIME DATA",
+        "gross_revenue": "GROSS REVENUE (YTD)",
+        "active_loads": "ACTIVE LOADS",
+        "in_transit": "12 In Transit",
+        "employee_headcount": "EMPLOYEE HEADCOUNT",
+        "across_branches": "Across 4 Branches",
+        "system_latency": "SYSTEM LATENCY"
+    },
+    "modules": {
+        "badge": "ALL-IN-ONE SOLUTION",
+        "title_1": "Unified",
+        "title_2": "Ecosystem",
+        "subtitle": "Stop switching between ten different spreadsheets. Hive centralizes every aspect of your Ethiopian business operations into one seamless dashboard.",
+        "finance": {
+            "title": "Intelligent Finance",
+            "desc": "Automated ERCA tax compliance, local bank API integrations for immediate reconciliation, and multi-currency ledger management (ETB\/USD).",
+            "vat": "VAT Calculation",
+            "telebirr": "Telebirr Sync"
+        },
+        "inventory": {
+            "title": "Inventory Management",
+            "desc": "Multi-branch stock syncing, automated reorder triggers, and warehouse routing with full batch tracking connectivity."
+        },
+        "compliance": {
+            "title": "Compliance Readiness",
+            "desc": "Native reporting for Ethiopian tax authorities and INSA aligned security protocols for localized data privacy."
+        },
+        "bi": {
+            "title": "Real-Time BI",
+            "desc": "Predictive operational analytics and custom KPI dashboards to monitor your business health from any device."
+        }
+    },
+    "mobility": {
+        "badge": "INFRASTRUCTURE MODULES",
+        "title_part1": "Smart Mobility &",
+        "title_part2": "Fleet Operations",
+        "desc": "Expand beyond basic tracking. Hive features advanced integration capabilities for municipalities, transit authorities, and logistics giants.",
+        "traffic_title": "Smart Traffic & Toll Management",
+        "traffic_desc": "Automate toll collection and traffic violation processing via direct API integration with Telebirr and local transit databases.",
+        "ev_title": "EV Dashboard Integration",
+        "ev_desc": "Manage an Electric Vehicle fleet with specialized dashboard modules tracking battery health, charging node status, and route optimization.",
+        "node_id": "NODE \/\/ MOBILITY",
+        "active_tolls": "Active Tolls (A.A. Expressway)",
+        "telebirr_sync": "TELEBIRR SYNC: ACTIVE",
+        "vehicles_per_hr": "Vehicles Processed\/Hr",
+        "cleared": "CLEARED",
+        "just_now": "Just Now",
+        "pending": "PENDING",
+        "min_ago": "1 min ago",
+        "exempt": "EXEMPT",
+        "mins_ago": "5 mins ago"
+    },
+    "hr": {
+        "badge": "HUMAN RESOURCES",
+        "title": "Ethiopian Payroll & Pension",
+        "desc": "Managing payroll shouldn't require a master's in tax law. Hive automatically handles ERCA tax tables and POESSA pension contributions for all your employees.",
+        "payslip_title": "Payslip Generation",
+        "salary_gross": "Gross Salary",
+        "salary_tax": "Income Tax (ERCA)",
+        "salary_pension": "Pension (7% Employee)",
+        "salary_net": "Net Salary",
+        "node_id": "NODE \/\/ HR_PAYROLL"
+    },
+    "pricing": {
+        "title_part1": "Scalable",
+        "title_part2": "Pricing Models",
+        "per_month": "per month",
+        "startup_label": "Startup",
+        "startup_tagline": "For growing teams",
+        "larva_label": "Larva Node",
+        "larva_tagline": "For individual creators",
+        "overlord_label": "Overlord",
+        "overlord_tagline": "Infinite potential",
+        "managed_title": "Managed Node",
+        "managed_desc": "We host it, you drive it.",
+        "get_started": "Get Started",
+        "popular": "Most Popular",
+        "free": "Free",
+        "forever": "Forever",
+        "feat_users_5": "Up to 5 Users",
+        "feat_inventory": "Basic Inventory",
+        "feat_finance": "Finance Core",
+        "feat_shared": "Shared AWS Node",
+        "feat_media_video": "Media & Video Engine",
+        "feat_isolated_db": "Isolated Database",
+        "feat_fleet": "Fleet Management",
+        "feat_priority_support": "Priority Support",
+        "feat_storage_2gb": "2GB Storage",
+        "feat_storage_10gb": "10GB Storage",
+        "feat_storage_50gb": "50GB Storage",
+        "feat_storage_200gb": "200GB Storage",
+        "feat_sla": "99.9% Up-time SLA"
+    },
+    "how": {
+        "title": "How It Works",
+        "subtitle": "Deploying your enterprise node is faster than you think.",
+        "sidebar_title": "Deployment Workflow",
+        "step1_title": "Provision Your Node",
+        "step1_desc": "Choose your region and compute power. We initialize a dedicated, secure environment for your company data.",
+        "step2_title": "Connect Core Modules",
+        "step2_desc": "Enable Finance, HR, or Supply Chain. Our setup wizard guides you through local tax and bank integrations.",
+        "step3_title": "Deploy & Scale",
+        "step3_desc": "Invite your team and start managing operations. Add new modules as your business grows without any downtime."
+    },
+    "faq": {
+        "title": "Frequently Asked Questions",
+        "subtitle": "Everything you need to know about the Hive ecosystem.",
+        "q1": "Does Hive ERP work during internet outages?",
+        "a1": "Yes. Our mobile apps and POS systems feature offline-sync. They store data locally and automatically push to the central cloud once connection is restored.",
+        "q2": "Is our corporate data stored locally in Ethiopia?",
+        "a2": "We offer hybrid deployments. You can choose to host your Node on our secure AWS infrastructure, or deploy an On-Premise instance directly within your local data center for strict INSA compliance.",
+        "q3": "Can we integrate existing legacy software?",
+        "a3": "Absolutely. Hive comes with a comprehensive REST API and webhooks, allowing Techive Technology Solutions to build custom bridges to your existing software.",
+        "q4": "How does the multi-tenant architecture work?",
+        "a4": "Each company gets its own isolated database schema. This guarantees zero data-bleed between clients while allowing us to push instantaneous system updates to everyone simultaneously."
+    },
+    "footer": {
+        "subtitle": "The Next-Generation ERP for the Ethiopian Market.",
+        "product": "Product",
+        "company": "Company",
+        "legal": "Legal",
+        "about": "About Us",
+        "careers": "Careers",
+        "security": "Security",
+        "privacy": "Privacy Policy",
+        "terms": "Terms of Service",
+        "rights": "All rights reserved."
+    },
+    "common": {
+        "general_business": "General Business",
+        "tenant_workspace": "Tenant Workspace"
+    }
+}

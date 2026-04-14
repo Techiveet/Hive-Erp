@@ -71,6 +71,7 @@ class SyncLocalizationCommand extends Command
                     $data = json_decode(File::get($file->getPathname()), true);
 
                     if (is_array($data) && count($data) > 0) {
+                        $data = \Illuminate\Support\Arr::dot($data);
                         $totalKeysFound += count($data);
 
                         DB::beginTransaction();

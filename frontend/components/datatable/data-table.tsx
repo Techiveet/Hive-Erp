@@ -14,6 +14,11 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, 
+  AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -668,11 +673,28 @@ function DataTableInner<TData, TValue>({
               {table.getHeaderGroups().map((hg) => (
                 <TableRow key={hg.id} className="border-border/50 hover:bg-transparent">
                   {hg.headers.map((h) => (
-                    <TableHead key={h.id} className={cn("h-11 px-4 text-xs font-bold text-muted-foreground uppercase tracking-wider", h.column.columnDef.meta?.align === "center" && "text-center")}>
-                      {h.isPlaceholder ? null : <div className={cn(h.column.getCanSort() && "cursor-pointer select-none flex items-center gap-2 hover:text-foreground transition-colors")} onClick={h.column.getToggleSortingHandler()}>
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {{ asc: <ArrowUp className="h-3 w-3 text-primary" />, desc: <ArrowDown className="h-3 w-3 text-primary" /> }[h.column.getIsSorted() as string] ?? null}
-                      </div>}
+                    <TableHead 
+                      key={h.id} 
+                      className={cn(
+                        "h-11 px-4 text-xs font-bold text-muted-foreground uppercase tracking-wider",
+                        h.column.columnDef.meta?.align === "center" && "text-center",
+                        h.column.columnDef.meta?.align === "right" && "text-right"
+                      )}
+                    >
+                      {h.isPlaceholder ? null : (
+                        <div 
+                          className={cn(
+                            "flex items-center gap-2",
+                            h.column.getCanSort() && "cursor-pointer select-none hover:text-foreground transition-colors",
+                            h.column.columnDef.meta?.align === "center" && "justify-center",
+                            h.column.columnDef.meta?.align === "right" && "justify-end"
+                          )} 
+                          onClick={h.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(h.column.columnDef.header, h.getContext())}
+                          {{ asc: <ArrowUp className="h-3 w-3 text-primary" />, desc: <ArrowDown className="h-3 w-3 text-primary" /> }[h.column.getIsSorted() as string] ?? null}
+                        </div>
+                      )}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -692,7 +714,18 @@ function DataTableInner<TData, TValue>({
               ) : table.getRowModel().rows.length ? (
                 table.getRowModel().rows.map((row) => (
                   <TableRow key={row.id} className={cn("border-b border-border/40 hover:bg-muted/20 transition-colors", row.getIsSelected() && "bg-primary/5")}>
-                    {row.getVisibleCells().map((cell) => <TableCell key={cell.id} className="px-4 py-3 align-middle">{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell 
+                        key={cell.id} 
+                        className={cn(
+                          "px-4 py-3 align-middle",
+                          cell.column.columnDef.meta?.align === "center" && "text-center",
+                          cell.column.columnDef.meta?.align === "right" && "text-right"
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))
               ) : (
@@ -777,19 +810,39 @@ function DataTableInner<TData, TValue>({
             {showSelectionDelete && (
               <>
                 <Separator orientation="vertical" className="h-5 mx-1 border-border" />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-red-500 hover:bg-red-500/10 hover:text-red-600 font-bold"
-                  onClick={async () => {
-                    const deleteRows = onDeleteRows;
-                    if (!deleteRows) return;
-                    await deleteRows(table.getSelectedRowModel().rows.map(r => r.original as TData));
-                    setRowSelection({});
-                  }}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" /> <span className="hidden sm:inline-block">Purge</span>
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-red-500 hover:bg-red-500/10 hover:text-red-600 font-bold"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> <span className="hidden sm:inline-block">Purge</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Purge Selected Records?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the selected entries from our servers.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                        className="rounded-xl bg-red-600 hover:bg-red-700"
+                        onClick={async () => {
+                          const deleteRows = onDeleteRows;
+                          if (!deleteRows) return;
+                          await deleteRows(table.getSelectedRowModel().rows.map(r => r.original as TData));
+                          setRowSelection({});
+                        }}
+                      >
+                        Confirm Purge
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </>
             )}
 

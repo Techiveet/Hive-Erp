@@ -37,6 +37,22 @@ class ProfileController extends Controller
         }
     }
 
+    /**
+     * Mark the welcome tour as completed for the authenticated operator.
+     */
+    public function completeWelcomeTour(Request $request)
+    {
+        $user = $request->user();
+        $user->has_completed_welcome_tour = true;
+        $user->save();
+
+        return response()->json([
+            'success' => true, 
+            'message' => 'Onboarding sequence finalized.',
+            'has_completed_welcome_tour' => true
+        ]);
+    }
+
     public function getAvatar(Request $request)
     {
         $user = $request->user();

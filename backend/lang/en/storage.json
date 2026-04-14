@@ -1,7 +1,7 @@
 {
     "upgrade_required": "Upgrade Required",
-    "storage_subscription_message": "Your current clearance level requires a separate storage subscription to orchestrate file operations on this cluster.",
+    "storage_subscription_message": "Your current clearance level requires a separate Storage subscription to manage file operations on this cluster.",
     "checkout_now": "Checkout Now",
-    "secure_pipeline": "Secure Pipeline",
+    "secure_pipeline": "SECURE PIPELINE",
     "storage_access_denied": "Storage Access Denied"
 }

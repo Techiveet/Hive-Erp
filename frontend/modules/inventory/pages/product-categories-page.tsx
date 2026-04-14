@@ -5,11 +5,17 @@ import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "@/store/use-translation";
 
 import { DataTable } from "@/components/datatable/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, 
+  AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -58,6 +64,7 @@ const DEFAULT_FORM: CategoryForm = {
 };
 
 export default function ProductCategoriesPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [tableQuery, setTableQuery] = React.useState<TableQueryState>(DEFAULT_QUERY);
@@ -102,24 +109,24 @@ export default function ProductCategoriesPage() {
       return createInventoryProductCategory(payload);
     },
     onSuccess: () => {
-      toast.success(form.id ? "Category updated." : "Category created.");
+      toast.success(form.id ? t("inventory.common.saved", "Category updated.") : t("inventory.common.saved", "Category created."));
       queryClient.invalidateQueries({ queryKey: ["inventory", "product-categories"] });
       closeModal();
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to save category.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to save category."));
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteInventoryProductCategory,
     onSuccess: () => {
-      toast.success("Category deleted.");
+      toast.success(t("inventory.common.deleted", "Category deleted."));
       queryClient.invalidateQueries({ queryKey: ["inventory", "product-categories"] });
       setSelectedRowIds({});
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to delete category.");
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to delete category."));
     },
   });
 
@@ -190,17 +197,17 @@ export default function ProductCategoriesPage() {
 
   const handleSave = React.useCallback(() => {
     if (!form.name.trim()) {
-      toast.error("Category name is required.");
+      toast.error(t("inventory.categories.name_required", "Category name is required."));
       return;
     }
     saveMutation.mutate();
-  }, [form.name, saveMutation]);
+  }, [form.name, saveMutation, t]);
 
   const columns = React.useMemo<ColumnDef<ProductCategory>[]>(
     () => [
       {
         accessorKey: "name",
-        header: "Category",
+        header: t("inventory.common.category", "Category"),
         cell: ({ row }) => (
           <div>
             <p className="font-semibold">{row.original.name}</p>
@@ -210,72 +217,91 @@ export default function ProductCategoriesPage() {
       },
       {
         id: "parent",
-        header: "Parent",
+        header: t("inventory.categories.col_parent", "Parent"),
         enableSorting: false,
-        cell: ({ row }) => row.original.parent?.name ?? "None",
+        cell: ({ row }) => row.original.parent?.name ?? t("inventory.common.none", "None"),
       },
       {
         accessorKey: "products_count",
-        header: "Products",
+        header: t("inventory.common.products", "Products"),
         enableSorting: false,
         cell: ({ row }) => row.original.products_count ?? 0,
+        meta: { align: "right" as const },
       },
       {
         accessorKey: "is_active",
-        header: "Status",
+        header: t("inventory.common.status", "Status"),
         enableSorting: false,
         cell: ({ row }) => (
           <Badge variant={row.original.is_active ? "default" : "secondary"}>
-            {row.original.is_active ? "active" : "inactive"}
+            {row.original.is_active ? t("inventory.common.active", "active") : t("inventory.common.inactive", "inactive")}
           </Badge>
         ),
+        meta: { align: "center" as const },
       },
       {
         id: "actions",
-        header: "Actions",
+        header: t("inventory.common.actions", "Actions"),
         enableSorting: false,
         cell: ({ row }) => {
           const category = row.original;
           return (
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-start gap-2">
               <Button size="sm" variant="outline" className="rounded-full" onClick={() => openEdit(category)}>
                 <Pencil className="mr-1 h-3.5 w-3.5" />
-                Edit
+                {t("inventory.common.edit", "Edit")}
               </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                className="rounded-full"
-                disabled={deleteMutation.isPending}
-                onClick={() => {
-                  if (!window.confirm(`Delete "${category.name}"?`)) return;
-                  deleteMutation.mutate(category.id);
-                }}
-              >
-                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                Delete
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="rounded-full"
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    {t("inventory.common.delete", "Delete")}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t("inventory.categories.delete_confirm_title", "Delete Category?")}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("inventory.categories.delete_confirm_desc", "This will permanently delete the category. Products in this category will become uncategorized.")} <strong>{category.name}</strong>.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="rounded-xl">{t("inventory.common.cancel", "Cancel")}</AlertDialogCancel>
+                    <AlertDialogAction 
+                      className="rounded-xl bg-destructive hover:bg-destructive/90"
+                      onClick={() => deleteMutation.mutate(category.id)}
+                    >
+                      {t("inventory.common.confirm", "Confirm Delete")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           );
         },
-        meta: { align: "right" as const },
+        meta: { align: "left" as const },
       },
     ],
-    [deleteMutation, openEdit]
+    [deleteMutation, openEdit, t]
   );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Product Categories</h1>
+          <h1 className="text-3xl font-black tracking-tight">{t("inventory.categories.title", "Product Categories")}</h1>
           <p className="text-sm text-muted-foreground">
-            Tenant-scoped category management with parent-child hierarchy.
+            {t("inventory.categories.subtitle", "Tenant-scoped category management with parent-child hierarchy.")}
           </p>
         </div>
         <Button className="rounded-full px-5" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Category
+          {t("inventory.categories.add_btn", "Add Category")}
         </Button>
       </div>
 
@@ -292,9 +318,6 @@ export default function ProductCategoriesPage() {
         onSelectionChange={(payload) => setSelectedRowIds(payload.selectedRowIds as RowSelectionState)}
         onDeleteRows={async (rows) => {
           if (rows.length === 0) return;
-          if (!window.confirm(`Delete ${rows.length} selected categor${rows.length === 1 ? "y" : "ies"}?`)) {
-            return;
-          }
           await Promise.all(rows.map((row) => deleteMutation.mutateAsync(row.id)));
           clearSelection();
         }}
@@ -307,7 +330,7 @@ export default function ProductCategoriesPage() {
           applyTableQuery(DEFAULT_QUERY);
           clearSelection();
         }}
-        searchPlaceholder="Search category..."
+        searchPlaceholder={t("inventory.categories.search_placeholder", "Search category...")}
         resourceName="categories"
         syncWithUrl={false}
       />
@@ -326,17 +349,17 @@ export default function ProductCategoriesPage() {
           <div className="border-b border-border/40 px-6 py-5">
             <DialogHeader>
               <DialogTitle className="text-xl font-black tracking-tight">
-                {form.id ? "Edit Category" : "Create Category"}
+                {form.id ? t("inventory.categories.edit_title", "Edit Category") : t("inventory.categories.create_title", "Create Category")}
               </DialogTitle>
               <DialogDescription>
-                Keep your product hierarchy clean for catalog and stock workflows.
+                {t("inventory.categories.modal_desc", "Keep your product hierarchy clean for catalog and stock workflows.")}
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="grid gap-4 px-6 py-5">
             <div className="space-y-2">
-              <Label htmlFor="category-name">Name</Label>
+              <Label htmlFor="category-name">{t("inventory.common.name", "Name")}</Label>
               <Input
                 id="category-name"
                 value={form.name}
@@ -346,14 +369,14 @@ export default function ProductCategoriesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category-parent">Parent Category</Label>
+              <Label htmlFor="category-parent">{t("inventory.categories.parent_label", "Parent Category")}</Label>
               <select
                 id="category-parent"
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={form.parent_id}
                 onChange={(event) => setForm((prev) => ({ ...prev, parent_id: event.target.value }))}
               >
-                <option value="">None</option>
+                <option value="">{t("inventory.common.none", "None")}</option>
                 {(parentOptionsQuery.data?.data ?? [])
                   .filter((parent) => parent.id !== form.id)
                   .map((parent) => (
@@ -373,18 +396,18 @@ export default function ProductCategoriesPage() {
                 }
               />
               <Label htmlFor="category-active" className="cursor-pointer">
-                Active category
+                {t("inventory.categories.active_label", "Active category")}
               </Label>
             </div>
           </div>
 
           <DialogFooter className="border-t border-border/40 bg-muted/20 px-6 py-4 sm:justify-end">
             <Button variant="outline" className="rounded-full" onClick={closeModal}>
-              Cancel
+              {t("inventory.common.cancel", "Cancel")}
             </Button>
             <Button className="rounded-full" disabled={saveMutation.isPending} onClick={handleSave}>
               {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {form.id ? "Save Changes" : "Create Category"}
+              {form.id ? t("inventory.common.save_changes", "Save Changes") : t("inventory.common.create", "Create Category")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -392,3 +415,4 @@ export default function ProductCategoriesPage() {
     </div>
   );
 }
+

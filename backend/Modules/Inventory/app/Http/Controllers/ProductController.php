@@ -333,10 +333,12 @@ class ProductController extends Controller
         $tagIds = array_values(array_unique(array_map('intval', $validated['tags'] ?? [])));
         unset($validated['tags']);
 
-        $record = Product::query()->updateOrCreate(
-            ['id' => $product?->id],
-            $validated
-        );
+        if ($product) {
+            $product->update($validated);
+            $record = $product;
+        } else {
+            $record = Product::query()->create($validated);
+        }
 
         if (!empty($validated['barcode'])) {
             $barcodePath = $this->storeBarcodeSvg($record, (string) $validated['barcode']);
