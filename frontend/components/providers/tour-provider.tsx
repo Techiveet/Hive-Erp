@@ -25,7 +25,7 @@ const CustomTooltip = React.forwardRef<HTMLDivElement, TooltipRenderProps>(
         if (!step) return null;
 
         const combinedStyle = {
-            ...tooltipProps.style,
+            ...(tooltipProps as any).style,
             zIndex: 1000000,
             backgroundColor: 'hsl(var(--card))',
             borderRadius: '1.5rem',
