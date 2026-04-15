@@ -884,18 +884,9 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   // burns the watermark for videos) and triggers a browser Save dialog instead
   // of opening in a new tab.
   const downloadFile = React.useCallback(async (fileId: number, filename: string) => {
-    const isVideo = /\.(mp4|mov|mkv|avi|webm|flv|wmv|m4v)$/i.test(filename);
-    const toastId = isVideo
-      ? toast.loading('Preparing download… applying watermark, this may take a moment.', { duration: Infinity })
-      : undefined;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 min max
-
     try {
       const url = `${getBackendApiRoot()}/files/${fileId}/download`;
-      const res = await fetch(url, { headers: getAuthHeaders(), signal: controller.signal });
-      clearTimeout(timeout);
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Download failed');
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
@@ -906,16 +897,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       a.click();
       a.remove();
       URL.revokeObjectURL(blobUrl);
-      if (toastId) toast.dismiss(toastId);
-      toast.success('Download started!');
-    } catch (err: any) {
-      clearTimeout(timeout);
-      if (toastId) toast.dismiss(toastId);
-      if (err?.name === 'AbortError') {
-        toast.error('Download timed out. The file may be too large to process.');
-      } else {
-        toast.error('Download failed. Please try again.');
-      }
+    } catch (err) {
+      toast.error('Download failed. Please try again.');
     }
   }, []);
 

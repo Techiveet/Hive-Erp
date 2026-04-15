@@ -452,24 +452,18 @@ class FileManagerController extends Controller
                   "x=w-tw-16:y=h-th-16:" .   // bottom-right, 16px padding (Udemy-style)
                   "shadowx=1:shadowy=1:shadowcolor=black@0.40";
 
-        // ── Build FFmpeg command ────────────────────────────────────────────
-        // -preset ultrafast → ~10x faster than 'fast', acceptable quality for watermarking
-        // -crf 28           → slightly lower quality than 23, barely noticeable
-        // -c:a copy         → audio is not re-encoded (instant)
-        // set_time_limit(0) → prevent PHP/Octane from killing the process mid-encode
-        set_time_limit(0);
+        // -c:a copy  → no audio re-encode (fast)
+        // -preset ultrafast -crf 28 → prioritize speed so the request doesn't timeout
         $cmd = sprintf(
-            '%s -i %s -vf %s -c:a copy -preset ultrafast -crf 28 -movflags +faststart -y %s 2>&1',
+            '%s -i %s -vf %s -c:a copy -preset ultrafast -crf 28 -y %s 2>&1',
             escapeshellarg($ffmpeg),
             escapeshellarg($filePath),
             escapeshellarg($filter),
             escapeshellarg($tempOut)
         );
 
-        Log::info("[Watermark] Running FFmpeg for file {$id} (ultrafast)");
+        Log::info("[Watermark] Running FFmpeg for file {$id}");
         $output = shell_exec($cmd);
-        $encoded = file_exists($tempOut) ? filesize($tempOut) : 0;
-        Log::info("[Watermark] FFmpeg done. Output size: {$encoded} bytes");
 
         if (!file_exists($tempOut) || filesize($tempOut) === 0) {
             Log::error("[Watermark] FFmpeg failed for file {$id}: {$output}");
