@@ -24,7 +24,7 @@ import { useTour } from "@/components/providers/tour-provider";
 import { useTranslation } from "@/store/use-translation"; 
 import { cn } from '@/lib/utils';
 import { initEcho } from '@/lib/echo';
-import { getBackendApiRoot, getTenantId, isTenantSession } from '@/lib/runtime-context';
+import { getBackendApiRoot, getTenantHeaders, getTenantId, isTenantSession } from '@/lib/runtime-context';
 import { DashboardOverviewPlaceholder } from "@/components/ui/loading-states";
 import { usePermissions } from "@/hooks/use-permissions";
 import { handleAuthFailureResponse } from "@/lib/auth-sync";
@@ -136,14 +136,13 @@ export default function DashboardHome() {
         queryKey: ['dashboardMetrics', tenantName],
         queryFn: async () => {
             const token = localStorage.getItem('hive_token');
-            const tenantId = getTenantId();
             const endpoint = `${getBackendApiRoot()}${isTenantSession() ? '/tenant/dashboard' : '/dashboard'}`;
             
             const res = await fetch(endpoint, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
-                    ...(tenantId ? { 'X-Tenant': tenantId } : {}),
+                    ...getTenantHeaders(),
                 }
             });
             if (await handleAuthFailureResponse(res)) {

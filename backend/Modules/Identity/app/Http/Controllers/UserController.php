@@ -3,30 +3,39 @@
 namespace Modules\Identity\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Modules\Identity\Models\User;
+use App\Support\AuthContext;
+use App\Support\TenantRequestSignature;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password as PasswordRule;
-
+use Modules\Core\Support\OwnedMediaPathResolver;
 use Modules\Identity\Mail\UserCreated;
-use Modules\Identity\Mail\UserUpdated;
 use Modules\Identity\Mail\UserStatusChanged;
+use Modules\Identity\Mail\UserUpdated;
+use Modules\Identity\Models\User;
 
 class UserController extends Controller
 {
+    public function __construct(
+        private readonly AuthContext $authContext,
+        private readonly TenantRequestSignature $tenantRequestSignature,
+        private readonly OwnedMediaPathResolver $ownedMediaPathResolver
+    ) {
+    }
+
     protected function success($data = null, $message = null, $code = 200)
     {
         return response()->json([
             'success' => true,
             'message' => $message,
-            'data'    => $data,
+            'data' => $data,
         ], $code);
     }
 
@@ -55,7 +64,7 @@ class UserController extends Controller
         $dateTo = $request->input('date_to');
 
         if (!empty($search)) {
-            $indexName = $isTenant ? "tenant_{$tenantId}_users" : "central_users";
+            $indexName = $isTenant ? "tenant_{$tenantId}_users" : 'central_users';
             $scout = User::search($search)->within($indexName);
 
             $scout->query(function ($query) use ($status, $role, $dateFrom, $dateTo) {
@@ -71,8 +80,17 @@ class UserController extends Controller
 
             $query->orderByRaw('id = 1 DESC');
 
-            $sortCol = $request->input('sort_by');
-            $sortDir = $request->input('sort_direction');
+            $sortableColumns = ['id', 'name', 'email', 'is_active', 'created_at'];
+            $sortCol = (string) $request->input('sort_by', 'created_at');
+            $sortDir = strtolower((string) $request->input('sort_direction', 'desc'));
+
+            if (!in_array($sortCol, $sortableColumns, true)) {
+                $sortCol = 'created_at';
+            }
+
+            if (!in_array($sortDir, ['asc', 'desc'], true)) {
+                $sortDir = 'desc';
+            }
 
             if ($sortCol && $sortDir) {
                 $query->orderBy($sortCol, $sortDir);
@@ -86,7 +104,7 @@ class UserController extends Controller
 
         $response = $users->toArray();
         $response['meta'] = [
-            'engine' => $engine
+            'engine' => $engine,
         ];
 
         return response()->json($response);
@@ -97,12 +115,15 @@ class UserController extends Controller
         if ($status !== 'all') {
             $query->where('is_active', $status === 'active');
         }
+
         if ($role !== 'all') {
-            $query->whereHas('roles', fn($q) => $q->where('name', $role));
+            $query->whereHas('roles', fn ($q) => $q->where('name', $role));
         }
+
         if (!empty($dateFrom)) {
             $query->whereDate('created_at', '>=', $dateFrom);
         }
+
         if (!empty($dateTo)) {
             $query->whereDate('created_at', '<=', $dateTo);
         }
@@ -112,12 +133,12 @@ class UserController extends Controller
     {
         $search = $request->input('search', '');
         $isTenant = function_exists('tenant') && tenant('id');
-        
+
         if (!empty($search)) {
-            $indexName = $isTenant ? "tenant_" . tenant('id') . "_users" : "central_users";
+            $indexName = $isTenant ? 'tenant_' . tenant('id') . '_users' : 'central_users';
             $users = User::search($search)
                 ->within($indexName)
-                ->query(fn($q) => $q->where('is_active', true))
+                ->query(fn ($q) => $q->where('is_active', true))
                 ->take(15)
                 ->get();
         } else {
@@ -126,8 +147,7 @@ class UserController extends Controller
                 ->get();
         }
 
-        // Map to a lightweight representation to prevent exfiltration of roles/permissions
-        $data = $users->map(function($user) {
+        $data = $users->map(function ($user) {
             return [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -136,62 +156,65 @@ class UserController extends Controller
             ];
         });
 
-        // Wrapper to match frontend expectations
         return response()->json(['data' => $data]);
     }
 
-   public function store(Request $request)
-{
-    $validated = $request->validate([
-        'name'        => 'required|string|max:255',
-        'email'       => 'required|email|unique:users,email',
-        'role'        => 'required|string|exists:roles,name',
-        'avatar_path' => 'nullable|string',
-        'password'    => 'nullable|string|min:8',
-    ]);
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'role' => 'required|string|exists:roles,name',
+            'avatar_path' => 'nullable|string',
+            'password' => 'nullable|string|min:8',
+        ]);
 
-    if ($validated['role'] === 'Super Admin') {
-        return $this->error('Access Denied: Cannot provision Super Admin accounts via API.', 403);
+        if ($validated['role'] === 'Super Admin') {
+            return $this->error('Access Denied: Cannot provision Super Admin accounts via API.', 403);
+        }
+
+        if ($request->filled('avatar_path')) {
+            return $this->error('Avatar files must be uploaded by the target user after the account is created.', 422);
+        }
+
+        $rawPassword = $request->input('password') ?: Str::random(16);
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($rawPassword),
+            'is_active' => true,
+            'avatar_path' => null,
+        ]);
+
+        $user->guard_name = $this->resolveGuard();
+        $user->assignRole($validated['role']);
+
+        Cache::forget("user_stats_{$user->guard_name}");
+
+        try {
+            $token = Password::createToken($user);
+            $tenantId = function_exists('tenant') && tenant() ? tenant('id') : null;
+
+            Mail::to($user->email)->queue(
+                new UserCreated(
+                    user: $user,
+                    token: $token,
+                    rawPassword: $rawPassword,
+                    tenantId: $tenantId
+                )
+            );
+        } catch (\Exception $e) {
+            Log::warning('UserCreated email failed: ' . $e->getMessage());
+        }
+
+        return $this->success($user, 'Node operator provisioned successfully.', 201);
     }
 
-    $rawPassword = $request->input('password') ?: \Illuminate\Support\Str::random(16);
-
-    $user = User::create([
-        'name'        => $validated['name'],
-        'email'       => $validated['email'],
-        'password'    => \Illuminate\Support\Facades\Hash::make($rawPassword),
-        'is_active'   => true,
-        'avatar_path' => $request->input('avatar_path'),
-    ]);
-
-    $user->guard_name = $this->resolveGuard();
-    $user->assignRole($validated['role']);
-
-    \Illuminate\Support\Facades\Cache::forget("user_stats_{$user->guard_name}");
-
-    try {
-        $token = \Illuminate\Support\Facades\Password::createToken($user);
-        $tenantId = function_exists('tenant') && tenant()
-            ? tenant('id')
-            : null;
-
-        \Illuminate\Support\Facades\Mail::to($user->email)->queue(
-            new \Modules\Identity\Mail\UserCreated(
-                user: $user,
-                token: $token,
-                rawPassword: $rawPassword,
-                tenantId: $tenantId
-            )
-        );
-    } catch (\Exception $e) {
-        \Illuminate\Support\Facades\Log::warning("UserCreated email failed: " . $e->getMessage());
-    }
-
-    return $this->success($user, 'Node operator provisioned successfully.', 201);
-}
     public function show($id)
     {
         $user = User::with('roles')->findOrFail($id);
+
         return $this->success($user);
     }
 
@@ -204,19 +227,31 @@ class UserController extends Controller
         }
 
         $request->validate([
-            'name'          => 'sometimes|string|max:255',
-            'email'         => ['sometimes', 'email', Rule::unique('users')->ignore($user->id)],
-            'role'          => 'sometimes|string|exists:roles,name',
-            'avatar_path'   => 'nullable|string', // 🚀 FIX: Accept string instead of image
+            'name' => 'sometimes|string|max:255',
+            'email' => ['sometimes', 'email', Rule::unique('users')->ignore($user->id)],
+            'role' => 'sometimes|string|exists:roles,name',
+            'avatar_path' => 'nullable|string',
             'remove_avatar' => 'nullable|boolean',
-            'password'      => ['nullable', 'string', PasswordRule::min(6)->mixedCase()->numbers()->symbols()]
+            'password' => ['nullable', 'string', PasswordRule::min(8)->mixedCase()->numbers()->symbols()],
         ]);
 
-        // 🚀 FIX: Handle avatar path strings natively
         if ($request->input('remove_avatar')) {
             $user->avatar_path = null;
         } elseif ($request->has('avatar_path')) {
-            $user->avatar_path = $request->input('avatar_path');
+            $avatarPath = trim((string) $request->input('avatar_path'));
+            $actingUser = $request->user();
+            $isPrivileged = method_exists($actingUser, 'hasAdministrativeRole') && $actingUser->hasAdministrativeRole();
+
+            if (
+                $avatarPath !== ''
+                && !$isPrivileged
+                && !$this->ownedMediaPathResolver->isOwnedMediaPath($avatarPath, (int) $user->id)
+                && !$this->ownedMediaPathResolver->isOwnedMediaPath($avatarPath, (int) $actingUser->id)
+            ) {
+                return $this->error('Access Denied: The selected avatar is not owned by the target or the operator.', 422);
+            }
+
+            $user->avatar_path = $avatarPath !== '' ? $avatarPath : null;
         }
 
         $userData = $request->only(['name', 'email']);
@@ -227,7 +262,7 @@ class UserController extends Controller
         }
 
         $user->update($userData);
-        $user->save(); // Ensure any avatar_path assignments are committed
+        $user->save();
 
         if ($request->has('role')) {
             $user->guard_name = $this->resolveGuard();
@@ -246,7 +281,7 @@ class UserController extends Controller
                 Mail::to($user->email)->queue(new UserUpdated($user, $changes));
             }
         } catch (\Exception $e) {
-            Log::warning("UserUpdated email failed: " . $e->getMessage());
+            Log::warning('UserUpdated email failed: ' . $e->getMessage());
         }
 
         return $this->success($user, 'Operator record updated.');
@@ -260,7 +295,15 @@ class UserController extends Controller
             return $this->error('CRITICAL: Cannot delete the Core Overlord.', 403);
         }
 
-        if ($user->avatar_path) Storage::disk('public')->delete($user->avatar_path);
+        if ($user->avatar_path) {
+            $avatarMedia = $this->ownedMediaPathResolver->resolveOwnedMediaFromPath($user->avatar_path, (int) $user->id);
+
+            if ($avatarMedia) {
+                $avatarMedia->delete();
+            } else {
+                Storage::disk('public')->delete(ltrim(str_replace('/storage/', '', $user->avatar_path), '/'));
+            }
+        }
 
         $guard = $this->resolveGuard();
         $user->delete();
@@ -285,47 +328,55 @@ class UserController extends Controller
         try {
             Mail::to($user->email)->queue(new UserStatusChanged($user));
         } catch (\Exception $e) {
-            Log::warning("UserStatusChanged email failed: " . $e->getMessage());
+            Log::warning('UserStatusChanged email failed: ' . $e->getMessage());
         }
 
         $status = $user->is_active ? 'activated' : 'deactivated';
+
         return $this->success($user, "Operator successfully {$status}.");
     }
 
-    // 🚀 BULLETPROOF IMPERSONATION METHOD
     public function impersonate(Request $request, $id)
     {
         try {
-            // 1. Get the authenticated ID
-            $currentUserId = $request->user()->id;
+            if (!$request->user()) {
+                return $this->error('Authentication required.', 401);
+            }
 
-            // 2. Explicitly fetch the user using the Identity Module's Model
-            // This guarantees the Spatie 'hasRole' and Sanctum 'createToken' traits are available!
+            $currentUserId = $request->user()->id;
             $identityUser = User::find($currentUserId);
 
-            // 3. Security Check
-            if (!$identityUser || !$identityUser->hasRole('Super Admin')) {
+            if (!$identityUser || !$identityUser->isSuperAdmin()) {
                 return $this->error('CRITICAL: Insufficient clearance. Only Super Admins can impersonate users.', 403);
             }
 
-            // 4. Fetch target user
             $userToImpersonate = User::findOrFail($id);
 
             if ($userToImpersonate->id === 1 || $userToImpersonate->id === '1') {
                 return $this->error('Cannot impersonate the Core Overlord.', 403);
             }
 
-            // 5. Generate a new temporary token
-            $token = $userToImpersonate->createToken('impersonation_token')->plainTextToken;
+            $currentContext = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
+            $token = $userToImpersonate->createToken(
+                'impersonation_token',
+                $this->authContext->abilitiesFor($currentContext)
+            )->plainTextToken;
 
             return $this->success([
                 'token' => $token,
-                'user' => $userToImpersonate
+                'user' => $userToImpersonate,
+                'context' => $currentContext,
+                'context_signature' => $currentContext === 'central'
+                    ? null
+                    : $this->tenantRequestSignature->sign($currentContext),
             ], 'Impersonation sequence activated.');
-
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Impersonation Error: ' . $e->getMessage());
-            return $this->error('System Crash: ' . $e->getMessage() . ' on line ' . $e->getLine(), 500);
+            Log::error('Impersonation Error: ' . $e->getMessage(), [
+                'user_id' => $request->user()?->id,
+                'target_user_id' => $id,
+            ]);
+
+            return $this->error('Impersonation sequence failed.', 500);
         }
     }
 }

@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-export type ModuleId = "core" | "identity" | "tenancy" | "subscription" | "nightclub" | "inventory";
+export type ModuleId = "core" | "identity" | "tenancy" | "subscription" | "nightclub" | "inventory" | "warehouse";
 export type DashboardNavPlacement = "primary" | "secondary";
 
 export interface ModuleNavItem {

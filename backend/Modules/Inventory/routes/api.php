@@ -23,7 +23,7 @@ use Modules\Inventory\Http\Controllers\TagController;
 use Modules\Inventory\Support\InventoryEntityCatalog;
 use Modules\Inventory\Support\InventoryWorkflowAliasCatalog;
 
-Route::middleware(['auth:sanctum'])
+Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout', 'tenant_module:inventory_control'])
     ->prefix('v1/inventory')
     ->name('api.inventory.')
     ->group(function (): void {

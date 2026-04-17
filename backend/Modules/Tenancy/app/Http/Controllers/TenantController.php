@@ -63,11 +63,17 @@ class TenantController extends Controller implements HasMiddleware
             });
         }
 
-        $sortBy = $request->input('sort_by', 'created_at');
-        $sortDir = $request->input('sort_direction', 'desc');
+        $sortBy = (string) $request->input('sort_by', 'created_at');
+        $sortDir = strtolower((string) $request->input('sort_direction', 'desc'));
+
+        if (!in_array($sortDir, ['asc', 'desc'], true)) {
+            $sortDir = 'desc';
+        }
 
         if (in_array($sortBy, ['name', 'plan', 'is_active', 'admin_email', 'admin_active'], true)) {
             $query->orderByRaw("data->>'$sortBy' $sortDir");
+        } elseif (!in_array($sortBy, ['id', 'created_at', 'updated_at'], true)) {
+            $query->orderBy('created_at', 'desc');
         } else {
             $query->orderBy($sortBy, $sortDir);
         }
@@ -100,11 +106,17 @@ class TenantController extends Controller implements HasMiddleware
             });
         }
 
-        $sortBy = $request->input('sort_by', 'created_at');
-        $sortDir = $request->input('sort_direction', 'desc');
+        $sortBy = (string) $request->input('sort_by', 'created_at');
+        $sortDir = strtolower((string) $request->input('sort_direction', 'desc'));
+
+        if (!in_array($sortDir, ['asc', 'desc'], true)) {
+            $sortDir = 'desc';
+        }
 
         if (in_array($sortBy, ['name', 'plan', 'is_active', 'admin_email', 'admin_active'], true)) {
             $query->orderByRaw("data->>'$sortBy' $sortDir");
+        } elseif (!in_array($sortBy, ['id', 'created_at', 'updated_at'], true)) {
+            $query->orderBy('created_at', 'desc');
         } else {
             $query->orderBy($sortBy, $sortDir);
         }

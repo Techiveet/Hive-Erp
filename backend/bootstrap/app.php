@@ -33,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // The middleware safely no-ops on central domains.
         $middleware->api(prepend: [
             \App\Http\Middleware\InitializeTenantContext::class,
+            \App\Http\Middleware\HandleQueryToken::class,
         ]);
 
     })

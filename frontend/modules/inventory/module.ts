@@ -1,4 +1,4 @@
-import { LayoutDashboard, PackageSearch, Shapes, Tags, Truck, Warehouse, Rows3, Grid3X3 } from "lucide-react";
+import { LayoutDashboard, PackageSearch, Shapes, Tags, Truck } from "lucide-react";
 import type { FrontendModuleDefinition } from "@/modules/types";
 
 export const inventoryModule: FrontendModuleDefinition = {
@@ -12,9 +12,6 @@ export const inventoryModule: FrontendModuleDefinition = {
     "/dashboard/inventory/catalog/tags",
     "/dashboard/inventory/catalog/products",
     "/dashboard/inventory/catalog/suppliers",
-    "/dashboard/inventory/locations/warehouses",
-    "/dashboard/inventory/locations/shelves",
-    "/dashboard/inventory/locations/shelf-boxes",
   ],
   navItems: [
     {
@@ -60,33 +57,6 @@ export const inventoryModule: FrontendModuleDefinition = {
       fallbackLabel: "Suppliers",
       href: "/dashboard/inventory/catalog/suppliers",
       icon: Truck,
-      permissions: ["view_inventory", "manage_inventory"],
-      placement: "primary",
-    },
-    {
-      moduleId: "inventory",
-      translationKey: "nav.inventory_warehouses",
-      fallbackLabel: "Warehouses",
-      href: "/dashboard/inventory/locations/warehouses",
-      icon: Warehouse,
-      permissions: ["view_inventory", "manage_inventory"],
-      placement: "primary",
-    },
-    {
-      moduleId: "inventory",
-      translationKey: "nav.inventory_shelves",
-      fallbackLabel: "Shelves",
-      href: "/dashboard/inventory/locations/shelves",
-      icon: Rows3,
-      permissions: ["view_inventory", "manage_inventory"],
-      placement: "primary",
-    },
-    {
-      moduleId: "inventory",
-      translationKey: "nav.inventory_shelf_boxes",
-      fallbackLabel: "Shelf Boxes",
-      href: "/dashboard/inventory/locations/shelf-boxes",
-      icon: Grid3X3,
       permissions: ["view_inventory", "manage_inventory"],
       placement: "primary",
     },

@@ -2,6 +2,8 @@
 
 namespace Modules\Identity\Http\Controllers;
 
+use App\Support\AuthContext;
+use App\Support\TenantRequestSignature;
 use App\Http\Controllers\Controller;
 use Modules\Identity\Models\User;
 use Illuminate\Http\Request;
@@ -21,6 +23,12 @@ use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly AuthContext $authContext,
+        private readonly TenantRequestSignature $tenantRequestSignature
+    ) {
+    }
+
     /**
      * Retrieve the authenticated operator's profile.
      */
@@ -141,7 +149,10 @@ class AuthController extends Controller
         }
 
         // 🚀 4. NORMAL LOGIN (No 2FA Required)
-        $token = $user->createToken('hive-access-token')->plainTextToken;
+        $token = $user->createToken(
+            'hive-access-token',
+            $this->authContext->abilitiesFor($currentTenant)
+        )->plainTextToken;
 
         // TRACK GEOGRAPHIC LOCATION
         $this->recordLoginHistory($user, $request, $currentTenant);
@@ -161,8 +172,11 @@ class AuthController extends Controller
             'message' => 'Authentication successful.',
             'data' => [
                 'user' => $this->formatUserPayload($user, $currentTenant),
-                'token'   => $token,
-                'context' => $currentTenant
+                'token' => $token,
+                'context' => $currentTenant,
+                'context_signature' => $currentTenant === 'central'
+                    ? null
+                    : $this->tenantRequestSignature->sign($currentTenant),
             ]
         ], 200);
     }
@@ -221,7 +235,10 @@ class AuthController extends Controller
         }
 
         Cache::forget('2fa_auth_' . $request->two_factor_token);
-        $token = $user->createToken('hive-access-token')->plainTextToken;
+        $token = $user->createToken(
+            'hive-access-token',
+            $this->authContext->abilitiesFor($currentTenant)
+        )->plainTextToken;
 
         // TRACK GEOGRAPHIC LOCATION
         $this->recordLoginHistory($user, $request, $currentTenant);
@@ -241,8 +258,11 @@ class AuthController extends Controller
             'message' => 'Authentication successful.',
             'data' => [
                 'user' => $this->formatUserPayload($user, $currentTenant, true),
-                'token'   => $token,
-                'context' => $currentTenant
+                'token' => $token,
+                'context' => $currentTenant,
+                'context_signature' => $currentTenant === 'central'
+                    ? null
+                    : $this->tenantRequestSignature->sign($currentTenant),
             ]
         ], 200);
     }
@@ -265,7 +285,7 @@ class AuthController extends Controller
                 ])
                 ->log('logged_out');
 
-            $user->currentAccessToken()->delete();
+            $user->currentAccessToken()?->delete();
         }
 
         return response()->json(['message' => 'Logged out successfully.'], 200);
@@ -364,6 +384,7 @@ class AuthController extends Controller
             'email' => $user->email,
             'roles' => $user->getRoleNames(),
             'permissions' => $user->getAllPermissions()->pluck('name'),
+            'central_control_override' => $user->hasCentralControlOverride(),
             'has_completed_welcome_tour' => (bool) $user->has_completed_welcome_tour,
             'two_factor_enabled' => $twoFactorEnabled ?? (!empty($user->two_factor_secret) && $user->two_factor_confirmed_at !== null),
             'module_access' => $tenant

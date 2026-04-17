@@ -19,18 +19,13 @@ import { LanguageSwitcher } from "../layout/language-switcher";
 import { GlobalSearch } from "./global-search";
 import { TopbarMailIcon } from "./topbar-mail";
 import { TopbarNotificationsIcon } from "./topbar-notifications";
-import { getBackendApiRoot, getTenantId, isTenantSession } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PROFILE_ROUTE_PERMISSIONS } from "@/lib/route-permissions";
 
 const getApiUrl = () => {
   return getBackendApiRoot();
-};
-
-const getTenantHeaders = (): Record<string, string> => {
-  const tenantId = getTenantId();
-  return tenantId ? { "X-Tenant": tenantId } : {};
 };
 
 const getTenantAwareEndpoint = (path: string) => {

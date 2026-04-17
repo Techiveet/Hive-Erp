@@ -43,6 +43,11 @@ class InventoryFileController extends Controller
     protected function resolvePath(mixed $path): string
     {
         $value = trim((string) $path);
+
+        if ($value === '' || str_contains($value, "\0") || preg_match('~(^|[\\/])\.\.(?:[\\/]|$)~', $value)) {
+            abort(400, 'Invalid file path.');
+        }
+
         $value = ltrim(str_replace('\\', '/', $value), '/');
 
         // Keep file access scoped to inventory storage area.
@@ -53,4 +58,3 @@ class InventoryFileController extends Controller
         return $value;
     }
 }
-

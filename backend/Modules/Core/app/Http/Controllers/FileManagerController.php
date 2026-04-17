@@ -5,12 +5,15 @@ namespace Modules\Core\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Modules\Core\Models\Folder;
 use Modules\Core\Models\FileEntry;
-use Modules\Core\Models\Setting;
+use Modules\Core\Jobs\PrepareVideoDownloadAsset;
+use Modules\Core\Jobs\TranscodeVideoForStreaming;
+use Modules\Core\Support\VideoWatermarkService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 // 🚀 Intervention Image v3 Imports
@@ -19,6 +22,10 @@ use Intervention\Image\Drivers\Gd\Driver;
 
 class FileManagerController extends Controller
 {
+    public function __construct(
+        private readonly VideoWatermarkService $videoWatermarkService
+    ) {}
+
     // =========================================================================
     // 1. Core Fetching & Metrics
     // =========================================================================
@@ -42,6 +49,12 @@ class FileManagerController extends Controller
             } elseif ($filter === 'recent') {
                 $filesQuery->orderBy('created_at', 'desc')->take(20);
                 $foldersQuery->whereRaw('1 = 0'); // Don't show folders in recent
+            } elseif ($request->has('playlist_id')) {
+                $playlistId = $request->input('playlist_id');
+                $filesQuery->whereHas('playlists', function($q) use ($playlistId) {
+                    $q->where('playlists.id', $playlistId);
+                });
+                $foldersQuery->whereRaw('1 = 0'); // No folders in playlist view
             } else {
                 $foldersQuery->where('parent_id', $folderId);
                 $filesQuery->where('folder_id', $folderId);
@@ -81,10 +94,14 @@ class FileManagerController extends Controller
             }
         }
 
+        $folders = $foldersQuery->orderBy('name')->get();
+        $files = $filesQuery->orderBy('created_at', 'desc')->get();
+        $this->queueMissingVideoStreams($files);
+
         return response()->json([
             'data' => [
-                'folders' => $foldersQuery->orderBy('name')->get(),
-                'files' => $filesQuery->orderBy('created_at', 'desc')->get(),
+                'folders' => $folders,
+                'files' => $files,
             ],
             'metrics' => $metrics
         ]);
@@ -101,6 +118,8 @@ class FileManagerController extends Controller
             'parent_id' => 'nullable|exists:folders,id'
         ]);
 
+        $this->assertOwnedFolderId($request->input('parent_id'));
+
         $folder = Folder::create([
             'name' => $request->name,
             'parent_id' => $request->parent_id,
@@ -116,10 +135,14 @@ class FileManagerController extends Controller
             'file' => 'required|file|max:102400',
             'folder_id' => 'nullable|exists:folders,id',
             'base_name' => 'nullable|string|max:255',
+            'original_name' => 'nullable|string|max:255',
+            'custom_thumbnail' => 'nullable|image|max:5120',
             'upload_id' => 'required|string',
             'chunk_index' => 'required|integer|min:0',
             'total_chunks' => 'required|integer|min:1',
         ]);
+
+        $this->assertOwnedFolderId($request->input('folder_id'));
 
         $chunkIndex = $request->input('chunk_index');
         $totalChunks = $request->input('total_chunks');
@@ -147,7 +170,7 @@ class FileManagerController extends Controller
                 'user_id' => auth()->id(),
             ]);
 
-            $originalName = $request->input('original_name');
+            $originalName = basename((string) ($request->input('original_name') ?: $file->getClientOriginalName()));
             $mediaUploader = $fileEntry->addMedia($tempPath)
                                        ->usingName($request->input('base_name') ?: pathinfo($originalName, PATHINFO_FILENAME))
                                        ->usingFileName($originalName);
@@ -158,8 +181,13 @@ class FileManagerController extends Controller
                 $fileEntry->addMedia($request->file('custom_thumbnail'))->toMediaCollection('custom_thumbnail');
             }
 
-            if (str_starts_with($media->mime_type, 'video/') && class_exists(\App\Jobs\TranscodeVideoForStreaming::class)) {
-                \App\Jobs\TranscodeVideoForStreaming::dispatch($fileEntry);
+            if (str_starts_with($media->mime_type, 'video/')) {
+                $this->dispatchVideoStreamPreparation($fileEntry);
+                $this->dispatchVideoDownloadPreparation($fileEntry);
+            }
+
+            if (file_exists($tempPath)) {
+                unlink($tempPath);
             }
 
             return response()->json(['message' => 'Upload complete', 'file' => $fileEntry->load('media')], 201);
@@ -235,6 +263,7 @@ class FileManagerController extends Controller
                 $media->name = $request->name;
                 $media->file_name = $request->name . ($extension ? '.' . $extension : '');
                 $media->save();
+
             }
         }
         return response()->json(['message' => 'Renamed successfully']);
@@ -248,6 +277,7 @@ class FileManagerController extends Controller
         ]);
 
         $destId = $request->destination_folder_id;
+        $this->assertOwnedFolderId($destId);
 
         foreach ($request->items as $item) {
             if ($item['type'] === 'folder') {
@@ -346,7 +376,21 @@ class FileManagerController extends Controller
 
     public function serveSubtitle($uuid)
     {
-        $media = Media::where('uuid', $uuid)->firstOrFail();
+        $media = Media::query()
+            ->where('uuid', $uuid)
+            ->where('model_type', FileEntry::class)
+            ->where('collection_name', 'subtitles')
+            ->firstOrFail();
+
+        $fileEntry = FileEntry::query()
+            ->whereKey($media->model_id)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        if (!$fileEntry || !file_exists($media->getPath())) {
+            abort(404, 'Subtitle not found.');
+        }
+
         return response(file_get_contents($media->getPath()), 200, [
             'Content-Type' => 'text/vtt',
             'Access-Control-Allow-Origin' => '*'
@@ -366,13 +410,88 @@ class FileManagerController extends Controller
         return response()->json(['message' => 'Subtitle deleted successfully', 'deleted_uuid' => $uuid], 200);
     }
 
+    /**
+     * Serve a tenant media file directly from the tenant-aware storage disk.
+     *
+     * Since tenancy is initialized via the X-Tenant header by InitializeTenantContext,
+     * Storage::disk('public') is automatically suffixed to the correct tenant path.
+     * This bypasses the broken getUrl() which always points to central storage.
+     *
+     * Query params:
+     *   ?thumb=custom  → serve the custom_thumbnail collection
+     *   ?thumb=1       → serve the generated video thumbnail conversion
+     *   (none)         → serve the main file
+     */
+    public function serveMedia(Request $request, $id)
+    {
+        $fileEntry = FileEntry::where('user_id', auth()->id())->findOrFail($id);
+
+        $thumb = $request->query('thumb');
+
+        if ($thumb === 'custom') {
+            $media = $fileEntry->getFirstMedia('custom_thumbnail');
+        } elseif ($thumb === '1') {
+            $media = $fileEntry->getFirstMedia('file');
+            // getPath() with conversion name serves the thumbnail conversion
+            $path = $media?->getPath('thumbnail');
+            if (!$media || !$path || !file_exists($path)) {
+                // Fallback to original
+                $path = $media?->getPath();
+            }
+            if (!$media || !$path || !file_exists($path)) {
+                abort(404, 'Thumbnail not found.');
+            }
+            return response()->file($path, [
+                'Content-Type'  => 'image/jpeg',
+                'Cache-Control' => 'private, max-age=86400',
+                'Access-Control-Allow-Origin' => '*',
+            ]);
+        } else {
+            $media = $fileEntry->getFirstMedia('file');
+        }
+
+        if (!$media) abort(404, 'File not found.');
+
+        // getPath() uses the already-initialized (tenant-aware) disk
+        $path = $media->getPath();
+
+        if (!file_exists($path)) {
+            abort(404, 'File not found on disk.');
+        }
+
+        $mimeType = $media->mime_type ?: 'application/octet-stream';
+
+        return response()->file($path, [
+            'Content-Type'  => $mimeType,
+            'Cache-Control' => 'private, max-age=86400',
+            'Access-Control-Allow-Origin' => '*',
+        ]);
+    }
+
+
     public function serveStream($mediaId, $filename)
     {
-        $path = storage_path("app/public/{$mediaId}/processed/{$filename}");
+        $safeFilename = basename((string) $filename);
+
+        if ($safeFilename !== $filename || !preg_match('/\A[\w.\-]+\z/', $safeFilename)) {
+            abort(404, 'Stream chunk not found.');
+        }
+
+        $ownsStream = FileEntry::query()
+            ->where('user_id', auth()->id())
+            ->where('hls_path', 'like', $mediaId . '/processed/%')
+            ->exists();
+
+        if (!$ownsStream) {
+            abort(403, 'Unauthorized');
+        }
+
+        $relativePath = "{$mediaId}/processed/{$safeFilename}";
+        $path = Storage::disk('public')->path($relativePath);
 
         if (!file_exists($path)) abort(404, "Stream chunk not found.");
 
-        $mime = str_ends_with($filename, '.m3u8') ? 'application/vnd.apple.mpegurl' : 'video/MP2T';
+        $mime = str_ends_with($safeFilename, '.m3u8') ? 'application/vnd.apple.mpegurl' : 'video/MP2T';
 
         return response()->file($path, [
             'Content-Type' => $mime,
@@ -385,116 +504,104 @@ class FileManagerController extends Controller
     {
         $fileEntry = FileEntry::findOrFail($id);
 
-        if ($fileEntry->user_id !== auth()->id()) abort(403, 'Unauthorized');
+        // Allow file owner, admins and tenant admins to download
+        $user = auth()->user();
+        $isAdmin = (bool) ($user && method_exists($user, 'hasAdministrativeRole') && $user->hasAdministrativeRole());
+        if (!$isAdmin && $fileEntry->user_id !== $user?->id) {
+            abort(403, 'Unauthorized');
+        }
 
         $media = $fileEntry->getFirstMedia('file');
         if (!$media) abort(404);
 
-        $filePath = $media->getPath();
-        $mimeType = $media->mime_type;
-        $fileName  = $media->file_name;
-
-        // ── Only watermark video files ──────────────────────────────────────
-        if (!str_starts_with($mimeType, 'video/')) {
-            return response()->file($filePath, [
-                'Content-Type'                => $mimeType,
-                'Content-Disposition'         => 'attachment; filename="' . $fileName . '"',
-                'Access-Control-Allow-Origin' => '*',
-            ]);
-        }
-
-        // ── Fetch app title from settings (cached 1 hour) ──────────────────
-        $tenantPrefix = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
-        $appTitle = Cache::remember("watermark_app_title_{$tenantPrefix}", 3600, function () {
-            return trim((string) Setting::where('key', 'app_title')->value('value')) ?: 'HIVE.OS';
-        });
-
-        // Escape special characters that FFmpeg drawtext cannot handle
-        $safeTitle = str_replace(["'", ':', '\\'], ["\\'", '\\:', '\\\\'], $appTitle);
-
-        // ── Check FFmpeg is available ───────────────────────────────────────
-        $ffmpeg = trim((string) shell_exec('which ffmpeg 2>/dev/null'));
-        if (empty($ffmpeg)) {
-            Log::warning('FFmpeg not found — serving video without watermark.');
-            return response()->file($filePath, [
-                'Content-Type'                => $mimeType,
-                'Content-Disposition'         => 'attachment; filename="' . $fileName . '"',
-                'Access-Control-Allow-Origin' => '*',
-            ]);
-        }
-
-        // ── Build temp output path ──────────────────────────────────────────
-        $tempDir  = storage_path('app/temp_watermark');
-        if (!is_dir($tempDir)) mkdir($tempDir, 0777, true);
-        $tempOut  = $tempDir . '/' . uniqid('wm_', true) . '.mp4';
-
-        // ── Resolve font path – use vendor DejaVu font (guaranteed by Composer) ──
-        // dompdf ships DejaVuSans-Bold.ttf, which is always present in the container.
-        $fontPath = base_path('vendor/dompdf/dompdf/lib/fonts/DejaVuSans-Bold.ttf');
-        // Fallback chain for system fonts (Alpine, Ubuntu, etc.)
-        if (!file_exists($fontPath)) $fontPath = '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf';
-        if (!file_exists($fontPath)) $fontPath = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
-        if (!file_exists($fontPath)) {
-            Log::warning('[Watermark] No font found – serving without watermark.');
-            return response()->file($filePath, [
-                'Content-Type'                => $mimeType,
-                'Content-Disposition'         => 'attachment; filename="' . $fileName . '"',
-                'Access-Control-Allow-Origin' => '*',
-            ]);
-        }
-
-        $fontArg = "fontfile={$fontPath}:";
-
-        $filter = "drawtext={$fontArg}" .
-                  "text='{$safeTitle}':" .
-                  "fontsize=18:" .
-                  "fontcolor=white@0.35:" .
-                  "x=w-tw-16:y=h-th-16:" .   // bottom-right, 16px padding (Udemy-style)
-                  "shadowx=1:shadowy=1:shadowcolor=black@0.40";
-
-        // -c:a copy  → no audio re-encode (fast)
-        // -preset ultrafast -crf 28 → prioritize speed so the request doesn't timeout
-        $cmd = sprintf(
-            '%s -i %s -vf %s -c:a copy -preset ultrafast -crf 28 -y %s 2>&1',
-            escapeshellarg($ffmpeg),
-            escapeshellarg($filePath),
-            escapeshellarg($filter),
-            escapeshellarg($tempOut)
-        );
-
-        Log::info("[Watermark] Running FFmpeg for file {$id}");
-        $output = shell_exec($cmd);
-
-        if (!file_exists($tempOut) || filesize($tempOut) === 0) {
-            Log::error("[Watermark] FFmpeg failed for file {$id}: {$output}");
-            // Graceful fallback — serve without watermark
-            return response()->file($filePath, [
-                'Content-Type'                => $mimeType,
-                'Content-Disposition'         => 'attachment; filename="' . $fileName . '"',
-                'Access-Control-Allow-Origin' => '*',
-            ]);
-        }
-
-        // ── Stream the watermarked file then clean up ───────────────────────
-        return response()->streamDownload(function () use ($tempOut) {
-            $handle = fopen($tempOut, 'rb');
-            while (!feof($handle)) {
-                echo fread($handle, 8192);
-                flush();
-            }
-            fclose($handle);
-            @unlink($tempOut); // delete temp file after streaming
-        }, $fileName, [
-            'Content-Type'                => 'video/mp4',
-            'Content-Disposition'         => 'attachment; filename="' . $fileName . '"',
+        $headers = [
             'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Expose-Headers' => 'Content-Disposition, X-Hive-Video-Download',
+            'Cache-Control' => 'private, no-store, max-age=0',
+        ];
+
+        $isVideo = str_starts_with((string) $media->mime_type, 'video/');
+        $isAudio = str_starts_with((string) $media->mime_type, 'audio/');
+
+        if ($isVideo || $isAudio) {
+            $shouldBrandDownload = $isVideo && $this->videoWatermarkService->shouldBrandDownloads();
+            
+            // For audio, we always "resolve" it through the service to check if the job ran
+            // even if no branding is applied.
+            $asset = ($shouldBrandDownload || $isAudio)
+                ? $this->videoWatermarkService->resolveDownloadAsset($fileEntry)
+                : null;
+
+            if (
+                $asset !== null
+                && Storage::disk($asset['disk'])->exists($asset['relative_path'])
+            ) {
+                return Storage::disk($asset['disk'])->download(
+                    $asset['relative_path'],
+                    $asset['filename'],
+                    $headers + [
+                        'X-Hive-Video-Download' => $isVideo ? ($shouldBrandDownload ? 'branded' : 'original') : 'audio',
+                    ]
+                );
+            }
+
+            if ($shouldBrandDownload || $isAudio) {
+                // If it's not ready yet, we dispatch and return 409
+                $this->dispatchVideoDownloadPreparation($fileEntry, true);
+
+                return response()->json([
+                    'message' => ($isVideo ? 'Branded video' : 'Audio file') . ' is being prepared.',
+                ], 409, $headers + [
+                    'X-Hive-Video-Download' => 'preparing',
+                    'Retry-After' => '3',
+                ]);
+            }
+        }
+
+        $disk = $media->disk ?: config('media-library.disk_name', 'public');
+        $relativePath = $media->id . '/' . $media->file_name;
+
+        if (!Storage::disk($disk)->exists($relativePath)) {
+            // Fallback to absolute path if manual relative path check fails (Spatie usually uses this)
+            $filePath = $media->getPath();
+            if (!is_file($filePath)) {
+                abort(404, 'File not found on disk.');
+            }
+            return response()->download($filePath, $media->file_name, $headers + [
+                'Content-Type' => $media->mime_type ?: 'application/octet-stream',
+                'X-Hive-Video-Download' => 'original',
+            ]);
+        }
+
+        return Storage::disk($disk)->download($relativePath, $media->file_name, $headers + [
+            'Content-Type' => $media->mime_type ?: 'application/octet-stream',
+            'X-Hive-Video-Download' => 'original',
         ]);
     }
 
+
     public function getFileDetails($id)
     {
-        $fileEntry = FileEntry::with('media')->findOrFail($id);
+        $fileEntry = FileEntry::with('media')
+            ->where('user_id', auth()->id())
+            ->findOrFail($id);
         $media = $fileEntry->getFirstMedia('file');
+        if (!$media) abort(404);
+
+        if (
+            str_starts_with((string) $media->mime_type, 'video/')
+            && $this->videoWatermarkService->shouldBrandDownloads()
+            && $this->videoWatermarkService->resolveDownloadAsset($fileEntry) === null
+        ) {
+            $this->dispatchVideoDownloadPreparation($fileEntry);
+        }
+
+        if (
+            str_starts_with((string) $media->mime_type, 'video/')
+            && (!$fileEntry->hls_path || !Storage::disk($media->disk ?: config('media-library.disk_name', 'public'))->exists($fileEntry->hls_path))
+        ) {
+            $this->dispatchVideoStreamPreparation($fileEntry);
+        }
 
         $qualities = [
             'original' => $media->getUrl(),
@@ -507,6 +614,158 @@ class FileManagerController extends Controller
             'file' => $fileEntry,
             'video_versions' => array_filter($qualities)
         ]);
+    }
+
+    /**
+     * Prepares a file for download by checking if background processing is needed.
+     * Returns "ready" if the file can be downloaded instantly, or "processing"
+     * if the watermark is still being burned.
+     */
+    public function prepareDownload($id)
+    {
+        $fileEntry = FileEntry::with('media')->findOrFail($id);
+        $user = auth()->user();
+        $isAdmin = (bool) ($user && method_exists($user, 'hasAdministrativeRole') && $user->hasAdministrativeRole());
+
+        if (!$isAdmin && $fileEntry->user_id !== $user?->id) {
+            abort(403, 'Unauthorized');
+        }
+
+        $media = $fileEntry->getFirstMedia('file');
+
+        if (!$media) {
+            return response()->json(['message' => 'File not found.'], 404);
+        }
+
+        $isVideo = str_starts_with((string) $media->mime_type, 'video/');
+        $isAudio = str_starts_with((string) $media->mime_type, 'audio/');
+        $shouldBrandDownload = $isVideo && $this->videoWatermarkService->shouldBrandDownloads();
+
+        if ($shouldBrandDownload || $isAudio) {
+            $asset = $this->videoWatermarkService->resolveDownloadAsset($fileEntry);
+
+            if ($asset && Storage::disk($asset['disk'])->exists($asset['relative_path'])) {
+                return response()->json([
+                    'status' => 'ready',
+                    'message' => ($isVideo ? 'Video' : 'Audio') . ' is ready for download.',
+                    'progress' => 100
+                ]);
+            }
+
+            // If the asset is not ready yet, enqueue preparation on the media worker.
+            $this->dispatchVideoDownloadPreparation($fileEntry, true);
+
+            // Fetch progress from cache (updated by VideoWatermarkService)
+            $progress = Cache::get("download_progress_{$id}", 0);
+
+            return response()->json([
+                'status' => 'processing',
+                'message' => $isVideo ? 'Watermark is being applied...' : 'Preparing audio for download...',
+                'progress' => (int) $progress,
+                'retry_after' => 2,
+            ]);
+        }
+
+        // For non-video files or if branding is disabled
+        return response()->json([
+            'status' => 'ready',
+            'message' => 'File is ready for download.'
+        ]);
+    }
+
+    private function dispatchVideoStreamPreparation(FileEntry $fileEntry): void
+    {
+        $tenantId = $this->currentTenantContextId();
+        $dispatchKey = TranscodeVideoForStreaming::dispatchMarkerKey((int) $fileEntry->getKey(), $tenantId);
+
+        if (!Cache::add($dispatchKey, 1, $this->mediaDispatchMarkerExpiration())) {
+            return;
+        }
+
+        try {
+            TranscodeVideoForStreaming::dispatch((int) $fileEntry->getKey(), $tenantId);
+        } catch (\Throwable $exception) {
+            Cache::forget($dispatchKey);
+
+            throw $exception;
+        }
+    }
+
+    private function dispatchVideoDownloadPreparation(FileEntry $fileEntry, bool $primeProgress = false): void
+    {
+        $tenantId = $this->currentTenantContextId();
+        $dispatchKey = PrepareVideoDownloadAsset::dispatchMarkerKey((int) $fileEntry->getKey(), $tenantId);
+        $progressKey = "download_progress_{$fileEntry->getKey()}";
+
+        if ($primeProgress) {
+            $existingProgress = (int) Cache::get($progressKey, 0);
+            Cache::put($progressKey, max(1, $existingProgress), $this->mediaDispatchMarkerExpiration());
+        }
+
+        if (!Cache::add($dispatchKey, 1, $this->mediaDispatchMarkerExpiration())) {
+            return;
+        }
+
+        try {
+            PrepareVideoDownloadAsset::dispatch((int) $fileEntry->getKey(), $tenantId);
+        } catch (\Throwable $exception) {
+            Cache::forget($dispatchKey);
+
+            if ($primeProgress) {
+                Cache::forget($progressKey);
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function currentTenantContextId(): string
+    {
+        return (function_exists('tenant') && tenant('id'))
+            ? (string) tenant('id')
+            : 'central';
+    }
+
+    private function mediaDispatchMarkerExpiration(): \DateTimeInterface
+    {
+        $ttlSeconds = max(600, (int) config('media-library.ffmpeg_timeout', 900) + 600);
+
+        return now()->addSeconds($ttlSeconds);
+    }
+
+    private function assertOwnedFolderId($folderId): void
+    {
+        if ($folderId === null || $folderId === '') {
+            return;
+        }
+
+        $ownsFolder = Folder::query()
+            ->whereKey($folderId)
+            ->where('user_id', auth()->id())
+            ->exists();
+
+        abort_unless($ownsFolder, 403, 'Unauthorized folder access.');
+    }
+
+    private function queueMissingVideoStreams(iterable $files): void
+    {
+        foreach ($files as $fileEntry) {
+            if (!$fileEntry instanceof FileEntry) {
+                continue;
+            }
+
+            $media = $fileEntry->getFirstMedia('file');
+            if (!$media || !str_starts_with((string) $media->mime_type, 'video/')) {
+                continue;
+            }
+
+            $disk = $media->disk ?: config('media-library.disk_name', 'public');
+            $needsStreamPreparation = !$fileEntry->hls_path || !Storage::disk($disk)->exists($fileEntry->hls_path);
+
+            if ($needsStreamPreparation) {
+                $this->dispatchVideoStreamPreparation($fileEntry);
+            }
+        }
     }
 
     // =========================================================================

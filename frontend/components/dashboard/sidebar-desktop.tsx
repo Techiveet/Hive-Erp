@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Layers, ChevronDown, ChevronRight, FileType, Mail, Boxes } from "lucide-react";
+import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Layers, ChevronDown, ChevronRight, FileType, Mail, Boxes, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { DASHBOARD_NAV, DASHBOARD_SECONDARY, type NavItem } from "./nav";
@@ -98,6 +98,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   
   const [isModulesOpen, setIsModulesOpen] = useState(true);
   const [isInventoryOpen, setIsInventoryOpen] = useState(true);
+  const [isWarehouseOpen, setIsWarehouseOpen] = useState(true);
   // 🚀 Apps dropdown state
   const [isAppsOpen, setIsAppsOpen] = useState(true);
   const canAccessConverter = hasAnyPermission(["manage_storage"]);
@@ -152,14 +153,18 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
     );
   }, [searchQuery, t, hasAnyPermission, isTenantNode, isMounted]);
 
-  const moduleNavItems = filteredNav.filter((item) => item.moduleId === "inventory" || item.moduleId === "nightclub");
-  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "nightclub");
+  const moduleNavItems = filteredNav.filter((item) => item.moduleId === "inventory" || item.moduleId === "nightclub" || item.moduleId === "warehouse");
+  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "nightclub" && item.moduleId !== "warehouse");
   const inventoryModuleItems = moduleNavItems.filter((item) => item.moduleId === "inventory");
   const nightclubModuleItems = moduleNavItems.filter((item) => item.moduleId === "nightclub");
+  const warehouseModuleItems = moduleNavItems.filter((item) => item.moduleId === "warehouse");
 
   useEffect(() => {
     if (pathname.startsWith("/dashboard/inventory")) {
       setIsInventoryOpen(true);
+    }
+    if (pathname.startsWith("/dashboard/warehouse")) {
+      setIsWarehouseOpen(true);
     }
   }, [pathname]);
 
@@ -330,6 +335,47 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                         </Link>
                       );
                     })}
+
+                    {warehouseModuleItems.length > 0 && (
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => setIsWarehouseOpen(!isWarehouseOpen)}
+                          className="group flex items-center justify-between rounded-2xl px-3 py-2 text-sm font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground outline-none"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Warehouse className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{t("nav.warehouse", "Warehouse Logic")}</span>
+                          </div>
+                          {isWarehouseOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
+                        </button>
+                        {isWarehouseOpen && (
+                          <div className="flex flex-col gap-1 pl-4">
+                            {warehouseModuleItems.map((item) => {
+                              const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                              const Icon = item.icon;
+                              const label = t(item.translationKey, item.fallbackLabel);
+
+                              return (
+                                <Link
+                                  key={item.href}
+                                  id={item.tourId}
+                                  href={item.href}
+                                  className={cn(
+                                "group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-all duration-200",
+                                active
+                                  ? "bg-primary/10 text-primary font-bold"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                              )}
+                            >
+                              <Icon className="h-4 w-4 shrink-0" />
+                              <span className="truncate">{label}</span>
+                            </Link>
+                          );
+                        })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -26,6 +26,11 @@ class EnsureTenantModuleEnabled
             return $next($request);
         }
 
+        $user = $request->user();
+        if ($user && method_exists($user, 'hasCentralControlOverride') && $user->hasCentralControlOverride()) {
+            return $next($request);
+        }
+
         $current = $this->subscriptions->currentForTenant($tenant);
         $status = $current['status'];
 

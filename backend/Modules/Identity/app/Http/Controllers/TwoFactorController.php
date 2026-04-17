@@ -140,10 +140,10 @@ class TwoFactorController extends Controller
     }
 
     /**
-     * Resolve user from Auth or user_id (API-friendly)
+     * Resolve the currently authenticated user only.
      */
     private function resolveUser(Request $request): ?User
     {
-        return $request->user() ?? User::find($request->input('user_id'));
+        return $request->user();
     }
 }

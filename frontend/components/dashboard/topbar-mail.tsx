@@ -6,7 +6,7 @@ import { Mail, Check, Circle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getBackendApiRoot, getTenantId, isTenantSession } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantHeaders, getTenantId, isTenantSession } from "@/lib/runtime-context";
 import { initEcho } from "@/lib/echo";
 import { toast } from "sonner";
 import { useMailStore } from "@/store/mail-store";
@@ -21,11 +21,6 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
 
   const getApiUrl = () => {
     return getBackendApiRoot();
-  };
-
-  const getTenantHeaders = (): Record<string, string> => {
-    const tenantId = getTenantId();
-    return tenantId ? { "X-Tenant": tenantId } : {};
   };
 
   const getTenantAwareEndpoint = (path: string) => {

@@ -1,7 +1,7 @@
 //lib/echo.ts
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
-import { getBackendOrigin, getTenantId } from "@/lib/runtime-context";
+import { getBackendOrigin, getTenantHeaders } from "@/lib/runtime-context";
 
 declare global {
   interface Window {
@@ -17,8 +17,6 @@ export const initEcho = (token: string) => {
     // Singleton pattern to prevent duplicate connections
     if (!window.Echo) {
       const authEndpoint = `${getBackendOrigin()}/api/v1/broadcasting/auth`;
-      const tenantId = getTenantId();
-
       window.Echo = new Echo({
         broadcaster: 'reverb',
         key: process.env.NEXT_PUBLIC_REVERB_APP_KEY,
@@ -35,7 +33,7 @@ export const initEcho = (token: string) => {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: 'application/json',
-            ...(tenantId ? { 'X-Tenant': tenantId } : {}),
+            ...getTenantHeaders(),
           },
         },
       });

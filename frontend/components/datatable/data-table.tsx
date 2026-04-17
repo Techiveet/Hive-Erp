@@ -7,8 +7,8 @@ import {
   RotateCcw, Search, Trash2, X
 } from "lucide-react";
 import {
-  Column, ColumnDef, RowSelectionState, SortingState, VisibilityState,
-  flexRender, getCoreRowModel, useReactTable,
+  Column, ColumnDef, RowSelectionState, SortingState, VisibilityState, ExpandedState,
+  flexRender, getCoreRowModel, getExpandedRowModel, useReactTable,
 } from "@tanstack/react-table";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
@@ -88,6 +88,7 @@ interface DataTableProps<TData, TValue> {
   canExport?: boolean;
   canPrint?: boolean;
   canRefresh?: boolean;
+  renderSubComponent?: (props: { row: any }) => React.ReactNode;
 }
 
 /* -------------------- Helper Functions -------------------- */
@@ -413,7 +414,7 @@ function DataTableInner<TData, TValue>({
   columns, data = [], totalEntries = 0, loading = false, pageIndex = 1, pageSize = 10, pageSizeOptions = [10, 25, 50, 100],
   onQueryChange, title, description, searchPlaceholder = "Search...", serverSearchDebounceMs = 400, className,
   enableRowSelection = false, getRowId, selectedRowIds, onSelectionChange, onDeleteRows, onRefresh, onResetFilters, exportEndpoint, resourceName = "records", syncWithUrl = true,
-  onCopy, onPrint, onExport, companySettings, brandingSettings, canCopy, canExport, canPrint, canRefresh
+  onCopy, onPrint, onExport, companySettings, brandingSettings, canCopy, canExport, canPrint, canRefresh, renderSubComponent
 }: DataTableProps<TData, TValue>) {
   
   const router = useRouter();
@@ -430,6 +431,7 @@ function DataTableInner<TData, TValue>({
   const [sorting, setSorting] = React.useState<SortingState>(getParam("sortCol", null) ? [{ id: getParam("sortCol", ""), desc: getParam("sortDir", "") === "desc" }] : []);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const [expanded, setExpanded] = React.useState<ExpandedState>({});
 
   const effectiveRowSelection = selectedRowIds ?? rowSelection;
   const debouncedSearch = useDebouncedValue(searchValue, serverSearchDebounceMs);
@@ -491,7 +493,7 @@ function DataTableInner<TData, TValue>({
 
   const table = useReactTable({
     data, columns: mergedColumns,
-    state: { sorting, columnVisibility, rowSelection: enableRowSelection ? effectiveRowSelection : {}, pagination: { pageIndex: pageIndex0, pageSize: effectivePageSize } },
+    state: { sorting, columnVisibility, expanded, rowSelection: enableRowSelection ? effectiveRowSelection : {}, pagination: { pageIndex: pageIndex0, pageSize: effectivePageSize } },
     onSortingChange: (updater) => {
       const newSorting = typeof updater === "function" ? updater(sorting) : updater;
       setSorting(newSorting);
@@ -506,6 +508,9 @@ function DataTableInner<TData, TValue>({
     },
     getRowId: getRowId ?? ((row: any, i) => row.id ?? String(i)),
     getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    onExpandedChange: setExpanded,
+    getRowCanExpand: () => true,
     manualPagination: true, manualSorting: true, pageCount,
   });
 
@@ -713,20 +718,29 @@ function DataTableInner<TData, TValue>({
                 ))
               ) : table.getRowModel().rows.length ? (
                 table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id} className={cn("border-b border-border/40 hover:bg-muted/20 transition-colors", row.getIsSelected() && "bg-primary/5")}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell 
-                        key={cell.id} 
-                        className={cn(
-                          "px-4 py-3 align-middle",
-                          cell.column.columnDef.meta?.align === "center" && "text-center",
-                          cell.column.columnDef.meta?.align === "right" && "text-right"
-                        )}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
-                  </TableRow>
+                  <React.Fragment key={row.id}>
+                    <TableRow className={cn("border-b border-border/40 hover:bg-muted/20 transition-colors", row.getIsSelected() && "bg-primary/5")} data-state={row.getIsSelected() && "selected"}>
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell 
+                          key={cell.id} 
+                          className={cn(
+                            "px-4 py-3 align-middle",
+                            cell.column.columnDef.meta?.align === "center" && "text-center",
+                            cell.column.columnDef.meta?.align === "right" && "text-right"
+                          )}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    {row.getIsExpanded() && renderSubComponent && (
+                      <TableRow>
+                        <TableCell colSpan={row.getVisibleCells().length} className="p-0 border-b border-border/40 bg-muted/10">
+                          {renderSubComponent({ row })}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
                 ))
               ) : (
                 <TableRow><TableCell colSpan={mergedColumns.length} className="h-40 text-center text-muted-foreground font-medium">No records found matching your filters.</TableCell></TableRow>

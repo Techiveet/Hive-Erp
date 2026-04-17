@@ -2,61 +2,84 @@
 
 namespace Modules\Core\Jobs;
 
-use Modules\Core\Models\FileEntry;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use ProtoneMedia\LaravelFFMpeg\Support\FFMpeg;
-use FFMpeg\Format\Video\X264;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Modules\Core\Jobs\Concerns\InteractsWithTenantContext;
+use ProtoneMedia\LaravelFFMpeg\Support\FFMpeg;
+use Modules\Core\Models\FileEntry;
+use Stancl\Tenancy\Tenancy;
+use Throwable;
 
 class TranscodeVideoForStreaming implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, InteractsWithTenantContext;
 
-    public $timeout = 3600;
-    public $tries = 1;
+    public int $timeout = 3600;
+    public int $tries = 2;
 
-    public function __construct(public FileEntry $fileEntry) {}
+    public function __construct(
+        public int $fileEntryId,
+        public string $tenantId = 'central'
+    ) {
+        $this->tenantId = trim($tenantId) !== '' ? $tenantId : 'central';
+        $this->onConnection((string) config('media-library.queue_connection_name', 'redis-media'));
+        $this->onQueue((string) config('media-library.queue_name', 'media-processing'));
+    }
 
-    public function handle()
+    public static function dispatchMarkerKey(int $fileEntryId, string $tenantId): string
+    {
+        return sprintf('media-dispatch:stream:%s:%s', $tenantId, $fileEntryId);
+    }
+
+    public function backoff(): array
+    {
+        return [30, 120, 300];
+    }
+
+    public function middleware(): array
+    {
+        return [
+            (new WithoutOverlapping($this->lockKey()))
+                ->expireAfter($this->timeout + 300)
+                ->dontRelease(),
+        ];
+    }
+
+    public function handle(Tenancy $tenancy): void
     {
         try {
-            $media = $this->fileEntry->getFirstMedia('file');
-            if (!$media || !str_starts_with($media->mime_type, 'video/')) return;
+            $this->initializeTenantContext($tenancy, $this->tenantId);
 
-            $disk = $media->disk;
+            $fileEntry = FileEntry::query()->find($this->fileEntryId);
+            if (!$fileEntry) {
+                return;
+            }
+
+            $media = $fileEntry->getFirstMedia('file');
+            if (!$media || !str_starts_with((string) $media->mime_type, 'video/')) {
+                return;
+            }
+
+            $disk = $media->disk ?: config('media-library.disk_name', 'public');
             $sourcePath = $media->getPathRelativeToRoot();
             $streamDir = dirname($sourcePath) . '/processed';
+            $playlistName = $streamDir . '/playlist.m3u8';
+
+            if ($fileEntry->hls_path && Storage::disk($disk)->exists($fileEntry->hls_path)) {
+                return;
+            }
 
             // Ensure the directory exists on the disk
-            \Illuminate\Support\Facades\Storage::disk($disk)->makeDirectory($streamDir);
-
-            $playlistName = $streamDir . '/playlist.m3u8';
-            $watermarkedName = $streamDir . '/download_wm.mp4';
-
-            $watermarkPath = storage_path('app/public/watermark.png');
+            Storage::disk($disk)->makeDirectory($streamDir);
 
             // Start FFmpeg process
-            $ffmpeg = \ProtoneMedia\LaravelFFMpeg\Support\FFMpeg::fromDisk($disk)->open($sourcePath);
-
-            // 1. Generate Watermarked MP4 for direct downloading
-            $ffmpeg->export()
-                ->toDisk($disk)
-                ->inFormat((new \FFMpeg\Format\Video\X264)->setKiloBitrate(2500)->setAudioCodec('aac'))
-                ->addFilter(function ($filters) use ($watermarkPath) {
-                    if (file_exists($watermarkPath)) {
-                        $filters->watermark($watermarkPath, [
-                            'position' => 'relative',
-                            'bottom' => 25,
-                            'right' => 25,
-                        ]);
-                    }
-                })
-                ->save($watermarkedName);
+            $ffmpeg = FFMpeg::fromDisk($disk)->open($sourcePath);
 
             // 2. THE YOUTUBE QUALITY LADDER (HLS Multi-Bitrate)
             // Define the bitrates (Higher resolution = needs more bitrate)
@@ -83,14 +106,23 @@ class TranscodeVideoForStreaming implements ShouldQueue
                 ->save($playlistName);
 
             // Update Database
-            $this->fileEntry->update([
+            $fileEntry->update([
                 'hls_path' => $playlistName,
-                'watermarked_path' => $watermarkedName
             ]);
-
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("FFmpeg Job Failed: " . $e->getMessage());
+        } catch (Throwable $e) {
+            Log::error("FFmpeg Job Failed: " . $e->getMessage(), [
+                'file_entry_id' => $this->fileEntryId,
+                'tenant_id' => $this->tenantId,
+            ]);
             throw $e;
+        } finally {
+            Cache::forget(self::dispatchMarkerKey($this->fileEntryId, $this->tenantId));
+            $this->endTenantContext($tenancy);
         }
+    }
+
+    private function lockKey(): string
+    {
+        return sprintf('media:stream:%s:%s', $this->tenantId, $this->fileEntryId);
     }
 }

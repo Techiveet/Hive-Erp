@@ -13,7 +13,7 @@ import { logFrontendAction } from "@/lib/api";
 import { clearHiveSession } from "@/lib/auth-sync";
 import { cn } from "@/lib/utils";
 import { QRCodeSVG } from "qrcode.react"; // 🚀 Used for forced setup
-import { getBackendApiRoot, getTenantId, isTenantHost } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantHeaders, getTenantId, isTenantHost, persistHiveContext } from "@/lib/runtime-context";
 import { initializeSessionActivity } from "@/lib/session-activity";
 
 export default function TwoFactorPage() {
@@ -67,8 +67,6 @@ export default function TwoFactorPage() {
 
     const email = sessionStorage.getItem("hive_pending_email");
     const host = window.location.hostname;
-    const tenantId = getTenantId();
-    
     // If they are setting it up for the first time, hit the confirm endpoint. Otherwise, hit verify.
     const endpoint = isTenantHost(host) ? "tenant/verify-2fa" : "verify-2fa";
     const apiUrl = `${getBackendApiRoot()}/${endpoint}`;
@@ -81,7 +79,7 @@ export default function TwoFactorPage() {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
-          ...(tenantId ? { "X-Tenant": tenantId } : {}),
+          ...getTenantHeaders({ allowUnsigned: true }),
         },
         body: JSON.stringify(payload),
       });
@@ -98,7 +96,7 @@ export default function TwoFactorPage() {
       localStorage.removeItem("hive_original_token");
       localStorage.setItem("hive_token", data.data.token);
       localStorage.setItem("hive_user", JSON.stringify(data.data.user));
-      localStorage.setItem("hive_context", data.data.context);
+      persistHiveContext(data.data.context, data.data.context_signature ?? null);
       initializeSessionActivity();
       sessionStorage.removeItem("hive_eject_reason");
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSystemSettings } from "@/components/providers/settings-provider";
 import { handleAuthFailureResponse } from "@/lib/auth-sync";
-import { getBackendApiRoot, getTenantId, isTenantSession } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { FullScreenPlaceholder } from "@/components/ui/loading-states";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -34,14 +34,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const tenantId = getTenantId();
         const endpoint = isTenantSession() ? "/tenant/user" : "/user";
 
         const response = await fetch(`${getBackendApiRoot()}${endpoint}`, {
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${token}`,
-            ...(tenantId ? { "X-Tenant": tenantId } : {}),
+            ...getTenantHeaders(),
           },
         });
 

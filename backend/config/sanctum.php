@@ -34,7 +34,9 @@ return [
     |
     */
 
-    'guard' => ['web'],
+    // API authentication is bearer-token only. Falling back to cookie / session
+    // guards lets tenant context drift across requests in a multi-tenant system.
+    'guard' => [],
 
     /*
     |--------------------------------------------------------------------------

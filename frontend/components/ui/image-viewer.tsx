@@ -103,7 +103,12 @@ export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, o
       setIsLoadingBlob(true);
       try {
         const token = localStorage.getItem('hive_token');
-        const response = await fetch(fetchUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+        const tenantId = localStorage.getItem('hive_context');
+        const headers: Record<string, string> = { 'Authorization': `Bearer ${token}` };
+        if (tenantId && tenantId !== 'central') {
+          headers['X-Tenant'] = tenantId;
+        }
+        const response = await fetch(fetchUrl, { headers });
         if (!response.ok) throw new Error("Failed to secure image");
         const blob = await response.blob();
         setBlobSrc(URL.createObjectURL(blob));

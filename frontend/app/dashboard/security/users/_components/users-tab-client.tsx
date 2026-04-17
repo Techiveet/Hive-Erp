@@ -39,7 +39,7 @@ import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTranslation } from "@/store/use-translation";
-import { getBackendApiRoot, getBackendStorageUrl } from "@/lib/runtime-context";
+import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, persistHiveContext } from "@/lib/runtime-context";
 
 import { FileManagerClient } from "@/components/dashboard/file-manager-client";
 
@@ -95,10 +95,15 @@ export function UsersTabClient(props: Props) {
   }, []);
 
   const extractPathFromUrl = React.useCallback((url: string) => {
-      if (!url) return null;
-      const storageIndex = url.indexOf('/storage/');
-      if (storageIndex !== -1) return url.substring(storageIndex + 9);
-      return url;
+    if (!url) return "";
+    const prefixes = ["/storage/", "/tenancy/assets/"];
+    for (const prefix of prefixes) {
+      const index = url.indexOf(prefix);
+      if (index !== -1) {
+        return url.substring(index + prefix.length);
+      }
+    }
+    return url;
   }, []);
 
   const generateStrongPassword = React.useCallback((length = 12) => {
@@ -259,7 +264,7 @@ export function UsersTabClient(props: Props) {
       
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
+        headers: { ...getAuthHeaders(), 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Impersonation request failed");
       return res.json();
@@ -271,6 +276,7 @@ export function UsersTabClient(props: Props) {
           localStorage.setItem('hive_original_token', currentToken);
         }
         localStorage.setItem('hive_token', data.data.token);
+        persistHiveContext(data.data.context ?? null, data.data.context_signature ?? null);
         toast.success(t('users.impersonating', 'Impersonating user...'));
         
         window.location.href = '/dashboard';

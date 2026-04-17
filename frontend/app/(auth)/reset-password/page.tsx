@@ -18,7 +18,7 @@ import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { logFrontendAction } from "@/lib/api"; // 🚀 Added Telemetry
 import { cn } from "@/lib/utils";
-import { getBackendApiRoot, getTenantId, isTenantHost } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantHeaders, getTenantId, isTenantHost } from "@/lib/runtime-context";
 
 function ResetPasswordForm({ isTenant }: { isTenant: boolean }) {
   const router = useRouter();
@@ -51,13 +51,12 @@ function ResetPasswordForm({ isTenant }: { isTenant: boolean }) {
 
       try {
         const host = window.location.hostname;
-        const tenantId = getTenantId();
         const endpoint = isTenantHost(host) ? "/tenant/password-policy" : "/password-policy";
         const res = await fetch(`${getBackendApiRoot()}${endpoint}`, {
           signal: controller.signal,
           headers: {
             "Accept": "application/json",
-            ...(tenantId ? { "X-Tenant": tenantId } : {}),
+            ...getTenantHeaders({ allowUnsigned: true }),
           },
         });
         
@@ -101,7 +100,6 @@ function ResetPasswordForm({ isTenant }: { isTenant: boolean }) {
 
     setLoading(true);
     const host = window.location.hostname;
-    const tenantId = getTenantId();
     const endpoint = isTenantHost(host) ? "/tenant/reset-password" : "/reset-password";
 
     try {
@@ -110,7 +108,7 @@ function ResetPasswordForm({ isTenant }: { isTenant: boolean }) {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
-          ...(tenantId ? { "X-Tenant": tenantId } : {}),
+          ...getTenantHeaders({ allowUnsigned: true }),
         },
         body: JSON.stringify({ email, token, password, password_confirmation: passwordConfirmation }),
       });

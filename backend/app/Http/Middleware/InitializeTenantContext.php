@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\TenantRequestSignature;
 use Closure;
 use Illuminate\Http\Request;
 use Modules\Tenancy\Models\Tenant;
@@ -11,7 +12,8 @@ use Symfony\Component\HttpFoundation\Response;
 class InitializeTenantContext
 {
     public function __construct(
-        private readonly Tenancy $tenancy
+        private readonly Tenancy $tenancy,
+        private readonly TenantRequestSignature $tenantRequestSignature
     ) {
     }
 
@@ -32,41 +34,52 @@ class InitializeTenantContext
             ->values()
             ->all();
 
-        $tenantKey = $request->header('X-Tenant') ?: $request->query('tenant');
-        $tenant = null;
+        $tenantKey = $request->header('X-Tenant');
+        $tenantFromHost = in_array($host, $centralDomains, true)
+            ? null
+            : $this->resolveTenant($host);
+        $tenantFromHeader = $tenantKey ? $this->resolveTenant($tenantKey) : null;
 
-        if ($tenantKey) {
-            $tenant = Tenant::query()
-                ->where('id', $tenantKey)
-                ->orWhereHas('domains', fn ($query) => $query->where('domain', $tenantKey))
-                ->first();
-        } else {
-            if (in_array($host, $centralDomains, true)) {
-                if ($this->tenancy->initialized) {
-                    $this->tenancy->end();
-                }
-
-                return $next($request);
+        if ($tenantFromHost) {
+            if ($tenantFromHeader && (string) $tenantFromHeader->id !== (string) $tenantFromHost->id) {
+                return $this->invalidTenantContextResponse(
+                    'Tenant header does not match the resolved tenant host.',
+                    'TENANT_HOST_HEADER_MISMATCH',
+                    400
+                );
             }
 
-            $tenant = Tenant::query()
-                ->whereHas('domains', fn ($query) => $query->where('domain', $host))
-                ->first();
-        }
+            $tenant = $tenantFromHost;
+        } elseif ($tenantKey) {
+            if (!$tenantFromHeader) {
+                return $this->tenantNotFoundResponse($request);
+            }
 
-        if (!$tenant) {
+            if (
+                !$this->allowsUnsignedTenantHeader($request)
+                && !$this->tenantRequestSignature->matches(
+                    (string) $tenantFromHeader->id,
+                    $this->tenantRequestSignature->fromRequest($request)
+                )
+            ) {
+                return $this->invalidTenantContextResponse(
+                    'Tenant context signature is missing or invalid. Please authenticate again.',
+                    'TENANT_CONTEXT_SIGNATURE_INVALID',
+                    401
+                );
+            }
+
+            $tenant = $tenantFromHeader;
+        } else {
             if ($this->tenancy->initialized) {
                 $this->tenancy->end();
             }
 
-            $hasBearerToken = (bool) $request->bearerToken();
+            return $next($request);
+        }
 
-            return response()->json([
-                'message' => $hasBearerToken
-                    ? 'Tenant context is no longer available. Please authenticate again.'
-                    : 'Tenant could not be identified for this request.',
-                'code' => $hasBearerToken ? 'TENANT_CONTEXT_INVALID' : 'TENANT_NOT_FOUND',
-            ], $hasBearerToken ? 401 : 404);
+        if (!$tenant) {
+            return $this->tenantNotFoundResponse($request);
         }
 
         // Always initialize the tenant for the current request. Under Octane /
@@ -76,5 +89,55 @@ class InitializeTenantContext
         $this->tenancy->initialize($tenant);
 
         return $next($request);
+    }
+
+    private function resolveTenant(string $tenantKey): ?Tenant
+    {
+        return Tenant::query()
+            ->where('id', $tenantKey)
+            ->orWhereHas('domains', fn ($query) => $query->where('domain', $tenantKey))
+            ->first();
+    }
+
+    private function allowsUnsignedTenantHeader(Request $request): bool
+    {
+        return in_array(trim($request->path(), '/'), [
+            'api/v1/login',
+            'api/v1/tenant/login',
+            'api/v1/verify-2fa',
+            'api/v1/tenant/verify-2fa',
+            'api/v1/password-policy',
+            'api/v1/tenant/password-policy',
+            'api/v1/reset-password',
+            'api/v1/tenant/reset-password',
+        ], true);
+    }
+
+    private function tenantNotFoundResponse(Request $request): Response
+    {
+        if ($this->tenancy->initialized) {
+            $this->tenancy->end();
+        }
+
+        $hasBearerToken = (bool) $request->bearerToken();
+
+        return response()->json([
+            'message' => $hasBearerToken
+                ? 'Tenant context is no longer available. Please authenticate again.'
+                : 'Tenant could not be identified for this request.',
+            'code' => $hasBearerToken ? 'TENANT_CONTEXT_INVALID' : 'TENANT_NOT_FOUND',
+        ], $hasBearerToken ? 401 : 404);
+    }
+
+    private function invalidTenantContextResponse(string $message, string $code, int $status): Response
+    {
+        if ($this->tenancy->initialized) {
+            $this->tenancy->end();
+        }
+
+        return response()->json([
+            'message' => $message,
+            'code' => $code,
+        ], $status);
     }
 }

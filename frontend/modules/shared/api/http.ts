@@ -1,6 +1,6 @@
 import axios from "axios";
 import { clearHiveSession } from "@/lib/auth-sync";
-import { getBackendApiRoot, getTenantId } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantHeaders } from "@/lib/runtime-context";
 
 export const api = axios.create({
   headers: {
@@ -13,11 +13,8 @@ api.interceptors.request.use((config) => {
     const token = localStorage.getItem("hive_token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
 
-    const tenantId = getTenantId();
     config.baseURL = getBackendApiRoot();
-    if (tenantId) {
-      config.headers["X-Tenant"] = tenantId;
-    }
+    Object.assign(config.headers, getTenantHeaders());
   }
   return config;
 });
@@ -28,6 +25,7 @@ api.interceptors.response.use(
     if (typeof window !== "undefined") {
       const status = error.response?.status;
       const msg = error.response?.data?.message || "";
+      const code = String(error.response?.data?.code || "");
       const requestUrl = String(error.config?.url || "");
 
       const isUnauthorized = status === 401;
@@ -35,7 +33,13 @@ api.interceptors.response.use(
       const isTelemetryRequest = requestUrl.includes("/logs/client-action");
 
       if ((isUnauthorized && !isTelemetryRequest) || isEjected) {
-        clearHiveSession();
+        const ejectReason = code === "TENANT_CONTEXT_INVALID"
+          || code === "TENANT_CONTEXT_SIGNATURE_INVALID"
+          || code === "SESSION_EXPIRED"
+          ? msg
+          : undefined;
+
+        clearHiveSession(ejectReason);
 
         if (isEjected) {
           sessionStorage.setItem("hive_eject_reason", msg.replace("CRITICAL: ", ""));

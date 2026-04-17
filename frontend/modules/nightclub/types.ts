@@ -55,9 +55,20 @@ export type NightClubServiceOrderItem = {
   inventory_item?: {
     id: number;
     name: string;
-    unit: string;
+    unit?: string | null;
     current_stock: string;
     selling_price: string;
+  } | null;
+  inventory_transaction?: {
+    id: number;
+    item_id: number;
+    type: string;
+    direction: string;
+    quantity: string;
+    balance_after: string;
+    module_source?: string | null;
+    reference_type?: string | null;
+    reference_id?: string | null;
   } | null;
 };
 

@@ -6,5 +6,6 @@
     "ActivityObserver": true,
     "MailBox": true,
     "NightClub": true,
-    "Inventory": true
+    "Inventory": true,
+    "Warehouse": true
 }

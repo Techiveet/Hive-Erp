@@ -34,6 +34,14 @@ class AppServiceProvider extends ServiceProvider
 
     protected function hasSuperAdminRole(mixed $user): bool
     {
+        if (! is_object($user)) {
+            return false;
+        }
+
+        if (method_exists($user, 'isSuperAdmin')) {
+            return $user->isSuperAdmin();
+        }
+
         if (! method_exists($user, 'hasRole')) {
             return false;
         }

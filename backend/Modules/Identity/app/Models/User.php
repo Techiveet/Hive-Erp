@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use Modules\Identity\Database\Factories\UserFactory;
+use Modules\Identity\Support\AccessControlCatalog;
 
 class User extends Authenticatable
 {
@@ -52,10 +53,11 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at'       => 'datetime',
-            'password'                => 'hashed',
-            'is_active'               => 'boolean',
-            'two_factor_confirmed_at' => 'datetime',
+            'email_verified_at'          => 'datetime',
+            'password'                   => 'hashed',
+            'is_active'                  => 'boolean',
+            'two_factor_confirmed_at'    => 'datetime',
+            'has_completed_welcome_tour' => 'boolean',
         ];
     }
 
@@ -98,6 +100,7 @@ class User extends Authenticatable
             'id'         => (int) $this->id,
             'name'       => $this->name,
             'email'      => $this->email,
+            'avatar_url' => $this->avatar_url,
             'roles'      => $this->roles->pluck('name')->toArray(),
             'is_active'  => (bool) $this->is_active,
             'created_at' => (int) $this->created_at?->timestamp,
@@ -121,6 +124,98 @@ class User extends Authenticatable
     public function scopeActive(Builder $query): void
     {
         $query->where('is_active', true);
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRoleAcrossGuards([AccessControlCatalog::SUPER_ADMIN_ROLE]);
+    }
+
+    public function hasAdministrativeRole(): bool
+    {
+        return $this->hasRoleAcrossGuards(AccessControlCatalog::administrativeRoles());
+    }
+
+    public function hasCentralControlOverride(): bool
+    {
+        return $this->hasRoleAcrossGuards(AccessControlCatalog::centralControlOverrideRoles())
+            && $this->hasPermissionAcrossGuards(AccessControlCatalog::centralControlOverridePermissions());
+    }
+
+    /**
+     * @param  array<int, string>  $roles
+     */
+    public function hasRoleAcrossGuards(array $roles): bool
+    {
+        $guards = array_values(array_unique(array_filter([
+            config('auth.defaults.guard'),
+            $this->guard_name ?? null,
+            'web',
+            'tenant',
+            'sanctum',
+        ])));
+
+        foreach ($guards as $guard) {
+            foreach ($roles as $role) {
+                try {
+                    if ($this->hasRole($role, $guard)) {
+                        return true;
+                    }
+                } catch (\Throwable) {
+                    // Keep checking the remaining guards.
+                }
+            }
+        }
+
+        foreach ($roles as $role) {
+            try {
+                if ($this->hasRole($role)) {
+                    return true;
+                }
+            } catch (\Throwable) {
+                // Ignore mismatched guard errors.
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<int, string>  $permissions
+     */
+    public function hasPermissionAcrossGuards(array $permissions): bool
+    {
+        $guards = array_values(array_unique(array_filter([
+            config('auth.defaults.guard'),
+            $this->guard_name ?? null,
+            'web',
+            'tenant',
+            'sanctum',
+        ])));
+
+        foreach ($guards as $guard) {
+            foreach ($permissions as $permission) {
+                try {
+                    if ($this->hasPermissionTo($permission, $guard)) {
+                        return true;
+                    }
+                } catch (\Throwable) {
+                    // Keep checking the remaining guards.
+                }
+            }
+        }
+
+        foreach ($permissions as $permission) {
+            try {
+                if ($this->hasPermissionTo($permission)) {
+                    return true;
+                }
+            } catch (\Throwable) {
+                // Ignore mismatched guard errors.
+            }
+        }
+
+        return false;
     }
 
     protected function makeAllSearchableUsing($query)

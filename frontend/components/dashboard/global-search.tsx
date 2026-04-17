@@ -8,7 +8,7 @@ import { useTranslation } from "@/store/use-translation";
 import { useDebounce } from "@/hooks/use-debounce";
 import { usePermissions } from "@/hooks/use-permissions";
 import { canAccessDashboardRoute } from "@/lib/route-permissions";
-import { getBackendApiRoot, getTenantId } from "@/lib/runtime-context";
+import { getBackendApiRoot, getTenantHeaders } from "@/lib/runtime-context";
 
 interface SearchResultItem {
   id: string | number;
@@ -84,13 +84,11 @@ export function GlobalSearch() {
       try {
         const token = localStorage.getItem('hive_token');
         const apiUrl = getBackendApiRoot();
-        const tenantId = getTenantId();
-
         const res = await fetch(`${apiUrl}/search?q=${encodeURIComponent(debouncedQuery)}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json',
-            ...(tenantId ? { 'X-Tenant': tenantId } : {}),
+            ...getTenantHeaders(),
           }
         });
 

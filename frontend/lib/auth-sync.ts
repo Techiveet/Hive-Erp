@@ -1,4 +1,4 @@
-import { getBackendApiRoot, getTenantId, isTenantSession } from "./runtime-context";
+import { getBackendApiRoot, getTenantHeaders, isTenantSession } from "./runtime-context";
 import { clearSessionActivity } from "./session-activity";
 import { clearOfflineState } from "@/lib/offline/storage";
 
@@ -9,6 +9,7 @@ export const clearHiveSession = (ejectReason?: string) => {
   localStorage.removeItem("hive_token");
   localStorage.removeItem("hive_user");
   localStorage.removeItem("hive_context");
+  localStorage.removeItem("hive_context_signature");
   clearSessionActivity();
   window.dispatchEvent(new Event("hive_session_cleared"));
 
@@ -38,7 +39,9 @@ export const handleAuthFailureResponse = async (response: Response): Promise<boo
 
   const ejectReason = isEjected
     ? message.replace("CRITICAL: ", "")
-    : code === "SESSION_EXPIRED" || code === "TENANT_CONTEXT_INVALID"
+    : code === "SESSION_EXPIRED"
+      || code === "TENANT_CONTEXT_INVALID"
+      || code === "TENANT_CONTEXT_SIGNATURE_INVALID"
       ? message
       : undefined;
 
@@ -58,7 +61,6 @@ export const syncUserSession = async () => {
     const token = localStorage.getItem("hive_token");
     if (!token) return;
 
-    const tenantId = getTenantId();
     const endpoint = isTenantSession() ? "/tenant/user" : "/user";
 
     // Use a plain fetch here so a transient /user failure never triggers the
@@ -69,7 +71,7 @@ export const syncUserSession = async () => {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${token}`,
-          ...(tenantId ? { "X-Tenant": tenantId } : {}),
+          ...getTenantHeaders(),
         },
       }
     );

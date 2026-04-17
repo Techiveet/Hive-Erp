@@ -48,5 +48,20 @@
     "live_node_audit": "የቀጥታ ኖድ ኦዲት",
     "no_audit_logs": "ለዚህ ኖድ የቅርብ ጊዜ የኦዲት መዝገቦች አልተገኙም።",
     "live": "በቀጥታ",
-    "node_connection_failed": "የኖድ ግንኙነት አልተሳካም"
+    "node_connection_failed": "የኖድ ግንኙነት አልተሳካም",
+    "modules": {
+        "title": "ሞጁሎች",
+        "traffic_volume": "የትራፊክ መጠን",
+        "response_latency": "የምላሽ መዘግየት",
+        "anomalies": "ያልተለመዱ ሁኔታዎች",
+        "volume_label": "መጠን",
+        "latency_label": "መዘግየት",
+        "identity": "ማንነት",
+        "tenancy": "ተከራይነት",
+        "billing": "ክፍያ",
+        "core": "ዋና",
+        "req_per_sec": "Req\/s",
+        "ms": "ms",
+        "events": "ክስተቶች"
+    }
 }

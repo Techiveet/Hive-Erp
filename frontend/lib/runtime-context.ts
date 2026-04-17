@@ -1,13 +1,44 @@
+const HIVE_CONTEXT_KEY = "hive_context";
+const HIVE_CONTEXT_SIGNATURE_KEY = "hive_context_signature";
+
 export const getStoredHiveContext = (): string | null => {
   if (typeof window === "undefined") return null;
 
-  const value = localStorage.getItem("hive_context");
+  const value = localStorage.getItem(HIVE_CONTEXT_KEY);
 
   if (!value || value === "undefined" || value === "null") {
     return null;
   }
 
   return value;
+};
+
+export const getStoredHiveContextSignature = (): string | null => {
+  if (typeof window === "undefined") return null;
+
+  const value = localStorage.getItem(HIVE_CONTEXT_SIGNATURE_KEY);
+
+  if (!value || value === "undefined" || value === "null") {
+    return null;
+  }
+
+  return value;
+};
+
+export const persistHiveContext = (context: string | null, signature?: string | null) => {
+  if (typeof window === "undefined") return;
+
+  if (context) {
+    localStorage.setItem(HIVE_CONTEXT_KEY, context);
+  } else {
+    localStorage.removeItem(HIVE_CONTEXT_KEY);
+  }
+
+  if (signature) {
+    localStorage.setItem(HIVE_CONTEXT_SIGNATURE_KEY, signature);
+  } else {
+    localStorage.removeItem(HIVE_CONTEXT_SIGNATURE_KEY);
+  }
 };
 
 const normalizeHost = (value: string | null | undefined): string | null => {
@@ -224,12 +255,38 @@ const getStorageAssetPath = (url: string | null | undefined): string | null => {
     return pathname.slice("storage/".length).replace(/^\/+/, "");
   }
 
+  // If no prefix but it looks like a relative path (doesn't start with / or http)
+  if (!pathname.startsWith("/") && !pathname.startsWith("http")) {
+    return pathname;
+  }
+
   return null;
 };
 
-export const getTenantHeaders = (): Record<string, string> => {
-  const tenantId = getTenantId();
-  return tenantId ? { "X-Tenant": tenantId } : {};
+type TenantHeaderOptions = {
+  allowUnsigned?: boolean;
+  tenantOverride?: string | null;
+  signatureOverride?: string | null;
+};
+
+export const getTenantHeaders = (options: TenantHeaderOptions = {}): Record<string, string> => {
+  const tenantId = options.tenantOverride ?? getTenantId();
+
+  if (!tenantId) {
+    return {};
+  }
+
+  const signature = options.signatureOverride ?? getStoredHiveContextSignature();
+  const tenantHost = typeof window !== "undefined" && isTenantHost(window.location.hostname);
+
+  if (!tenantHost && !signature && !options.allowUnsigned) {
+    return {};
+  }
+
+  return {
+    "X-Tenant": tenantId,
+    ...(signature ? { "X-Tenant-Signature": signature } : {}),
+  };
 };
 
 export const getAuthHeaders = (extras: Record<string, string> = {}): Record<string, string> => {

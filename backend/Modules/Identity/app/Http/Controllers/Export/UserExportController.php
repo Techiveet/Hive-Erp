@@ -49,8 +49,20 @@ class UserExportController extends Controller
 
         $query->orderByRaw('id = 1 DESC');
 
+        $sortableColumns = ['id', 'name', 'email', 'is_active', 'created_at'];
+        $sortCol = (string) $request->input('sortCol', 'id');
+        $sortDir = strtolower((string) $request->input('sortDir', 'asc'));
+
+        if (!in_array($sortCol, $sortableColumns, true)) {
+            $sortCol = 'id';
+        }
+
+        if (!in_array($sortDir, ['asc', 'desc'], true)) {
+            $sortDir = 'asc';
+        }
+
         if ($request->filled('sortCol') && $request->filled('sortDir')) {
-            $query->orderBy($request->sortCol, $request->sortDir);
+            $query->orderBy($sortCol, $sortDir);
         } else {
             $query->orderBy('id', 'asc');
         }

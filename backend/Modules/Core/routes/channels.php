@@ -14,9 +14,11 @@ use Illuminate\Support\Facades\Broadcast;
 */
 
 Broadcast::channel('dashboard.{tenantId}', function ($user, $tenantId) {
-    // 🛡️ Add your security logic here!
-    // Example: return $user->tenant_id === $tenantId;
+    $currentTenantId = function_exists('tenant') && tenant('id') ? (string) tenant('id') : 'central';
 
-    // For now, if they have a valid token, we allow them to connect
-    return true;
+    if ($currentTenantId !== (string) $tenantId) {
+        return false;
+    }
+
+    return $user->can('view_system_dashboard');
 });

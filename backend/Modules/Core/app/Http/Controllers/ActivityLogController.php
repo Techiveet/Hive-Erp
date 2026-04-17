@@ -19,6 +19,8 @@ class ActivityLogController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('auth:sanctum'),
+            new Middleware('active_status'),
+            new Middleware('dynamic_timeout'),
         ];
     }
 
@@ -208,11 +210,13 @@ class ActivityLogController extends Controller implements HasMiddleware
         }
     }
 
-    public function destroyArchived($id)
+    public function destroyArchived(Request $request, $id)
     {
         $this->authorizeViewLogs();
 
-        $log = ActivityArchive::findOrFail($id);
+        $log = AuditLogQuery::filtered($request, true)
+            ->whereKey($id)
+            ->firstOrFail();
         $log->delete();
         return response()->json(['message' => 'Archived log permanently deleted.']);
     }
@@ -222,7 +226,9 @@ class ActivityLogController extends Controller implements HasMiddleware
         $this->authorizeViewLogs();
 
         $request->validate(['ids' => 'required|array']);
-        ActivityArchive::whereIn('id', $request->ids)->delete();
+        AuditLogQuery::filtered($request, true)
+            ->whereIn('id', $request->ids)
+            ->delete();
         return response()->json(['message' => 'Selected vaulted logs permanently deleted.']);
     }
 }

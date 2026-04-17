@@ -98,6 +98,8 @@ return [
 
     'waits' => [
         'redis:default' => 60,
+        'redis-media:media-downloads' => 30,
+        'redis-media:media-processing' => 60,
     ],
 
     /*
@@ -220,10 +222,34 @@ return [
                 'balanceCooldown' => 3,
                 'timeout' => 3600,
             ],
+            'supervisor-media-downloads' => [
+                'connection' => 'redis-media',
+                'queue' => ['media-downloads'],
+                'maxProcesses' => 3,
+                'timeout' => 3600,
+            ],
+            'supervisor-media-processing' => [
+                'connection' => 'redis-media',
+                'queue' => ['media-processing'],
+                'maxProcesses' => 5,
+                'timeout' => 3600,
+            ],
         ],
 
         'local' => [
             'supervisor-1' => [
+                'maxProcesses' => 3,
+                'timeout' => 3600,
+            ],
+            'supervisor-media-downloads' => [
+                'connection' => 'redis-media',
+                'queue' => ['media-downloads'],
+                'maxProcesses' => 2,
+                'timeout' => 3600,
+            ],
+            'supervisor-media-processing' => [
+                'connection' => 'redis-media',
+                'queue' => ['media-processing'],
                 'maxProcesses' => 3,
                 'timeout' => 3600,
             ],

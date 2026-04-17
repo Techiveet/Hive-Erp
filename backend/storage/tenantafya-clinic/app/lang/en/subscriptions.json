@@ -1,4 +1,4 @@
 {
-    "clearance_message": "Tenant module subscriptions are only available inside a tenant workspace with the right clearance.",
-    "subtitle": "Activate the modules your tenant wants to use, from media tools to operational addons and custom capabilities."
+    "clearance_message": "Tenant module subscriptions are only available within the respective authorized tenant workspace.",
+    "subtitle": "Activate the modules your tenant requires, from fintech tools to extended capabilities."
 }

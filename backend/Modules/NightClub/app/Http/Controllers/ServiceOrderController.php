@@ -8,14 +8,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Modules\Inventory\Models\InventoryItem;
-use Modules\Inventory\Support\InventoryTransactionService;
+use Modules\Inventory\Contracts\InventoryIntegrationGateway;
 use Modules\NightClub\Models\ServiceOrder;
 
 class ServiceOrderController extends Controller
 {
     public function __construct(
-        protected InventoryTransactionService $inventoryTransactions
+        protected InventoryIntegrationGateway $inventoryGateway
     ) {
     }
 
@@ -26,7 +25,7 @@ class ServiceOrderController extends Controller
                 'table:id,name,zone,table_type',
                 'reservation:id,reservation_code,customer_name',
                 'servedBy:id,name,email',
-                'items.inventoryItem:id,name,unit,current_stock,selling_price',
+                'items',
             ]);
 
         if ($request->filled('status')) {
@@ -50,11 +49,15 @@ class ServiceOrderController extends Controller
             });
         }
 
-        return response()->json(
-            $query
-                ->latest()
-                ->paginate((int) $request->integer('per_page', 50))
+        $orders = $query
+            ->latest()
+            ->paginate((int) $request->integer('per_page', 50));
+
+        $orders->getCollection()->transform(
+            fn (ServiceOrder $order) => $this->hydrateLegacySnapshots($order)
         );
+
+        return response()->json($orders);
     }
 
     public function store(Request $request)
@@ -66,13 +69,15 @@ class ServiceOrderController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
             'served_by_id' => ['nullable', 'exists:users,id'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.inventory_item_id' => ['nullable', 'exists:inventory_items,id'],
+            'items.*.inventory_item_id' => ['nullable', 'integer', 'min:1'],
             'items.*.item_name' => ['required', 'string', 'max:120'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.001'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $order = DB::transaction(function () use ($validated) {
+        $inventorySnapshots = $this->resolveRequestedInventorySnapshots($validated['items']);
+
+        $order = DB::transaction(function () use ($validated, $inventorySnapshots) {
             $order = ServiceOrder::query()->create([
                 'order_number' => $this->generateOrderNumber(),
                 'table_id' => $validated['table_id'],
@@ -86,21 +91,23 @@ class ServiceOrderController extends Controller
             $total = 0;
 
             foreach ($validated['items'] as $itemPayload) {
-                $inventoryItem = null;
-
-                if (!empty($itemPayload['inventory_item_id'])) {
-                    $inventoryItem = InventoryItem::query()->find($itemPayload['inventory_item_id']);
-                }
+                $inventoryItemId = isset($itemPayload['inventory_item_id'])
+                    ? (int) $itemPayload['inventory_item_id']
+                    : null;
+                $inventorySnapshot = $inventoryItemId
+                    ? ($inventorySnapshots[$inventoryItemId] ?? null)
+                    : null;
 
                 $unitPrice = isset($itemPayload['unit_price'])
                     ? (float) $itemPayload['unit_price']
-                    : (float) ($inventoryItem?->selling_price ?? 0);
+                    : (float) ($inventorySnapshot['selling_price'] ?? 0);
 
                 $quantity = (float) $itemPayload['quantity'];
                 $lineTotal = round($quantity * $unitPrice, 2);
 
                 $order->items()->create([
-                    'inventory_item_id' => $itemPayload['inventory_item_id'] ?? null,
+                    'inventory_item_id' => $inventoryItemId,
+                    'inventory_item_snapshot' => $inventorySnapshot,
                     'item_name' => $itemPayload['item_name'],
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
@@ -116,29 +123,13 @@ class ServiceOrderController extends Controller
             return $order;
         });
 
-        return response()->json(
-            $order->load([
-                'table:id,name,zone,table_type',
-                'reservation:id,reservation_code,customer_name',
-                'servedBy:id,name,email',
-                'items.inventoryItem:id,name,unit,current_stock,selling_price',
-            ]),
-            201
-        );
+        return response()->json($this->loadOrderResponse($order->fresh()), 201);
     }
 
     public function show($id)
     {
         return response()->json(
-            ServiceOrder::query()
-                ->with([
-                    'table:id,name,zone,table_type',
-                    'reservation:id,reservation_code,customer_name,status',
-                    'servedBy:id,name,email',
-                    'items.inventoryItem:id,name,unit,current_stock,selling_price',
-                    'items.inventoryTransaction:id,type,direction,quantity,balance_after,module_source,reference_type,reference_id',
-                ])
-                ->findOrFail($id)
+            $this->loadOrderResponse(ServiceOrder::query()->findOrFail($id))
         );
     }
 
@@ -154,32 +145,32 @@ class ServiceOrderController extends Controller
 
         $order->update($validated);
 
-        return response()->json(
-            $order->fresh()->load([
-                'table:id,name,zone,table_type',
-                'reservation:id,reservation_code,customer_name',
-                'servedBy:id,name,email',
-                'items.inventoryItem:id,name,unit,current_stock,selling_price',
-            ])
-        );
+        return response()->json($this->loadOrderResponse($order->fresh()));
     }
 
     public function close(Request $request, $id)
     {
-        $order = ServiceOrder::query()->with(['items', 'table', 'reservation'])->findOrFail($id);
+        $order = ServiceOrder::query()->with(['items'])->findOrFail($id);
 
         if ($order->status === 'closed') {
-            return response()->json($order->fresh()->load('items.inventoryItem'));
+            return response()->json($this->loadOrderResponse($order->fresh()));
         }
 
+        $fallbackInventorySnapshots = $this->inventoryGateway->getItemSnapshots(
+            $order->items
+                ->filter(fn ($item): bool => (bool) $item->inventory_item_id && $item->inventory_item === null)
+                ->pluck('inventory_item_id')
+                ->all()
+        );
+
         try {
-            DB::transaction(function () use ($order): void {
+            DB::transaction(function () use ($order, $fallbackInventorySnapshots): void {
                 foreach ($order->items as $item) {
                     if (!$item->inventory_item_id || $item->stock_deducted) {
                         continue;
                     }
 
-                    $transaction = $this->inventoryTransactions->consume(
+                    $transactionSnapshot = $this->inventoryGateway->consume(
                         (int) $item->inventory_item_id,
                         (float) $item->quantity,
                         [
@@ -198,9 +189,18 @@ class ServiceOrderController extends Controller
                         ]
                     );
 
+                    $inventorySnapshot = $item->inventory_item
+                        ?? ($fallbackInventorySnapshots[(int) $item->inventory_item_id] ?? null);
+
+                    if (is_array($inventorySnapshot) && isset($transactionSnapshot['balance_after'])) {
+                        $inventorySnapshot['current_stock'] = $transactionSnapshot['balance_after'];
+                    }
+
                     $item->update([
                         'stock_deducted' => true,
-                        'inventory_transaction_id' => $transaction->id,
+                        'inventory_item_snapshot' => $inventorySnapshot,
+                        'inventory_transaction_id' => $transactionSnapshot['id'] ?? null,
+                        'inventory_transaction_snapshot' => $transactionSnapshot,
                     ]);
                 }
 
@@ -213,15 +213,7 @@ class ServiceOrderController extends Controller
             throw $exception;
         }
 
-        return response()->json(
-            $order->fresh()->load([
-                'table:id,name,zone,table_type',
-                'reservation:id,reservation_code,customer_name,status',
-                'servedBy:id,name,email',
-                'items.inventoryItem:id,name,unit,current_stock,selling_price',
-                'items.inventoryTransaction:id,type,direction,quantity,balance_after,module_source,reference_type,reference_id',
-            ])
-        );
+        return response()->json($this->loadOrderResponse($order->fresh()));
     }
 
     public function destroy($id)
@@ -246,5 +238,82 @@ class ServiceOrderController extends Controller
         } while (ServiceOrder::query()->where('order_number', $number)->exists());
 
         return $number;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function resolveRequestedInventorySnapshots(array $items): array
+    {
+        $snapshots = $this->inventoryGateway->getItemSnapshots(
+            collect($items)
+                ->pluck('inventory_item_id')
+                ->all()
+        );
+
+        $errors = [];
+
+        foreach ($items as $index => $itemPayload) {
+            $inventoryItemId = isset($itemPayload['inventory_item_id'])
+                ? (int) $itemPayload['inventory_item_id']
+                : null;
+
+            if ($inventoryItemId && !array_key_exists($inventoryItemId, $snapshots)) {
+                $errors["items.{$index}.inventory_item_id"] = 'The selected inventory item is unavailable in the current inventory domain.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $snapshots;
+    }
+
+    private function loadOrderResponse(ServiceOrder $order): ServiceOrder
+    {
+        $order->load([
+            'table:id,name,zone,table_type',
+            'reservation:id,reservation_code,customer_name,status',
+            'servedBy:id,name,email',
+            'items',
+        ]);
+
+        return $this->hydrateLegacySnapshots($order);
+    }
+
+    private function hydrateLegacySnapshots(ServiceOrder $order): ServiceOrder
+    {
+        $missingInventoryItemIds = $order->items
+            ->filter(fn ($item): bool => (bool) $item->inventory_item_id && $item->inventory_item === null)
+            ->pluck('inventory_item_id')
+            ->all();
+
+        $missingTransactionIds = $order->items
+            ->filter(fn ($item): bool => (bool) $item->inventory_transaction_id && $item->inventory_transaction === null)
+            ->pluck('inventory_transaction_id')
+            ->all();
+
+        $inventorySnapshots = $this->inventoryGateway->getItemSnapshots($missingInventoryItemIds);
+        $transactionSnapshots = $this->inventoryGateway->getTransactionSnapshots($missingTransactionIds);
+
+        $order->items->each(function ($item) use ($inventorySnapshots, $transactionSnapshots): void {
+            if ($item->inventory_item === null && $item->inventory_item_id) {
+                $item->setAttribute(
+                    'inventory_item_snapshot',
+                    $inventorySnapshots[(int) $item->inventory_item_id] ?? null
+                );
+            }
+
+            if ($item->inventory_transaction === null && $item->inventory_transaction_id) {
+                $item->setAttribute(
+                    'inventory_transaction_snapshot',
+                    $transactionSnapshots[(int) $item->inventory_transaction_id] ?? null
+                );
+            }
+        });
+
+        return $order;
     }
 }

@@ -16,7 +16,7 @@ import { useTranslation } from "@/store/use-translation";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { logFrontendAction } from "@/lib/api"; 
 import { clearHiveSession } from "@/lib/auth-sync";
-import { getBackendApiRoot, getBackendStorageUrl, getTenantId, isTenantHost } from "@/lib/runtime-context";
+import { getBackendApiRoot, getBackendStorageUrl, getTenantHeaders, getTenantId, isTenantHost, persistHiveContext } from "@/lib/runtime-context";
 import { initializeSessionActivity } from "@/lib/session-activity";
 
 export default function LoginPage() {
@@ -75,7 +75,6 @@ export default function LoginPage() {
     setError("");
 
     const host = window.location.hostname;
-    const tenantId = getTenantId();
     const endpoint = isTenantHost(host) ? "/tenant/login" : "/login";
     const apiUrl = `${getBackendApiRoot()}${endpoint}`;
 
@@ -85,7 +84,7 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
-          ...(tenantId ? { "X-Tenant": tenantId } : {}),
+          ...getTenantHeaders({ allowUnsigned: true }),
         },
         body: JSON.stringify({ email, password }),
       });
@@ -118,7 +117,7 @@ export default function LoginPage() {
       localStorage.removeItem("hive_original_token");
       localStorage.setItem("hive_token", data.data.token);
       localStorage.setItem("hive_user", JSON.stringify(data.data.user));
-      localStorage.setItem("hive_context", data.data.context);
+      persistHiveContext(data.data.context, data.data.context_signature ?? null);
       initializeSessionActivity();
       sessionStorage.removeItem("hive_eject_reason");
 

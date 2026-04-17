@@ -18,13 +18,19 @@ return [
      * This queue connection will be used to generate derived and responsive images.
      * Leave empty to use the default queue connection.
      */
-    'queue_connection_name' => env('QUEUE_CONNECTION', 'sync'),
+    'queue_connection_name' => env('MEDIA_QUEUE_CONNECTION', 'redis-media'),
 
     /*
      * This queue will be used to generate derived and responsive images.
      * Leave empty to use the default queue.
      */
-    'queue_name' => env('MEDIA_QUEUE', ''),
+    'queue_name' => env('MEDIA_QUEUE', 'media-processing'),
+
+    /*
+     * Download asset preparation uses a dedicated queue so user-triggered
+     * downloads don't wait behind longer adaptive-stream transcodes.
+     */
+    'download_queue_name' => env('MEDIA_DOWNLOAD_QUEUE', 'media-downloads'),
 
     /*
      * By default all conversions will be performed on a queue.

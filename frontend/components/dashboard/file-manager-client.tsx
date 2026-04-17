@@ -30,7 +30,8 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, getTenantId } from "@/lib/runtime-context";
+import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, getStoredHiveContextSignature, getTenantId } from "@/lib/runtime-context";
+import { authenticatedDownload } from "@/lib/authenticated-download";
 import { useTranslation } from "@/store/use-translation";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
@@ -146,6 +147,102 @@ const formatBytes = (bytes: number, decimals = 2) => {
 
 const getStorageUrl = (url: string | null | undefined) => {
   return getBackendStorageUrl(url) || '';
+};
+
+/**
+ * Converts a /files/{id}/serve URL to a streamable /media/stream/{id}?token=xxx&tenant=xxx URL.
+ * Browser <video> and <audio> elements cannot send custom headers, so we embed auth
+ * credentials in the query string for native playback. For central/plain storage URLs
+ * the original URL is returned unchanged.
+ */
+const getStreamUrl = (url: string | null | undefined, apiRoot: string): string => {
+  if (!url) return '';
+  // Check if this is a tenant serve URL: http://...//api/v1/files/{id}/serve
+  const match = url.match(/\/api\/v1\/files\/(\d+)\/serve/);
+  if (!match) return url; // central or plain storage URL — use as-is
+
+  const fileId = match[1];
+  const token = typeof window !== 'undefined' ? localStorage.getItem('hive_token') : null;
+  const tenantId = typeof window !== 'undefined' ? localStorage.getItem('hive_context') : null;
+  const tenantSignature = getStoredHiveContextSignature();
+
+  const params = new URLSearchParams();
+  if (token) params.set('token', token);
+  if (tenantId) params.set('tenant', tenantId);
+  if (tenantId && tenantId !== 'central' && tenantSignature) {
+    params.set('signature', tenantSignature);
+  }
+
+  return `${apiRoot}/media/stream/${fileId}?${params.toString()}`;
+};
+
+
+/**
+ * AuthImage – renders <img> tags that require Authorization headers.
+ * For tenant sessions, the API returns /files/{id}/serve URLs which are protected.
+ * This component fetches via fetch() with the full auth headers and passes a blob URL to <img>.
+ * For central sessions or plain storage URLs, it falls back to a direct <img>.
+ */
+const AuthImage = ({ src, alt, className, style, onError }: { src: string; alt?: string; className?: string; style?: React.CSSProperties; onError?: () => void }) => {
+  const isTenantUrl = src?.includes('/api/v1/files/') && src?.includes('/serve');
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
+  const [failed, setFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isTenantUrl || !src) return;
+    let revoked = false;
+    let currentBlob: string | null = null;
+
+    (async () => {
+      try {
+        const res = await fetch(src, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('auth image failed');
+        const blob = await res.blob();
+        if (!revoked) {
+          currentBlob = URL.createObjectURL(blob);
+          setBlobUrl(currentBlob);
+        }
+      } catch {
+        if (!revoked) {
+          setFailed(true);
+          onError?.();
+        }
+      }
+    })();
+
+    return () => {
+      revoked = true;
+      if (currentBlob) URL.revokeObjectURL(currentBlob);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src]);
+
+  if (!isTenantUrl) {
+    return <img src={src} alt={alt} className={className} style={style} onError={onError} />;
+  }
+
+  if (failed || (!blobUrl && !src)) {
+    return <span className={className} style={style} />;
+  }
+
+  if (!blobUrl) {
+    return <div className={className} style={style} />;
+  }
+
+  return <img src={blobUrl} alt={alt} className={className} style={style} onError={onError} />;
+};
+
+
+const getDownloadNameFromDisposition = (contentDisposition: string | null, fallback: string) => {
+  if (!contentDisposition) return fallback;
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+
+  const basicMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+  return basicMatch?.[1] || fallback;
 };
 
 // ============================================================================
@@ -849,16 +946,18 @@ export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, o
 export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, access }: { tenantName?: string, isPickerMode?: boolean, onFileSelect?: (file: any) => void, access?: { canRead: boolean; canManage: boolean } }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { playTrack } = useGlobalAudio(); 
-  const { hasPermission, hasAnyPermission } = usePermissions();
+  const { playTrack, syncFavoriteStatus, currentTrack } = useGlobalAudio();
+  const { hasPermission } = usePermissions();
   const { hasModule } = useTenantModuleAccess();
-  const canRead = access?.canRead ?? hasAnyPermission(["view_storage", "manage_storage"]);
+  
+  const canRead = access?.canRead ?? hasPermission("read_storage");
   const canManage = access?.canManage ?? hasPermission("manage_storage");
+  const hasVideoPlayer = hasModule("video_audio_player");
+  const hasImageEditor = hasModule("image_editor");
+
+  const [checkoutModuleSlug, setCheckoutModuleSlug] = React.useState<"image_editor" | "video_player" | null>(null);
   const tenantId = getTenantId();
   const isTenantWorkspace = Boolean(tenantId);
-  const hasImageEditor = !isTenantWorkspace || hasModule("image_editor");
-  const hasVideoPlayer = !isTenantWorkspace || hasModule("video_player");
-  const [checkoutModuleSlug, setCheckoutModuleSlug] = React.useState<"image_editor" | "video_player" | null>(null);
 
   const { data: subscriptionData } = useQuery({
     queryKey: ["tenant-current-subscriptions", "file-manager"],
@@ -866,6 +965,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     enabled: isTenantWorkspace && canRead,
     staleTime: 300_000,
   });
+
   const paymentMethods = subscriptionData?.data?.payment_methods ?? [];
   const lockedModule = checkoutModuleSlug
     ? subscriptionData?.data?.module_subscriptions?.catalog_modules?.find(
@@ -873,34 +973,129 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       ) ?? null
     : null;
 
+  // --- Brand settings for video watermark ---
+  const { data: brandData } = useQuery({
+    queryKey: ['brandSettings', 'file-manager'],
+    queryFn: async () => {
+      const res = await fetch(`${getBackendApiRoot()}/settings/brand/public`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    staleTime: 600_000, // 10 minutes
+  });
+  const watermarkText: string | null = brandData?.data?.hide_watermark
+    ? null
+    : (brandData?.data?.app_title || 'HIVE.OS');
+
+  // --- Download loading state ---
+  const [downloadingFileId, setDownloadingFileId] = React.useState<number | null>(null);
+  const [downloadProgress, setDownloadProgress] = React.useState<number>(0);
+  const [downloadPhase, setDownloadPhase] = React.useState<"preparing" | "downloading" | null>(null);
+
   // --- Core State ---
+  const { data: playlistsData } = useQuery({
+    queryKey: ["playlists"],
+    queryFn: async () => {
+      const res = await fetch(`${getBackendApiRoot()}/playlists`, { headers: getAuthHeaders() });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: canRead,
+  });
+
+  const playlists = playlistsData || [];
   const [activeFilter, setActiveFilter] = React.useState<"all" | "favorites" | "trash" | "recent">("all");
   const [activeTypeFilter, setActiveTypeFilter] = React.useState<"image" | "video" | "document" | "audio" | "archive" | "other" | null>(null);
+  const [activePlaylistId, setActivePlaylistId] = React.useState<number | null>(null);
   const [currentFolderId, setCurrentFolderId] = React.useState<number | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
+  
+  // --- Playlist Modal States ---
+  const [isAddToPlaylistOpen, setIsAddToPlaylistOpen] = React.useState(false);
+  const [itemToAddToPlaylist, setItemToAddToPlaylist] = React.useState<{id: number, type: 'file' | 'folder'} | null>(null);
 
   // ── Authenticated download helper ─────────────────────────────────────────
-  // Fetches the file through the secure /files/{id}/download endpoint (which
-  // burns the watermark for videos) and triggers a browser Save dialog instead
-  // of opening in a new tab.
+  // Uses fetch with auth headers so tenants also get the correct file.
+  // ── Authenticated download helper ─────────────────────────────────────────
+  // Uses two-stage approach: 1. Prepare (Async/Queue) 2. Trigger (Direct Browser Link)
   const downloadFile = React.useCallback(async (fileId: number, filename: string) => {
+    if (downloadingFileId) return; // prevent double-click
+    setDownloadingFileId(fileId);
+    setDownloadPhase("preparing");
+    setDownloadProgress(0);
+    
     try {
-      const url = `${getBackendApiRoot()}/files/${fileId}/download`;
-      const res = await fetch(url, { headers: getAuthHeaders() });
-      if (!res.ok) throw new Error('Download failed');
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = filename || 'download';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(blobUrl);
-    } catch (err) {
-      toast.error('Download failed. Please try again.');
+      const apiRoot = getBackendApiRoot();
+      const prepareUrl = `${apiRoot}/files/${fileId}/prepare-download`;
+      let attempt = 0;
+      let didShowPreparingToast = false;
+
+      const pollPreparation = async (): Promise<string | null> => {
+        const res = await fetch(prepareUrl, { headers: getAuthHeaders() });
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data?.message || 'Download preparation failed.');
+        }
+
+        if (data.status === 'ready') {
+          return `${apiRoot}/files/${fileId}/download`;
+        }
+
+          if (data.status === 'processing' && attempt < 120) { // Max 6 minutes
+            if (!didShowPreparingToast) {
+              didShowPreparingToast = true;
+              toast.loading("Downloading your video...", { id: `download-${fileId}` });
+            }
+            
+            // Update the UI progress state
+            if (typeof data.progress === 'number') {
+              setDownloadProgress(data.progress);
+              toast.loading(`Preparing download: ${data.progress}%`, { id: `download-${fileId}` });
+            }
+            
+            attempt++;
+            const waitTime = (data.retry_after || 3) * 1000;
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            return pollPreparation();
+          }
+
+        throw new Error('Preparation timed out. Please try again later.');
+      };
+
+      const finalDownloadUrl = await pollPreparation();
+      
+      if (finalDownloadUrl) {
+        if (didShowPreparingToast) {
+          toast.dismiss(`download-${fileId}`);
+        }
+
+        setDownloadPhase("downloading");
+        setDownloadProgress(0);
+        toast.loading("Downloading file...", { id: `download-${fileId}` });
+
+        await authenticatedDownload(finalDownloadUrl, {
+          filename,
+          headers: getAuthHeaders(),
+          onProgress: (progress) => {
+            setDownloadProgress(progress);
+            toast.loading(`Downloading file: ${progress}%`, { id: `download-${fileId}` });
+          },
+        });
+
+        toast.success("Download complete.", { id: `download-${fileId}` });
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Download failed. Please try again.');
+      toast.dismiss(`download-${fileId}`);
+    } finally {
+      setDownloadingFileId(null);
+      setDownloadPhase(null);
+      setDownloadProgress(0);
     }
-  }, []);
+  }, [downloadingFileId]);
 
   const [showAllFiles, setShowAllFiles] = React.useState(false);
 
@@ -967,10 +1162,11 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   const MAX_STORAGE_BYTES = 5 * 1024 * 1024 * 1024; 
 
   const { data, isLoading } = useQuery({
-    queryKey: ["files", currentFolderId, activeFilter],
+    queryKey: ["files", currentFolderId, activeFilter, activePlaylistId],
     queryFn: async () => {
       const params = new URLSearchParams({ filter: activeFilter });
       if (currentFolderId) params.append('folder_id', currentFolderId.toString());
+      if (activePlaylistId) params.append('playlist_id', activePlaylistId.toString());
 
       const res = await fetch(`${getBackendApiRoot()}/files?${params}`, {
         headers: getAuthHeaders()
@@ -980,6 +1176,68 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     },
     enabled: canRead,
   });
+
+  React.useEffect(() => {
+    if (!selectedFile || !data?.data?.files) {
+      return;
+    }
+
+    const refreshedFile = data.data.files.find((file: any) => file.id === selectedFile.id);
+    if (!refreshedFile) {
+      return;
+    }
+
+    const currentMedia = selectedFile.media_details ?? {};
+    const nextMedia = refreshedFile.media_details ?? {};
+    const didMediaStateChange =
+      selectedFile.is_favorite !== refreshedFile.is_favorite ||
+      currentMedia.hls_path !== nextMedia.hls_path ||
+      currentMedia.url !== nextMedia.url ||
+      currentMedia.thumbnail !== nextMedia.thumbnail ||
+      currentMedia.title !== nextMedia.title ||
+      (currentMedia.subtitles?.length ?? 0) !== (nextMedia.subtitles?.length ?? 0);
+
+    if (didMediaStateChange) {
+      setSelectedFile(refreshedFile);
+    }
+  }, [data, selectedFile]);
+
+  React.useEffect(() => {
+    const waitingForAdaptiveQuality = Boolean(
+      selectedFile?.media_details?.mime_type?.startsWith('video/') &&
+      !selectedFile?.media_details?.hls_path
+    );
+
+    if (!waitingForAdaptiveQuality) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+    }, 4000);
+
+    return () => window.clearInterval(intervalId);
+  }, [queryClient, selectedFile]);
+
+  React.useEffect(() => {
+    const selectedMime = selectedFile?.media_details?.mime_type || "";
+    const shouldPrewarmDownload =
+      selectedFile &&
+      (selectedMime.startsWith("video/") || selectedMime.startsWith("audio/"));
+
+    if (!shouldPrewarmDownload) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    fetch(`${getBackendApiRoot()}/files/${selectedFile.id}/prepare-download`, {
+      headers: getAuthHeaders(),
+      signal: controller.signal,
+    }).catch(() => undefined);
+
+    return () => controller.abort();
+  }, [selectedFile]);
 
   // ==============================================================================
   // 🚀 ADVANCED MUTATIONS (Rename, Move, Trash Management)
@@ -1120,6 +1378,14 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["folders"] });
+
+      // Synchronize with Global Audio Context if this is an audio file
+      if (variables.type === 'file' && currentTrack && currentTrack.id === variables.id) {
+        // Update the internal state of the audio context to match the new backend state
+        syncFavoriteStatus(variables.id, data.is_favorite); 
+      }
+
       if (selectedFile && selectedFile.id === variables.id && variables.type === 'file') {
         const newStatus = !selectedFile.is_favorite;
         setSelectedFile({ ...selectedFile, is_favorite: newStatus });
@@ -1140,6 +1406,58 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       return res.json();
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["files"] }); toast.success("Folder created successfully"); setIsCreateFolderOpen(false); setFolderName(""); }
+  });
+
+  const addToPlaylistMut = useMutation({
+    mutationFn: async ({ playlistId, fileId }: { playlistId: number, fileId: number }) => {
+      const res = await fetch(`${getBackendApiRoot()}/playlists/${playlistId}/add`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ file_id: fileId })
+      });
+      if (!res.ok) throw new Error("Failed to add to playlist");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      toast.success("Added to playlist! 🎵");
+      setIsAddToPlaylistOpen(false);
+      setItemToAddToPlaylist(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to add to playlist");
+    }
+  });
+
+  const createPlaylistMut = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch(`${getBackendApiRoot()}/playlists`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ name })
+      });
+      if (!res.ok) throw new Error("Failed to create playlist");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playlists"] });
+      toast.success("Playlist created! 🎧");
+    }
+  });
+
+  const deletePlaylistMut = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`${getBackendApiRoot()}/playlists/${id}`, {
+        method: 'DELETE', headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error("Failed to delete playlist");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playlists"] });
+      toast.success("Playlist deleted");
+      if (activePlaylistId) setActivePlaylistId(null);
+    }
   });
 
   const uploadFileMut = useMutation({
@@ -1275,8 +1593,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   // 🚀 Sorting Execution
   const sortData = (a: any, b: any) => {
       if (sortBy === 'name') {
-          const nameA = (a.name || a.media_details?.name || "").toLowerCase();
-          const nameB = (b.name || b.media_details?.name || "").toLowerCase();
+          const nameA = (a.name || a.media_details?.title || a.media_details?.name || "").toLowerCase();
+          const nameB = (b.name || b.media_details?.title || b.media_details?.name || "").toLowerCase();
           return nameA.localeCompare(nameB);
       }
       if (sortBy === 'size') return (b.media_details?.size || 0) - (a.media_details?.size || 0);
@@ -1289,7 +1607,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   if (searchQuery) {
       const q = searchQuery.toLowerCase();
       folders = folders.filter((f: any) => f.name.toLowerCase().includes(q));
-      allFiles = allFiles.filter((f: any) => (f.media_details?.name || "").toLowerCase().includes(q));
+      allFiles = allFiles.filter((f: any) => (f.media_details?.title || f.media_details?.name || "").toLowerCase().includes(q));
   }
 
   // Type Filter
@@ -1337,9 +1655,14 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   const renderFilePreview = (file: any) => {
     if (!file || !file.media_details) return null;
     const media = file.media_details;
+    const mediaTitle = media.title || media.name;
     const mime = media.mime_type || '';
     const safeUrl = getStorageUrl(media.url);
+    // Detect if this is a tenant-served file (uses authenticated API URL)
     let hlsUrl = '';
+    // Only use HLS on central — on tenant sessions the HLS endpoint cannot resolve
+    // tenant tokens via auth:sanctum (tokens live in tenant DB, not central).
+    // Tenant videos fall back to the authenticated /media/stream/{id}?token= URL.
     if (media.hls_path) {
         const cleanPath = media.hls_path.replace(/^\/?(storage\/)?/, '');
         hlsUrl = `${getBackendApiRoot()}/files/stream/${cleanPath.split('/')[0]}/playlist.m3u8`;
@@ -1350,8 +1673,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
         <div className="w-full h-full flex flex-col rounded-2xl overflow-hidden min-h-[50vh]">
            <ImageViewer
              src={safeUrl}
-             fetchUrl={`${getBackendApiRoot()}/files/${file.id}/download`}
-             alt={media.name}
+             fetchUrl={media.url?.includes('/api/v1/files/') ? media.url : `${getBackendApiRoot()}/files/${file.id}/download`}
+             alt={mediaTitle}
              onSaveEdited={canManage && hasImageEditor ? (f: any) => saveEditedImageMut.mutate({ file: f, originalId: file.id }) : undefined}
              onUpgradeRequested={canManage && !hasImageEditor ? () => setCheckoutModuleSlug("image_editor") : undefined}
            />
@@ -1365,7 +1688,9 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       const handleNext = () => { if (currentIndex < videoFiles.length - 1) setSelectedFile(videoFiles[currentIndex + 1]); };
       const handlePrev = () => { if (currentIndex > 0) setSelectedFile(videoFiles[currentIndex - 1]); };
       const formattedSubtitles = (media.subtitles || []).map((sub: any) => ({ ...sub, src: sub.uuid ? `${getBackendApiRoot()}/files/subtitle/${sub.uuid}` : sub.src, srcLang: sub.srcLang || 'en', label: sub.label || 'Subtitle', default: sub.default || false }));
-      const formattedVersions = (media.video_versions || []).map((v: any) => ({ label: v.label, url: getStorageUrl(v.url) }));
+      const formattedVersions = (media.video_versions || []).map((v: any) => ({ label: v.label, url: getStreamUrl(getStorageUrl(v.url), getBackendApiRoot()) }));
+      const nativeSrc = getStreamUrl(safeUrl, getBackendApiRoot());
+      const adaptiveStreamingReady = Boolean(media.hls_path);
 
       if (!hasVideoPlayer) {
         return (
@@ -1388,18 +1713,28 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
 
       return (
         <div className="flex flex-col items-center justify-center bg-black rounded-2xl h-full min-h-[400px] border border-border/50 overflow-hidden shadow-inner w-full relative">
+          {!adaptiveStreamingReady && (
+            <div className="absolute top-4 left-4 z-20 rounded-full border border-white/10 bg-black/65 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white/70 backdrop-blur-xl">
+              Adaptive quality preparing...
+            </div>
+          )}
           {hlsUrl || safeUrl ? (
              <VideoPlayer 
-                src={hlsUrl || safeUrl}
-                nativeSrc={safeUrl}
+                src={hlsUrl || nativeSrc}
+                nativeSrc={nativeSrc}
                 poster={getStorageUrl(media.thumbnail)} 
                 className="w-full h-full" 
+                title={mediaTitle}
                 authToken={typeof window !== 'undefined' ? localStorage.getItem('hive_token') : null} 
-                watermark={<div className="flex items-center gap-2 drop-shadow-lg"><div className="h-6 w-6 bg-emerald-500 rounded-md flex items-center justify-center text-emerald-950 shadow-md"><Video className="h-3 w-3" /></div><span className="text-white font-space font-black tracking-widest text-sm opacity-90">HIVE.OS</span></div>} 
+                watermark={watermarkText} 
                 onNext={currentIndex < videoFiles.length - 1 ? handleNext : undefined} 
                 onPrevious={currentIndex > 0 ? handlePrev : undefined} 
                 subtitles={formattedSubtitles} 
                 videoVersions={formattedVersions} 
+                rememberProgress
+                resumeKey={`file-entry:${file.id}`}
+                playbackRates={[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]}
+                adaptiveQualityPending={!adaptiveStreamingReady}
              />
           ) : (<div className="text-center p-6"><Loader2 className="h-8 w-8 animate-spin text-emerald-500 mx-auto mb-4" /><p className="text-white font-bold text-sm">Processing Video...</p></div>)}
         </div>
@@ -1411,21 +1746,30 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       const currentIndex = audioFiles.findIndex((f: any) => f.id === file.id);
       const handleNext = () => { if (currentIndex < audioFiles.length - 1) setSelectedFile(audioFiles[currentIndex + 1]); };
       const handlePrev = () => { if (currentIndex > 0) setSelectedFile(audioFiles[currentIndex - 1]); };
-      const currentPlaylist = audioFiles.map((f: any) => ({ id: f.id, src: getStorageUrl(f.media_details?.url), title: f.media_details?.name || "Unknown Track", coverArt: getStorageUrl(f.media_details?.thumbnail) }));
+      const currentPlaylist = audioFiles.map((f: any) => ({
+        id: f.id,
+        src: getStreamUrl(getStorageUrl(f.media_details?.url), getBackendApiRoot()),
+        title: f.media_details?.title || f.media_details?.name || "Unknown Track",
+        artist: f.media_details?.artist || "HIVE.OS Audio",
+        coverArt: getStorageUrl(f.media_details?.thumbnail),
+        isFavorite: f.is_favorite,
+        downloadUrl: `${getBackendApiRoot()}/files/${f.id}/download`,
+      }));
+      const streamSrc = getStreamUrl(safeUrl, getBackendApiRoot());
 
       return (
         <div className="flex flex-col items-center justify-center rounded-2xl h-full min-h-[350px] border border-border/50 shadow-inner w-full overflow-hidden relative bg-muted/10">
           <div className="absolute top-4 right-4 z-[60]">
-             <Button variant="outline" size="sm" className="bg-background/80 backdrop-blur border-border/50 shadow-sm hover:bg-pink-500 hover:border-pink-500 hover:text-white transition-all text-xs flex items-center gap-2 rounded-xl group" onClick={() => { playTrack({ id: file.id, src: safeUrl, title: media.name, coverArt: getStorageUrl(media.thumbnail) }, currentPlaylist); setSelectedFile(null); }}>
-               <ExternalLink className="h-3 w-3 group-hover:scale-110 transition-transform" /> Play in Background
+             <Button variant="outline" size="icon" className="h-8 w-8 bg-background/80 backdrop-blur border-border/50 shadow-sm hover:bg-emerald-500 hover:border-emerald-500 hover:text-white transition-all rounded-xl group" onClick={() => { playTrack({ id: file.id, src: streamSrc, title: mediaTitle, artist: media.artist || "HIVE.OS Audio", coverArt: getStorageUrl(media.thumbnail), isFavorite: file.is_favorite, downloadUrl: `${getBackendApiRoot()}/files/${file.id}/download` }, currentPlaylist); setSelectedFile(null); }} title="Play in Background">
+               <ExternalLink className="h-4 w-4 group-hover:scale-110 transition-transform" />
              </Button>
           </div>
-          <AudioPlayer id={file.id} src={safeUrl} title={media.name} coverArt={getStorageUrl(media.thumbnail)} onNext={currentIndex < audioFiles.length - 1 ? handleNext : undefined} onPrevious={currentIndex > 0 ? handlePrev : undefined} className="shadow-2xl scale-105 z-10 w-[80%] max-w-[450px]" autoPlay={false} />
+          <AudioPlayer id={file.id} src={streamSrc} title={mediaTitle} artist={media.artist || "HIVE.OS Audio"} coverArt={getStorageUrl(media.thumbnail)} isFavorite={file.is_favorite} trackList={currentPlaylist} downloadUrl={`${getBackendApiRoot()}/files/${file.id}/download`} onNext={currentIndex < audioFiles.length - 1 ? handleNext : undefined} onPrevious={currentIndex > 0 ? handlePrev : undefined} className="shadow-2xl scale-105 z-10 w-[80%] max-w-[450px]" autoPlay={false} />
         </div>
       );
     }
 
-    if (mime === 'application/pdf') return <div className="h-full w-full min-h-[60vh] rounded-2xl overflow-hidden border border-border/50"><PdfViewer src={safeUrl} title={media.name} /></div>;
+    if (mime === 'application/pdf') return <div className="h-full w-full min-h-[60vh] rounded-2xl overflow-hidden border border-border/50"><PdfViewer src={safeUrl} title={mediaTitle} /></div>;
     if (/(document|msword|excel|spreadsheet|powerpoint|presentation|csv)/i.test(mime)) return <div className="h-full w-full min-h-[50vh] rounded-2xl overflow-hidden border border-border/50"><DocumentViewer url={safeUrl} type="office" /></div>;
     return <div className="flex flex-col items-center justify-center bg-muted/20 rounded-2xl h-full min-h-[40vh] border border-dashed border-border/50 w-full"><FileIcon className="h-16 w-16 text-muted-foreground/40 mb-4" /><p className="text-base font-bold text-foreground mb-1">Preview Unavailable</p><Button onClick={() => window.open(safeUrl, '_blank')} className="mt-6 rounded-xl shadow-md px-8"><Download className="h-4 w-4 mr-2" /> Download to View</Button></div>;
   };
@@ -1446,16 +1790,47 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
         </div>
 
         <nav className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 custom-scrollbar shrink-0">
-          <button onClick={() => { setActiveFilter("all"); setCurrentFolderId(null); setActiveTypeFilter(null); }} className={cn("whitespace-nowrap flex-shrink-0 lg:w-full flex items-center px-4 lg:px-3 py-2.5 rounded-xl text-sm font-bold transition-all", activeFilter === "all" ? "bg-emerald-500/10 text-emerald-500" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}>
+          <button onClick={() => { setActiveFilter("all"); setCurrentFolderId(null); setActiveTypeFilter(null); setActivePlaylistId(null); }} className={cn("whitespace-nowrap flex-shrink-0 lg:w-full flex items-center px-4 lg:px-3 py-2.5 rounded-xl text-sm font-bold transition-all", activeFilter === "all" && !activePlaylistId ? "bg-emerald-500/10 text-emerald-500" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}>
             <div className="flex items-center gap-3"><Folder className="h-4 w-4" /> My Files</div>
-            {activeFilter === "all" && !currentFolderId && <span className="hidden lg:inline-block ml-auto bg-emerald-500 text-emerald-950 text-[10px] px-2 py-0.5 rounded-full">{folders.length + allFiles.length}</span>}
+            {activeFilter === "all" && !currentFolderId && !activePlaylistId && <span className="hidden lg:inline-block ml-auto bg-emerald-500 text-emerald-950 text-[10px] px-2 py-0.5 rounded-full">{folders.length + allFiles.length}</span>}
           </button>
           <button onClick={() => { setActiveFilter("favorites"); setActiveTypeFilter(null); }} className={cn("whitespace-nowrap flex-shrink-0 lg:w-full flex items-center gap-3 px-4 lg:px-3 py-2.5 rounded-xl text-sm font-bold transition-all", activeFilter === "favorites" ? "bg-emerald-500/10 text-emerald-500" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}>
             <Star className="h-4 w-4" /> Favourites
           </button>
-          <button onClick={() => { setActiveFilter("recent"); setActiveTypeFilter(null); }} className={cn("whitespace-nowrap flex-shrink-0 lg:w-full flex items-center gap-3 px-4 lg:px-3 py-2.5 rounded-xl text-sm font-bold transition-all", activeFilter === "recent" ? "bg-emerald-500/10 text-emerald-500" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}>
+          <button onClick={() => { setActiveFilter("recent"); setActiveTypeFilter(null); setActivePlaylistId(null); }} className={cn("whitespace-nowrap flex-shrink-0 lg:w-full flex items-center gap-3 px-4 lg:px-3 py-2.5 rounded-xl text-sm font-bold transition-all", activeFilter === "recent" ? "bg-emerald-500/10 text-emerald-500" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}>
             <Clock className="h-4 w-4" /> Recent Files
           </button>
+          
+          <div className="hidden lg:block h-px bg-border/50 w-full my-2"></div>
+          <p className="hidden lg:block text-[10px] font-black uppercase text-muted-foreground tracking-widest px-3 mb-1">Playlists</p>
+          <div className="flex lg:flex-col gap-1">
+            {playlists.map((pl: any) => (
+              <div key={pl.id} className="group/pl relative w-full flex-shrink-0 lg:w-full">
+                <div 
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { setActiveFilter("all"); setActivePlaylistId(pl.id); setCurrentFolderId(null); setActiveTypeFilter(null); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setActiveFilter("all"); setActivePlaylistId(pl.id); setCurrentFolderId(null); setActiveTypeFilter(null); } }}
+                  className={cn("whitespace-nowrap cursor-pointer flex-shrink-0 lg:w-full flex items-center justify-between px-4 lg:px-3 py-2 rounded-xl text-xs font-bold transition-all", activePlaylistId === pl.id ? "bg-pink-500/10 text-pink-500" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}
+                >
+                  <div className="flex items-center gap-3 truncate">
+                    <Music className="h-3.5 w-3.5" /> {pl.name}
+                  </div>
+                  {canManage && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deletePlaylistMut.mutate(pl.id); }}
+                      className="opacity-0 group-hover/pl:opacity-100 p-1 hover:bg-red-500/20 rounded-md text-red-500 transition-all ml-2"
+                      title="Delete Playlist"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {playlists.length === 0 && <p className="hidden lg:block text-[10px] text-muted-foreground px-3 italic">No playlists yet</p>}
+          </div>
+
           <div className="hidden lg:block h-px bg-border/50 w-full my-2"></div>
           <button onClick={() => { setActiveFilter("trash"); setActiveTypeFilter(null); }} className={cn("whitespace-nowrap flex-shrink-0 lg:w-full flex items-center gap-3 px-4 lg:px-3 py-2.5 rounded-xl text-sm font-bold transition-all", activeFilter === "trash" ? "bg-red-500/10 text-red-500" : "text-muted-foreground hover:bg-red-500/10 hover:text-red-500")}>
             <Trash2 className="h-4 w-4" /> Recycle Bin
@@ -1685,7 +2060,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
                             {/* Thumbnail */}
                             <div className={cn("bg-muted/30 rounded-xl flex items-center justify-center overflow-hidden border border-border/50 relative z-10 shrink-0", viewMode === 'grid' ? "aspect-square mb-3 w-full" : "h-10 w-10 ml-8")}>
                               {media?.thumbnail ? (
-                                <img src={safeUrl} alt={media.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                <AuthImage src={safeUrl} alt={media.title || media.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                               ) : (
                                 <FileIcon className="h-6 w-6 text-muted-foreground/40 transition-transform duration-300 group-hover:scale-110 group-hover:text-emerald-500/50" />
                               )}
@@ -1696,7 +2071,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
 
                             {/* File Info */}
                             <div className={cn("flex flex-col min-w-0", viewMode === 'grid' ? "w-full" : "flex-1")}>
-                                <h4 className={cn("font-bold text-sm truncate", viewMode==='grid' && "px-1 text-center sm:text-left")} title={media?.name}>{media?.name || "Unknown File"}</h4>
+                                <h4 className={cn("font-bold text-sm truncate", viewMode==='grid' && "px-1 text-center sm:text-left")} title={media?.title || media?.name}>{media?.title || media?.name || "Unknown File"}</h4>
                                 {viewMode === 'grid' && (
                                     <div className="flex justify-between items-center px-1 mt-1">
                                         <span className="text-[10px] text-muted-foreground font-mono uppercase truncate max-w-[70%]">{media?.mime_type?.split('/')[1] || 'FILE'}</span>
@@ -1723,7 +2098,13 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
                                 <SimpleMenu trigger={<Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-background/80 lg:opacity-0 group-hover:opacity-100 transition-opacity"><MoreVertical className="h-4 w-4"/></Button>}>
                                   <MenuItem icon={<LinkIcon />} label="Share Link" onClick={() => shareLinkMut.mutate({type: "file", id: file.id})} />
                                   <MenuItem icon={<Edit />} label="Rename" onClick={() => setRenameTarget({type: "file", id: file.id, name: media?.name})} />
-                                  <MenuItem icon={<Download />} label="Download" onClick={() => downloadFile(file.id, file.media_details?.name || 'download')} />
+                                  <MenuItem 
+                                    icon={downloadingFileId === file.id ? <Loader2 className="h-4 w-4 animate-spin text-emerald-500" /> : <Download />} 
+                                    label={downloadingFileId === file.id ? (downloadPhase === "downloading" ? (downloadProgress > 0 ? `Downloading: ${downloadProgress}%` : "Downloading...") : (downloadProgress > 0 ? `Preparing: ${downloadProgress}%` : "Preparing...")) : "Download"} 
+                                    onClick={() => downloadFile(file.id, file.media_details?.download_name || file.media_details?.name || 'download')} 
+                                  />
+                                  <MenuItem icon={<Star className={cn(file.is_favorite && "fill-yellow-500 text-yellow-500")} />} label={file.is_favorite ? "Unfavorite" : "Favorite"} onClick={() => toggleFavoriteMut.mutate({ type: 'file', id: file.id })} />
+                                  <MenuItem icon={<Music />} label="Add to Playlist" onClick={() => { setItemToAddToPlaylist({id: file.id, type: 'file'}); setIsAddToPlaylistOpen(true); }} />
                                   <MenuItem icon={<FolderInput />} label="Move To..." onClick={() => openMoveModal([{type: "file", id: file.id}])} />
                                   <div className="h-px bg-border/50 my-1"></div>
                                   {activeFilter === "trash" ? (
@@ -1862,7 +2243,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
                 <Button variant="ghost" size="icon" onClick={() => setSelectedFile(null)} className="absolute top-4 right-4 z-50 rounded-full h-8 w-8 hover:bg-destructive hover:text-white transition-colors" title="Close Preview"><X className="h-4 w-4" /></Button>
 
                 <div className="p-6 border-b border-border/50 min-w-0 sticky top-0 bg-card/80 backdrop-blur-xl z-10">
-                  <div className="flex justify-between items-start gap-4"><h3 className="font-bold text-lg leading-tight truncate w-full pr-8" title={selectedFile.media_details?.name}>{selectedFile.media_details?.name}</h3></div>
+                  <div className="flex justify-between items-start gap-4"><h3 className="font-bold text-lg leading-tight truncate w-full pr-8" title={selectedFile.media_details?.title || selectedFile.media_details?.name}>{selectedFile.media_details?.title || selectedFile.media_details?.name}</h3></div>
                   <div className="flex gap-2 mt-3">
                     <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-widest bg-muted/80">{selectedFile.media_details?.mime_type?.split('/')[1] || 'FILE'}</Badge>
                     <Badge variant="outline" className="font-mono text-[10px] border-emerald-500/30 text-emerald-500 bg-emerald-500/5">{selectedFile.media_details?.human_size}</Badge>
@@ -1911,7 +2292,24 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
                 </div>
 
                 <div className="p-6 border-t border-border/50 bg-background/40 space-y-3 shrink-0 mt-auto sticky bottom-0 z-10 backdrop-blur-xl">
-                  <Button className="w-full rounded-xl shadow-md font-bold h-11 bg-emerald-500 text-emerald-950 hover:bg-emerald-400 transition-all" onClick={() => downloadFile(selectedFile.id, selectedFile.media_details?.name || 'download')}><Download className="h-4 w-4 mr-2" /> Download File</Button>
+                  <Button
+                    className="w-full rounded-xl shadow-md font-bold h-11 bg-emerald-500 text-emerald-950 hover:bg-emerald-400 transition-all disabled:opacity-70"
+                    disabled={downloadingFileId === selectedFile.id}
+                    onClick={() => downloadFile(selectedFile.id, selectedFile.media_details?.download_name || selectedFile.media_details?.name || 'download')}
+                  >
+                    {downloadingFileId === selectedFile.id
+                      ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {downloadPhase === "downloading" ? (downloadProgress > 0 ? `Downloading: ${downloadProgress}%` : "Downloading...") : (downloadProgress > 0 ? `Preparing: ${downloadProgress}%` : "Preparing...")}</>
+                      : <><Download className="h-4 w-4 mr-2" /> Download File</>}
+                  </Button>
+                  {downloadingFileId === selectedFile.id && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                        <span>{downloadPhase === "downloading" ? "Downloading file" : "Preparing secure download"}</span>
+                        <span>{downloadProgress}%</span>
+                      </div>
+                      <Progress value={downloadProgress} className="h-2 rounded-full bg-muted/40" />
+                    </div>
+                  )}
                   {canManage && <Button variant="outline" className={cn("w-full rounded-xl h-11 transition-all font-bold border-border/50 hover:bg-muted", selectedFile.is_favorite ? "border-yellow-500 text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20" : "")} onClick={() => toggleFavoriteMut.mutate({ type: 'file', id: selectedFile.id })}><Star className={cn("h-4 w-4 mr-2 shrink-0", selectedFile.is_favorite && "fill-yellow-500")} /> <span className="truncate">{selectedFile.is_favorite ? 'Unfavorite' : 'Favorite'}</span></Button>}
                 </div>
               </div>
@@ -1943,6 +2341,80 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
             </div>
           </form>
           <DialogFooter className="border-t border-border/40 p-4 shrink-0 bg-muted/10"><Button type="button" variant="ghost" onClick={() => setIsUploadOpen(false)} disabled={uploadFileMut.isPending} className="rounded-xl">Cancel</Button><Button type="submit" form="upload-file-form" disabled={!uploadFile || uploadFileMut.isPending} className="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)] transition-all flex-1 sm:flex-none px-8">{uploadFileMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading...</> : 'Upload File'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ADD TO PLAYLIST DIALOG */}
+      <Dialog open={isAddToPlaylistOpen} onOpenChange={setIsAddToPlaylistOpen}>
+        <DialogContent className="sm:max-w-md rounded-[3rem] bg-background/80 backdrop-blur-3xl border-border/40 shadow-2xl p-0 overflow-hidden">
+          <div className="p-8 border-b border-border/40 flex items-center justify-between bg-pink-500/5">
+            <div>
+              <DialogTitle className="flex items-center gap-2 text-2xl font-black tracking-tight"><Music className="h-6 w-6 text-pink-500" /> Add to Playlist</DialogTitle>
+              <DialogDescription className="text-sm font-medium mt-1">Select a destination for your sound.</DialogDescription>
+            </div>
+          </div>
+          <div className="p-4 space-y-2 max-h-[40vh] overflow-y-auto custom-scrollbar bg-card/20">
+            {playlists.map((pl: any) => (
+              <button
+                key={pl.id}
+                onClick={() => itemToAddToPlaylist && addToPlaylistMut.mutate({ playlistId: pl.id, fileId: itemToAddToPlaylist.id })}
+                disabled={addToPlaylistMut.isPending}
+                className="w-full flex items-center justify-between p-4 rounded-[1.5rem] border border-border/40 hover:bg-pink-500/10 hover:border-pink-500/40 transition-all group hover:scale-[1.01] active:scale-[0.99] shadow-sm"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="bg-pink-500/10 p-2.5 rounded-xl group-hover:bg-pink-500/20 transition-colors">
+                    <Music className="h-5 w-5 text-pink-500" />
+                  </div>
+                  <div className="text-left">
+                    <span className="font-bold text-base block leading-none">{pl.name}</span>
+                    <span className="text-[10px] uppercase tracking-widest font-black text-muted-foreground/60 mt-1 block">Custom Playlist</span>
+                  </div>
+                </div>
+                <div className="h-8 w-8 rounded-full bg-pink-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-0 translate-x-4">
+                  <Plus className="h-4 w-4 text-pink-500" />
+                </div>
+              </button>
+            ))}
+            {playlists.length === 0 && (
+              <div className="text-center py-12 px-6">
+                <div className="h-20 w-20 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-dashed border-border/40">
+                  <Music className="h-10 w-10 text-muted-foreground/30" />
+                </div>
+                <p className="text-base font-bold text-foreground mb-1">No playlists yet</p>
+                <p className="text-xs text-muted-foreground font-medium">Create your first playlist below to start organizing.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="p-8 pt-6 border-t border-border/40 bg-pink-500/5 flex flex-col gap-4">
+             <div className="relative w-full">
+                <Music className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="New Playlist Name..." 
+                  id="new-playlist-input"
+                  className="rounded-[1.25rem] h-12 bg-background border-border/50 focus-visible:ring-pink-500 pl-11 shadow-inner font-bold" 
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = (e.target as HTMLInputElement).value;
+                      if (val) { createPlaylistMut.mutate(val); (e.target as HTMLInputElement).value = ''; }
+                    }
+                  }}
+                />
+                <Button 
+                  size="sm" 
+                  className="absolute right-1 top-1 h-10 w-10 p-0 rounded-xl bg-pink-500 hover:bg-pink-400 text-white shadow-lg shadow-pink-500/20"
+                  onClick={() => {
+                    const input = document.getElementById('new-playlist-input') as HTMLInputElement;
+                    if (input.value) { createPlaylistMut.mutate(input.value); input.value = ''; }
+                  }}
+                  disabled={createPlaylistMut.isPending}
+                >
+                  {createPlaylistMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
+                </Button>
+             </div>
+             <div className="flex gap-3 w-full">
+                <Button type="button" variant="ghost" className="rounded-2xl h-11 flex-1 font-bold hover:bg-pink-500/5" onClick={() => setIsAddToPlaylistOpen(false)}>Close</Button>
+             </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

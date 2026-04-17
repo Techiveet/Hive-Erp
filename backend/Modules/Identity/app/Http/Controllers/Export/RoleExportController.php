@@ -44,8 +44,20 @@ class RoleExportController extends Controller
             }
         }
 
+        $sortableColumns = ['id', 'name', 'created_at', 'updated_at'];
+        $sortCol = (string) $request->input('sortCol', 'created_at');
+        $sortDir = strtolower((string) $request->input('sortDir', 'desc'));
+
+        if (!in_array($sortCol, $sortableColumns, true)) {
+            $sortCol = 'created_at';
+        }
+
+        if (!in_array($sortDir, ['asc', 'desc'], true)) {
+            $sortDir = 'desc';
+        }
+
         if ($request->filled('sortCol') && $request->filled('sortDir')) {
-            $query->orderBy($request->sortCol, $request->sortDir);
+            $query->orderBy($sortCol, $sortDir);
         } else {
             $query->orderBy('created_at', 'desc');
         }

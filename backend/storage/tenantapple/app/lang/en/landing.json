@@ -52,27 +52,27 @@
     },
     "modules": {
         "badge": "ALL-IN-ONE SOLUTION",
-        "title_1": "Unified",
-        "title_2": "Ecosystem",
-        "subtitle": "Stop switching between ten different spreadsheets. Hive centralizes every aspect of your Ethiopian business operations into one seamless dashboard.",
-        "finance": {
-            "title": "Intelligent Finance",
-            "desc": "Automated ERCA tax compliance, local bank API integrations for immediate reconciliation, and multi-currency ledger management (ETB\/USD).",
-            "vat": "VAT Calculation",
-            "telebirr": "Telebirr Sync"
-        },
-        "inventory": {
-            "title": "Inventory Management",
-            "desc": "Multi-branch stock syncing, automated reorder triggers, and warehouse routing with full batch tracking connectivity."
-        },
-        "compliance": {
-            "title": "Compliance Readiness",
-            "desc": "Native reporting for Ethiopian tax authorities and INSA aligned security protocols for localized data privacy."
-        },
-        "bi": {
-            "title": "Real-Time BI",
-            "desc": "Predictive operational analytics and custom KPI dashboards to monitor your business health from any device."
-        }
+        "title_part1": "Unified",
+        "title_part2": "Ecosystem",
+        "desc": "Stop switching between ten different spreadsheets. Hive centralizes every aspect of your Ethiopian business operations into one seamless dashboard.",
+        "finance_title": "Intelligent Finance",
+        "finance_desc": "Automated ERCA tax compliance, local bank API integrations for immediate reconciliation, and multi-currency ledger management (ETB\/USD).",
+        "telebirr_sync": "Telebirr Sync",
+        "vat_calc": "VAT Calculation",
+        "automated": "AUTOMATED",
+        "inventory_title": "Inventory Management",
+        "inventory_desc": "Multi-branch stock syncing, automated reorder triggers, and warehouse routing.",
+        "compliance_title": "Compliance",
+        "compliance_desc": "INSA & NBE aligned reporting.",
+        "bi_title": "Real-Time BI",
+        "bi_desc": "Predictive operational analytics."
+    },
+    "fintech": {
+        "pill": "FINANCIAL ECOSYSTEM",
+        "title_part1": "Native",
+        "title_part2": "Payment Gateway",
+        "title_part3": "Sync",
+        "desc": "We understand the Ethiopian financial landscape. Hive bridges the gap between your operational ERP and localized payment processors."
     },
     "mobility": {
         "badge": "INFRASTRUCTURE MODULES",
@@ -105,50 +105,8 @@
         "salary_net": "Net Salary",
         "node_id": "NODE \/\/ HR_PAYROLL"
     },
-    "pricing": {
-        "title_part1": "Scalable",
-        "title_part2": "Pricing Models",
-        "per_month": "per month",
-        "startup_label": "Startup",
-        "startup_tagline": "For growing teams",
-        "larva_label": "Larva Node",
-        "larva_tagline": "For individual creators",
-        "overlord_label": "Overlord",
-        "overlord_tagline": "Infinite potential",
-        "managed_title": "Managed Node",
-        "managed_desc": "We host it, you drive it.",
-        "get_started": "Get Started",
-        "popular": "Most Popular",
-        "free": "Free",
-        "forever": "Forever",
-        "feat_users_5": "Up to 5 Users",
-        "feat_inventory": "Basic Inventory",
-        "feat_finance": "Finance Core",
-        "feat_shared": "Shared AWS Node",
-        "feat_media_video": "Media & Video Engine",
-        "feat_isolated_db": "Isolated Database",
-        "feat_fleet": "Fleet Management",
-        "feat_priority_support": "Priority Support",
-        "feat_storage_2gb": "2GB Storage",
-        "feat_storage_10gb": "10GB Storage",
-        "feat_storage_50gb": "50GB Storage",
-        "feat_storage_200gb": "200GB Storage",
-        "feat_sla": "99.9% Up-time SLA"
-    },
-    "how": {
-        "title": "How It Works",
-        "subtitle": "Deploying your enterprise node is faster than you think.",
-        "sidebar_title": "Deployment Workflow",
-        "step1_title": "Provision Your Node",
-        "step1_desc": "Choose your region and compute power. We initialize a dedicated, secure environment for your company data.",
-        "step2_title": "Connect Core Modules",
-        "step2_desc": "Enable Finance, HR, or Supply Chain. Our setup wizard guides you through local tax and bank integrations.",
-        "step3_title": "Deploy & Scale",
-        "step3_desc": "Invite your team and start managing operations. Add new modules as your business grows without any downtime."
-    },
     "faq": {
         "title": "Frequently Asked Questions",
-        "subtitle": "Everything you need to know about the Hive ecosystem.",
         "q1": "Does Hive ERP work during internet outages?",
         "a1": "Yes. Our mobile apps and POS systems feature offline-sync. They store data locally and automatically push to the central cloud once connection is restored.",
         "q2": "Is our corporate data stored locally in Ethiopia?",
@@ -157,18 +115,6 @@
         "a3": "Absolutely. Hive comes with a comprehensive REST API and webhooks, allowing Techive Technology Solutions to build custom bridges to your existing software.",
         "q4": "How does the multi-tenant architecture work?",
         "a4": "Each company gets its own isolated database schema. This guarantees zero data-bleed between clients while allowing us to push instantaneous system updates to everyone simultaneously."
-    },
-    "footer": {
-        "subtitle": "The Next-Generation ERP for the Ethiopian Market.",
-        "product": "Product",
-        "company": "Company",
-        "legal": "Legal",
-        "about": "About Us",
-        "careers": "Careers",
-        "security": "Security",
-        "privacy": "Privacy Policy",
-        "terms": "Terms of Service",
-        "rights": "All rights reserved."
     },
     "common": {
         "general_business": "General Business",

@@ -18,4 +18,14 @@ class ModuleCatalog
     {
         return array_keys($this->all());
     }
+
+    public function dependencies(string $key): array
+    {
+        return $this->get($key)['dependencies'] ?? [];
+    }
+
+    public function publicApi(string $key): array
+    {
+        return $this->get($key)['public_api'] ?? [];
+    }
 }

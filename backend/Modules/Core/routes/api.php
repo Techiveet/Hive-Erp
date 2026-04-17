@@ -22,6 +22,8 @@ use Modules\Core\Http\Controllers\Dashboard\DashboardController;
 use Modules\Core\Http\Controllers\Dashboard\SystemOperationsController;
 use Modules\Core\Http\Controllers\SystemAlertController;
 use Modules\Core\Http\Controllers\Tools\FileConverterController; // 🚀 ADDED: File Converter
+use Modules\Core\Http\Controllers\MediaStreamController;
+use Modules\Core\Http\Controllers\PlaylistController;
 use Modules\Identity\Http\Controllers\UserController;
 
 $centralDomains = collect(array_merge(
@@ -144,7 +146,9 @@ foreach ($centralDomains as $domain) {
                 Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle'])->middleware(['permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum', 'tenant_module:video_player']);
                 Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle'])->middleware(['permission:manage_storage,sanctum', 'tenant_module:video_player']);
                 Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream'])->middleware(['permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum', 'tenant_module:video_player']);
+                Route::get('/{id}/serve', [FileManagerController::class, 'serveMedia'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
                 Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+                Route::get('/{id}/prepare-download', [FileManagerController::class, 'prepareDownload'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
                 Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
                 Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
                 Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
@@ -193,6 +197,11 @@ Route::middleware([
 
     // 🚀 LARGE FILE DOWNLOAD ROUTE (Tenant)
     Route::get('/system/backups/{id}/download', [SystemOperationsController::class, 'downloadBackup']);
+
+    // 🎬 MEDIA STREAM ROUTE: Token-in-URL for native browser <video>/<audio> playback.
+    // Auth is handled internally via ?token= query param since browser media elements
+    // cannot set custom Authorization headers.
+    Route::get('/media/stream/{id}', [MediaStreamController::class, 'stream']);
 
     Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
         Broadcast::routes();
@@ -256,10 +265,21 @@ Route::middleware([
             Route::get('/subtitle/{uuid}', [FileManagerController::class, 'serveSubtitle'])->middleware(['permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum', 'tenant_module:video_player']);
             Route::delete('/subtitle/{uuid}', [FileManagerController::class, 'deleteSubtitle'])->middleware(['permission:manage_storage,sanctum', 'tenant_module:video_player']);
             Route::get('/stream/{mediaId}/{filename}', [FileManagerController::class, 'serveStream'])->middleware(['permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum', 'tenant_module:video_player']);
+            Route::get('/{id}/serve', [FileManagerController::class, 'serveMedia'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
             Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+            Route::get('/{id}/prepare-download', [FileManagerController::class, 'prepareDownload'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
             Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
             Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
             Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
+        });
+
+        Route::prefix('playlists')->middleware('tenant_module:media_library')->group(function () {
+            Route::get('/', [PlaylistController::class, 'index']);
+            Route::post('/', [PlaylistController::class, 'store']);
+            Route::put('/{id}', [PlaylistController::class, 'update']);
+            Route::delete('/{id}', [PlaylistController::class, 'destroy']);
+            Route::post('/{id}/add', [PlaylistController::class, 'addTrack']);
+            Route::post('/{id}/remove', [PlaylistController::class, 'removeTrack']);
         });
 
         Route::prefix('logs')->group(function () {

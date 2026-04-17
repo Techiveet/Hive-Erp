@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { getBackendOrigin, getTenantId } from "@/lib/runtime-context";
+import { getBackendOrigin, getStoredHiveContextSignature, getTenantHeaders, getTenantId } from "@/lib/runtime-context";
 import { cn } from "@/lib/utils";
 import { Home, ExternalLink, ShieldCheck, Network, ServerCog, RefreshCcw, Braces } from "lucide-react";
 
@@ -63,6 +63,7 @@ export default function ApiDocsPage() {
   const [mode, setMode] = useState<Mode>("central");
   const [token, setToken] = useState("");
   const [tenant, setTenant] = useState("");
+  const [tenantSignature, setTenantSignature] = useState("");
   const [status, setStatus] = useState("Loading API command deck...");
 
   const backendOrigin = useMemo(() => getBackendOrigin(), []);
@@ -81,13 +82,15 @@ export default function ApiDocsPage() {
   useEffect(() => {
     const savedToken = window.localStorage.getItem("hive_token") || "";
     const savedTenant = getTenantId() || "";
+    const savedTenantSignature = getStoredHiveContextSignature() || "";
     const savedMode = savedTenant ? "tenant" : "central";
 
     setToken(savedToken);
     setTenant(savedTenant);
+    setTenantSignature(savedTenantSignature);
     setMode(savedMode);
     setStatus(savedMode === "tenant"
-      ? `Tenant mode ready. Requests will use X-Tenant=${savedTenant || "[empty]"}.`
+      ? `Tenant mode ready. Requests will use signed tenant headers for ${savedTenant || "[empty]"}.`
       : "Central mode ready. Requests will target shared /api/v1 endpoints.");
   }, []);
 
@@ -111,7 +114,7 @@ export default function ApiDocsPage() {
         spec.servers = [{
           url: `${backendOrigin}/api`,
           description: mode === "tenant"
-            ? "Tenant testing root. Use X-Tenant or tenant aliases below."
+            ? "Tenant testing root. Use signed tenant headers or tenant aliases below."
             : "Central testing root.",
         }];
 
@@ -141,10 +144,24 @@ export default function ApiDocsPage() {
               delete request.headers.Authorization;
             }
 
-            if (mode === "tenant" && tenant) {
-              request.headers["X-Tenant"] = tenant;
+            const tenantHeaders = mode === "tenant"
+              ? getTenantHeaders({
+                  tenantOverride: tenant || null,
+                  signatureOverride: tenantSignature || null,
+                  allowUnsigned: !token,
+                })
+              : {};
+
+            if (tenantHeaders["X-Tenant"]) {
+              request.headers["X-Tenant"] = tenantHeaders["X-Tenant"];
             } else {
               delete request.headers["X-Tenant"];
+            }
+
+            if (tenantHeaders["X-Tenant-Signature"]) {
+              request.headers["X-Tenant-Signature"] = tenantHeaders["X-Tenant-Signature"];
+            } else {
+              delete request.headers["X-Tenant-Signature"];
             }
 
             return request;
@@ -152,7 +169,7 @@ export default function ApiDocsPage() {
         });
 
         setStatus(mode === "tenant"
-          ? `Tenant mode active. Swagger requests will include X-Tenant=${tenant || "[empty]"}.`
+          ? `Tenant mode active. Swagger requests will include signed tenant headers for ${tenant || "[empty]"}.`
           : "Central mode active. Swagger requests will use the shared API root.");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : "Unable to load the OpenAPI spec.");
@@ -168,19 +185,22 @@ export default function ApiDocsPage() {
       }
       window.hiveSwaggerUi = null;
     };
-  }, [backendOrigin, mode, ready, specUrl, tenant, token]);
+  }, [backendOrigin, mode, ready, specUrl, tenant, tenantSignature, token]);
 
   const applySessionDefaults = () => {
     const savedToken = window.localStorage.getItem("hive_token") || "";
     const savedTenant = getTenantId() || "";
+    const savedTenantSignature = getStoredHiveContextSignature() || "";
     setToken(savedToken);
     setTenant(savedTenant);
+    setTenantSignature(savedTenantSignature);
     setMode(savedTenant ? "tenant" : "central");
   };
 
   const clearAuthorization = () => {
     setToken("");
     setTenant("");
+    setTenantSignature("");
     setMode("central");
   };
 
@@ -210,7 +230,7 @@ export default function ApiDocsPage() {
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             <FeatureCard icon={<ServerCog className="h-5 w-5 text-sky-300" />} title="Central mode" body="Use the shared /api/v1 endpoints with no tenant header for control-plane requests." />
-            <FeatureCard icon={<Network className="h-5 w-5 text-emerald-300" />} title="Tenant mode" body="Inject X-Tenant automatically for shared tenant requests or call /v1/tenant aliases directly." />
+            <FeatureCard icon={<Network className="h-5 w-5 text-emerald-300" />} title="Tenant mode" body="Inject signed tenant headers for shared requests or call /v1/tenant aliases directly." />
             <FeatureCard icon={<ShieldCheck className="h-5 w-5 text-amber-300" />} title="Fast authorization" body="Paste a bearer token once or pull it from local storage, then Try it out immediately." />
           </div>
         </div>
@@ -252,6 +272,11 @@ export default function ApiDocsPage() {
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">X-Tenant Header</label>
               <Input value={tenant} onChange={(event) => setTenant(event.target.value)} placeholder="tenantapple" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">X-Tenant-Signature</label>
+              <Input value={tenantSignature} onChange={(event) => setTenantSignature(event.target.value)} placeholder="Signed tenant context" />
             </div>
 
             <div className="flex flex-wrap gap-2">

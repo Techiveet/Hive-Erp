@@ -30,8 +30,20 @@ class PermissionExportController extends Controller
             $query->where('name', 'LIKE', '%' . $request->search . '%');
         }
 
+        $sortableColumns = ['id', 'name', 'guard_name', 'created_at', 'updated_at'];
+        $sortCol = (string) $request->input('sortCol', 'name');
+        $sortDir = strtolower((string) $request->input('sortDir', 'asc'));
+
+        if (!in_array($sortCol, $sortableColumns, true)) {
+            $sortCol = 'name';
+        }
+
+        if (!in_array($sortDir, ['asc', 'desc'], true)) {
+            $sortDir = 'asc';
+        }
+
         if ($request->filled('sortCol') && $request->filled('sortDir')) {
-            $query->orderBy($request->sortCol, $request->sortDir);
+            $query->orderBy($sortCol, $sortDir);
         } else {
             $query->orderBy('name', 'asc');
         }

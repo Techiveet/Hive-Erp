@@ -5,8 +5,6 @@ namespace Modules\NightClub\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Inventory\Models\InventoryItem;
-use Modules\Inventory\Models\InventoryTransaction;
 
 class ServiceOrderItem extends Model
 {
@@ -18,6 +16,8 @@ class ServiceOrderItem extends Model
         'service_order_id',
         'inventory_item_id',
         'inventory_transaction_id',
+        'inventory_item_snapshot',
+        'inventory_transaction_snapshot',
         'item_name',
         'quantity',
         'unit_price',
@@ -30,6 +30,18 @@ class ServiceOrderItem extends Model
         'unit_price' => 'decimal:2',
         'total_price' => 'decimal:2',
         'stock_deducted' => 'boolean',
+        'inventory_item_snapshot' => 'array',
+        'inventory_transaction_snapshot' => 'array',
+    ];
+
+    protected $appends = [
+        'inventory_item',
+        'inventory_transaction',
+    ];
+
+    protected $hidden = [
+        'inventory_item_snapshot',
+        'inventory_transaction_snapshot',
     ];
 
     public function order(): BelongsTo
@@ -37,13 +49,13 @@ class ServiceOrderItem extends Model
         return $this->belongsTo(ServiceOrder::class, 'service_order_id');
     }
 
-    public function inventoryItem(): BelongsTo
+    public function getInventoryItemAttribute(): ?array
     {
-        return $this->belongsTo(InventoryItem::class, 'inventory_item_id');
+        return $this->inventory_item_snapshot;
     }
 
-    public function inventoryTransaction(): BelongsTo
+    public function getInventoryTransactionAttribute(): ?array
     {
-        return $this->belongsTo(InventoryTransaction::class, 'inventory_transaction_id');
+        return $this->inventory_transaction_snapshot;
     }
 }

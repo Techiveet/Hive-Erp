@@ -12,7 +12,7 @@ Route::prefix('v1/public/nightclub')->name('api.public.nightclub.')->group(funct
     Route::post('reserve', [PublicReservationController::class, 'store'])->name('reserve');
 });
 
-Route::middleware(['auth:sanctum'])
+Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout', 'tenant_module:lounge_club_management'])
     ->prefix('v1/nightclub')
     ->name('api.nightclub.')
     ->group(function (): void {
