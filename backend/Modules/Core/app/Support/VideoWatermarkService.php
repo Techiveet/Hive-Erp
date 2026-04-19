@@ -18,7 +18,8 @@ class VideoWatermarkService
     private const ASSET_VERSION = 'v4-brand-overlay';
 
     public function __construct(
-        private readonly BrandSettingsStore $brandSettingsStore
+        private readonly BrandSettingsStore $brandSettingsStore,
+        private readonly TenantMediaStorage $mediaStorage
     ) {}
 
     public function ensureDownloadAsset(FileEntry $fileEntry): ?array
@@ -115,11 +116,9 @@ class VideoWatermarkService
     public function invalidateDownloadAsset(FileEntry $fileEntry): void
     {
         $media = $fileEntry->getFirstMedia('file');
-        $disk = $media?->disk ?: config('media-library.disk_name', 'public');
+        $disk = $media ? $this->mediaStorage->mediaDisk($media) : (config('media-library.disk_name') ?: 'public');
 
-        if ($fileEntry->watermarked_path && Storage::disk($disk)->exists($fileEntry->watermarked_path)) {
-            Storage::disk($disk)->delete($fileEntry->watermarked_path);
-        }
+        $this->mediaStorage->deleteIfExists($disk, $fileEntry->watermarked_path);
 
         if ($media) {
             $media->setCustomProperty(self::ASSET_SIGNATURE_KEY, null);
@@ -136,7 +135,7 @@ class VideoWatermarkService
 
     private function generateOrReuseDownloadAsset(FileEntry $fileEntry, Media $media, string $watermarkText): ?array
     {
-        $disk = $media->disk ?: config('media-library.disk_name', 'public');
+        $disk = $this->mediaStorage->mediaDisk($media);
         $signature = $this->buildWatermarkSignature($watermarkText);
 
         if ($existingAsset = $this->resolveExistingAsset($fileEntry, $media, $signature)) {
@@ -144,11 +143,11 @@ class VideoWatermarkService
         }
 
         if (str_starts_with((string) $media->mime_type, 'audio/')) {
-            // 🚀 FAST-PATH FOR AUDIO: No branding needed (yet), just mark as ready.
             Cache::put("download_progress_{$fileEntry->id}", 100, now()->addMinutes(10));
+
             return [
                 'disk' => $disk,
-                'relative_path' => $media->id . '/' . $media->file_name,
+                'relative_path' => $this->mediaStorage->mediaRelativePath($media),
                 'filename' => $media->file_name,
             ];
         }
@@ -163,53 +162,40 @@ class VideoWatermarkService
         }
 
         $relativePath = $fileEntry->watermarked_path ?: $this->defaultOutputPath($media);
-        $temporaryRelativePath = $this->temporaryOutputPath($relativePath);
-        $temporaryOutputPath = Storage::disk($disk)->path($temporaryRelativePath);
-        $finalOutputPath = Storage::disk($disk)->path($relativePath);
+        $sourceLocalPath = $this->mediaStorage->stageMediaToLocalTemp($media);
+        $temporaryOutputPath = $this->mediaStorage->temporaryLocalPath('mp4', 'wm-');
         $fontPath = $this->resolveFontPath();
         $watermarkOverlayPath = $this->createWatermarkOverlay($watermarkText, $fontPath);
-
-        Storage::disk($disk)->makeDirectory(dirname($relativePath));
-        Storage::disk($disk)->makeDirectory(dirname($temporaryRelativePath));
-
-        if (is_file($temporaryOutputPath)) {
-            @unlink($temporaryOutputPath);
-        }
 
         try {
             $command = $this->buildFfmpegCommand(
                 $ffmpegBinary,
-                $media,
+                $sourceLocalPath,
                 $temporaryOutputPath,
                 $watermarkText,
                 $fontPath,
                 $watermarkOverlayPath
             );
 
-            // 🚀 PROGRESS TRACKING START
-            $duration = $this->getVideoDuration($media->getPath());
+            $duration = $this->getVideoDuration($sourceLocalPath);
             $process = new Process($command);
             $process->setTimeout((int) config('media-library.ffmpeg_timeout', 900));
-            
-            // Set 5% manually as "started"
+
             Cache::put("download_progress_{$fileEntry->id}", 5, now()->addMinutes(15));
 
             $process->run(function ($type, $buffer) use ($fileEntry, $duration) {
                 if ($type === Process::OUT || $type === Process::ERR) {
-                    // Parse 'time=00:00:20.50' from FFmpeg output
                     if ($duration > 0 && preg_match('/time=([0-9:.]+)/', $buffer, $matches)) {
                         $currentTime = $this->parseFfmpegTime($matches[1]);
                         $percentage = min(99, round(($currentTime / $duration) * 100));
-                        // Update cache for the polling frontend
                         Cache::put("download_progress_{$fileEntry->id}", $percentage, now()->addMinutes(15));
                     }
                 }
             });
 
             if (!$process->isSuccessful()) {
-                throw new \RuntimeException("FFmpeg failed: " . $process->getErrorOutput());
+                throw new \RuntimeException('FFmpeg failed: ' . $process->getErrorOutput());
             }
-
         } catch (\Throwable $exception) {
             Cache::forget("download_progress_{$fileEntry->id}");
 
@@ -218,15 +204,9 @@ class VideoWatermarkService
                 'error' => $exception->getMessage(),
             ]);
 
-            if ($watermarkOverlayPath && is_file($watermarkOverlayPath)) {
-                @unlink($watermarkOverlayPath);
-            }
+            $this->cleanupTemporaryArtifacts($sourceLocalPath, $temporaryOutputPath, $watermarkOverlayPath);
 
             return null;
-        }
-
-        if ($watermarkOverlayPath && is_file($watermarkOverlayPath)) {
-            @unlink($watermarkOverlayPath);
         }
 
         if (!is_file($temporaryOutputPath) || filesize($temporaryOutputPath) < 1024) {
@@ -241,11 +221,13 @@ class VideoWatermarkService
                 @unlink($temporaryOutputPath);
             }
 
+            $this->cleanupTemporaryArtifacts($sourceLocalPath, $watermarkOverlayPath);
+
             return null;
         }
 
         try {
-            $this->promoteGeneratedAsset($temporaryOutputPath, $finalOutputPath);
+            $this->mediaStorage->putLocalFile($disk, $relativePath, $temporaryOutputPath);
         } catch (\Throwable $exception) {
             Cache::forget("download_progress_{$fileEntry->id}");
 
@@ -254,12 +236,12 @@ class VideoWatermarkService
                 'error' => $exception->getMessage(),
             ]);
 
-            if (is_file($temporaryOutputPath)) {
-                @unlink($temporaryOutputPath);
-            }
+            $this->cleanupTemporaryArtifacts($temporaryOutputPath, $sourceLocalPath, $watermarkOverlayPath);
 
             return null;
         }
+
+        $this->cleanupTemporaryArtifacts($temporaryOutputPath, $sourceLocalPath, $watermarkOverlayPath);
 
         $fileEntry->forceFill([
             'watermarked_path' => $relativePath,
@@ -280,7 +262,7 @@ class VideoWatermarkService
 
     private function resolveExistingAsset(FileEntry $fileEntry, Media $media, string $signature): ?array
     {
-        $disk = $media->disk ?: config('media-library.disk_name', 'public');
+        $disk = $this->mediaStorage->mediaDisk($media);
         $relativePath = $fileEntry->watermarked_path ?: $this->defaultOutputPath($media);
         $storedSignature = (string) (
             $media->getCustomProperty(self::ASSET_SIGNATURE_KEY)
@@ -357,21 +339,17 @@ class VideoWatermarkService
         $safeTitle = $this->escapeDrawText($watermarkText);
         $safeFontPath = $this->escapeDrawText($fontPath);
 
-        // x=w-tw-10:y=h-th-10 (10px from bottom-right corner)
-        // fontsize=14 (Smaller, sleeker)
-        // shadowx=1:shadowy=1 (Subtle shadow)
         return "drawtext=fontfile='{$safeFontPath}':text='{$safeTitle}':fontsize=14:fontcolor=white@0.7:box=1:boxcolor=black@0.3:boxborderw=6:x=w-tw-10:y=h-th-10:shadowx=1:shadowy=1:shadowcolor=black@0.6";
     }
 
     private function buildOverlayFilterGraph(): string
     {
-        // main_w-overlay_w-10 (10px from edge)
         return '[0:v:0][1:v:0]overlay=x=main_w-overlay_w-10:y=main_h-overlay_h-10:format=auto:eof_action=repeat[branded]';
     }
 
     private function buildFfmpegCommand(
         string $ffmpegBinary,
-        Media $media,
+        string $sourcePath,
         string $temporaryOutputPath,
         string $watermarkText,
         ?string $fontPath,
@@ -382,7 +360,7 @@ class VideoWatermarkService
             $ffmpegBinary,
             '-y',
             '-i',
-            $media->getPath(),
+            $sourcePath,
         ];
 
         if ($watermarkOverlayPath !== null) {
@@ -409,7 +387,7 @@ class VideoWatermarkService
 
         return array_merge($command, [
             '-c:a',
-            'copy', // Fast! Avoid re-encoding audio if possible.
+            'copy',
             '-map',
             $videoMap,
             '-map',
@@ -427,13 +405,13 @@ class VideoWatermarkService
             '-c:v',
             'libx264',
             '-preset',
-            'ultrafast', // Much faster!
+            'ultrafast',
             '-profile:v',
             'main',
             '-level',
             '4.1',
             '-crf',
-            '23', // Balanced quality/speed
+            '23',
             '-f',
             'mp4',
             $temporaryOutputPath,
@@ -448,10 +426,10 @@ class VideoWatermarkService
 
         $normalizedText = preg_replace('/\s+/u', ' ', trim($watermarkText)) ?: 'HIVE.OS';
         $normalizedText = Str::limit($normalizedText, 60, '');
-        $fontSize = 12; // Smaller
+        $fontSize = 12;
         $paddingX = 12;
         $paddingY = 8;
-        $canvasHeight = 42; // Lower profile
+        $canvasHeight = 42;
         $maxWidth = 320;
         $useTtf = $fontPath !== null && function_exists('imagettfbbox') && function_exists('imagettftext');
 
@@ -540,14 +518,6 @@ class VideoWatermarkService
         return sha1(self::ASSET_VERSION . '|' . $watermarkText);
     }
 
-    private function temporaryOutputPath(string $relativePath): string
-    {
-        $directory = dirname($relativePath);
-        $baseName = pathinfo(basename($relativePath), PATHINFO_FILENAME);
-
-        return $directory . '/.' . $baseName . '.' . Str::lower(Str::random(12)) . '.tmp.mp4';
-    }
-
     private function buildAssetLockKey(FileEntry $fileEntry): string
     {
         $context = function_exists('tenant') && tenant('id')
@@ -560,17 +530,17 @@ class VideoWatermarkService
     private function getVideoDuration(string $path): float
     {
         $ffprobe = str_replace('ffmpeg', 'ffprobe', $this->resolveFfmpegBinary() ?: 'ffmpeg');
-        
+
         $process = new Process([
             $ffprobe,
             '-v', 'error',
             '-show_entries', 'format=duration',
             '-of', 'default=noprint_wrappers=1:nokey=1',
-            $path
+            $path,
         ]);
-        
+
         $process->run();
-        
+
         return (float) trim($process->getOutput());
     }
 
@@ -578,27 +548,24 @@ class VideoWatermarkService
     {
         $parts = array_reverse(explode(':', $time));
         $seconds = (float) array_shift($parts);
-        
-        if (isset($parts[0])) $seconds += (int) $parts[0] * 60;
-        if (isset($parts[1])) $seconds += (int) $parts[1] * 3600;
-        
+
+        if (isset($parts[0])) {
+            $seconds += (int) $parts[0] * 60;
+        }
+
+        if (isset($parts[1])) {
+            $seconds += (int) $parts[1] * 3600;
+        }
+
         return $seconds;
     }
 
-    private function promoteGeneratedAsset(string $temporaryPath, string $finalPath): void
+    private function cleanupTemporaryArtifacts(?string ...$paths): void
     {
-        if (is_file($finalPath)) {
-            @unlink($finalPath);
+        foreach ($paths as $path) {
+            if ($path && is_file($path)) {
+                @unlink($path);
+            }
         }
-
-        if (@rename($temporaryPath, $finalPath)) {
-            return;
-        }
-
-        if (!@copy($temporaryPath, $finalPath)) {
-            throw new \RuntimeException('Unable to promote generated watermark asset.');
-        }
-
-        @unlink($temporaryPath);
     }
 }

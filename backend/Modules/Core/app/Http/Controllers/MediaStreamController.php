@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Support\TemporaryDownloadSignature;
 use App\Support\TenantRequestSignature;
 use Illuminate\Http\Request;
+use Laravel\Sanctum\PersonalAccessToken;
 use Modules\Core\Models\FileEntry;
+use Modules\Core\Support\TenantMediaStorage;
 use Modules\Tenancy\Models\Tenant;
 use Stancl\Tenancy\Tenancy;
 
@@ -21,8 +23,14 @@ class MediaStreamController extends Controller
 {
     public function __construct(
         private readonly Tenancy $tenancy,
+<<<<<<< HEAD
         private readonly TenantRequestSignature $tenantRequestSignature,
         private readonly TemporaryDownloadSignature $temporaryDownloadSignature
+=======
+        private readonly AuthContext $authContext,
+        private readonly TenantRequestSignature $tenantRequestSignature,
+        private readonly TenantMediaStorage $mediaStorage
+>>>>>>> fdba7116f66fd5d462137665fb0c6cad6d63dd2d
     ) {}
 
     public function stream(Request $request, $id)
@@ -92,26 +100,27 @@ class MediaStreamController extends Controller
             abort(404, 'Media not found.');
         }
 
-        // 4. Resolve the physical path (tenant-aware after initialize above)
-        $path = $media->getPath();
+        $disk = $this->mediaStorage->mediaDisk($media);
+        $path = $this->resolveStreamPath($media, $disk);
         if (!file_exists($path)) {
             abort(404, 'File not found on disk.');
         }
 
         $mimeType = $media->mime_type ?: 'application/octet-stream';
         $fileSize = filesize($path);
-        $inlineFileName = $this->inlineFilename((string) ($media->file_name ?: 'media-stream'));
+        $inlineFileName = $this->mediaStorage->sanitizeInlineFilename((string) ($media->file_name ?: 'media-stream'));
+        $cleanupAfterStream = $this->shouldCleanupStreamPath($disk);
 
         // 5. Support range requests for video/audio seeking
         $headers = [
-            'Content-Type'                => $mimeType,
-            'Accept-Ranges'               => 'bytes',
-            'Cache-Control'               => 'private, no-store, max-age=0',
-            'Content-Disposition'         => "inline; filename=\"{$inlineFileName}\"",
+            'Content-Type' => $mimeType,
+            'Accept-Ranges' => 'bytes',
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Content-Disposition' => "inline; filename=\"{$inlineFileName}\"",
             'Access-Control-Expose-Headers' => 'Content-Length, Content-Range, Accept-Ranges, Content-Disposition',
             'Access-Control-Allow-Origin' => '*',
             'Cross-Origin-Resource-Policy' => 'cross-origin',
-            'X-Content-Type-Options'      => 'nosniff',
+            'X-Content-Type-Options' => 'nosniff',
         ];
 
         // Handle range request (browser seeking)
@@ -119,17 +128,17 @@ class MediaStreamController extends Controller
         if ($rangeHeader) {
             preg_match('/bytes=(\d+)-(\d*)/', $rangeHeader, $matches);
             $start = (int) $matches[1];
-            $end   = isset($matches[2]) && $matches[2] !== '' ? (int) $matches[2] : $fileSize - 1;
-            $end   = min($end, $fileSize - 1);
+            $end = isset($matches[2]) && $matches[2] !== '' ? (int) $matches[2] : $fileSize - 1;
+            $end = min($end, $fileSize - 1);
             $length = $end - $start + 1;
 
-            $headers['Content-Range']  = "bytes {$start}-{$end}/{$fileSize}";
+            $headers['Content-Range'] = "bytes {$start}-{$end}/{$fileSize}";
             $headers['Content-Length'] = $length;
 
             $fp = fopen($path, 'rb');
             fseek($fp, $start);
 
-            return response()->stream(function () use ($fp, $length) {
+            return response()->stream(function () use ($fp, $length, $cleanupAfterStream, $path) {
                 $remaining = $length;
                 while ($remaining > 0 && !feof($fp)) {
                     $chunk = min(8192, $remaining);
@@ -138,6 +147,10 @@ class MediaStreamController extends Controller
                     flush();
                 }
                 fclose($fp);
+
+                if ($cleanupAfterStream && is_file($path)) {
+                    @unlink($path);
+                }
             }, 206, $headers);
         }
 
@@ -145,20 +158,30 @@ class MediaStreamController extends Controller
         $headers['Content-Length'] = $fileSize;
 
         $fp = fopen($path, 'rb');
-        return response()->stream(function () use ($fp) {
+        return response()->stream(function () use ($fp, $cleanupAfterStream, $path) {
             while (!feof($fp)) {
                 echo fread($fp, 8192);
                 flush();
             }
             fclose($fp);
+
+            if ($cleanupAfterStream && is_file($path)) {
+                @unlink($path);
+            }
         }, 200, $headers);
     }
 
-    private function inlineFilename(string $filename): string
+    private function resolveStreamPath($media, string $disk): string
     {
-        $safeFilename = basename($filename);
-        $safeFilename = preg_replace('/[^A-Za-z0-9._ -]+/', '', $safeFilename) ?: 'media-stream.mp4';
+        if ($this->shouldCleanupStreamPath($disk)) {
+            return $this->mediaStorage->stageMediaToLocalTemp($media);
+        }
 
-        return trim($safeFilename) !== '' ? trim($safeFilename) : 'media-stream.mp4';
+        return $media->getPath();
+    }
+
+    private function shouldCleanupStreamPath(string $disk): bool
+    {
+        return (string) config("filesystems.disks.{$disk}.driver") !== 'local';
     }
 }

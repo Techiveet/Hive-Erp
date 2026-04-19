@@ -4,6 +4,7 @@ namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Support\TenantMediaStorage;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -64,24 +65,28 @@ class FileEntry extends Model implements HasMedia
 
         $title = $this->resolveDisplayTitle($media);
 
+        $mediaStorage = app(TenantMediaStorage::class);
+        $mediaDisk = $mediaStorage->mediaDisk($media);
+
         // Determine if we're in a tenant context. If so, getUrl() returns the wrong URL
         // because the public symlink only covers central storage. We serve tenant assets
         // through the authenticated API endpoint which uses the tenant-aware disk instead.
         $isTenant = function_exists('tenant') && tenant('id') !== null;
+        $serveThroughApi = $isTenant || $mediaDisk !== 'public';
 
-        $mediaUrl = $isTenant
+        $mediaUrl = $serveThroughApi
             ? url("/api/v1/files/{$this->id}/serve")
             : $media->getUrl();
 
         $thumbnailUrl = null;
         if ($this->getFirstMedia('custom_thumbnail')) {
             $thumbnailMedia = $this->getFirstMedia('custom_thumbnail');
-            $thumbnailUrl = $isTenant
+            $thumbnailUrl = $serveThroughApi
                 ? url("/api/v1/files/{$this->id}/serve?thumb=custom")
                 : $thumbnailMedia->getUrl();
         } elseif ($media->hasGeneratedConversion('thumbnail')) {
             // Video thumbnail — also served through the API in tenant context
-            $thumbnailUrl = $isTenant
+            $thumbnailUrl = $serveThroughApi
                 ? url("/api/v1/files/{$this->id}/serve?thumb=1")
                 : $media->getUrl('thumbnail');
         } elseif (str_starts_with($media->mime_type, 'image/')) {
@@ -91,7 +96,7 @@ class FileEntry extends Model implements HasMedia
         $subtitles = $this->getMedia('subtitles')->map(function ($sub) {
             return [
                 'uuid' => $sub->uuid,
-                'src' => $sub->getUrl(),
+                'src' => url("/api/v1/files/subtitle/{$sub->uuid}"),
                 'srcLang' => $sub->getCustomProperty('language', 'en'),
                 'label' => $sub->getCustomProperty('label', 'Subtitle'),
                 'default' => (bool) $sub->getCustomProperty('default', false),
