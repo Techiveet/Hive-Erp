@@ -1,0 +1,25 @@
+# Ignore tenant storage directories (these contain large media files)
+storage/tenantafya-clinic
+storage/tenantapple
+storage/tenantnile-suites
+storage/tenantselam-bistro
+storage/tenanttesla
+storage/tenant*
+
+# Keep essential storage dirs only
+!storage/app/.gitkeep
+!storage/framework/.gitkeep
+!storage/logs/.gitkeep
+
+# Logs and debug
+storage/logs/*
+storage/debugbar
+*.log
+
+# IDE
+.idea
+.vscode
+*.md
+
+# Keep essential files
+!.gitkeep
