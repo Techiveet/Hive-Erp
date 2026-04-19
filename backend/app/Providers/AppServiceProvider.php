@@ -5,6 +5,9 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Model; // <-- Add this import
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,6 +32,33 @@ class AppServiceProvider extends ServiceProvider
         // tenant, and Sanctum API guard contexts.
         Gate::before(function ($user, $ability) {
             return $this->hasSuperAdminRole($user) ? true : null;
+        });
+
+        RateLimiter::for('auth-login', function (Request $request) {
+            $email = strtolower((string) $request->input('email', 'unknown'));
+
+            return [
+                Limit::perMinute(10)->by($request->ip()),
+                Limit::perMinute(5)->by('login:'.$email),
+            ];
+        });
+
+        RateLimiter::for('auth-2fa', function (Request $request) {
+            $email = strtolower((string) $request->input('email', 'unknown'));
+
+            return [
+                Limit::perMinute(12)->by($request->ip()),
+                Limit::perMinute(6)->by('2fa:'.$email),
+            ];
+        });
+
+        RateLimiter::for('auth-password-reset', function (Request $request) {
+            $email = strtolower((string) $request->input('email', 'unknown'));
+
+            return [
+                Limit::perMinute(6)->by($request->ip()),
+                Limit::perMinute(3)->by('password-reset:'.$email),
+            ];
         });
     }
 

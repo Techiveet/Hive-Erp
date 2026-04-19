@@ -33,6 +33,8 @@ Route::get('/internal/caddy/allow-domain', function (Request $request) {
 });
 
 Route::get('/test-broadcast', function () {
+    abort_unless(app()->environment(['local', 'testing']), 404);
+
     $payload = [
         'id'          => rand(1000, 9999),
         'event'       => 'MANUAL_TEST',

@@ -8,6 +8,8 @@ REQUESTED_ROOT_DOMAIN=""
 REQUESTED_SERVER_IP=""
 REQUESTED_TLS_MODE=""
 SKIP_FALLBACK_DOMAIN_SYNC=0
+MIN_FREE_DISK_MB="${MIN_FREE_DISK_MB:-5120}"
+DOCKER_PRUNE_BEFORE_BUILD="${DOCKER_PRUNE_BEFORE_BUILD:-1}"
 
 print_usage() {
   cat <<'EOF'
@@ -88,6 +90,50 @@ done
 
 compose() {
   docker compose -f "${COMPOSE_FILE}" "$@"
+}
+
+free_disk_mb() {
+  df -Pm . | awk 'NR==2 {print $4}'
+}
+
+show_disk_usage() {
+  local free_mb
+  free_mb="$(free_disk_mb)"
+  echo "Disk free space: ${free_mb} MB"
+  docker system df || true
+}
+
+cleanup_docker_build_cache() {
+  echo "Pruning Docker build cache and dangling resources before build..."
+  docker builder prune -af || true
+  docker image prune -af || true
+  docker container prune -f || true
+}
+
+ensure_disk_space_for_build() {
+  local free_mb_before free_mb_after
+  free_mb_before="$(free_disk_mb)"
+  echo "Free disk before build preflight: ${free_mb_before} MB (required >= ${MIN_FREE_DISK_MB} MB)"
+
+  if [ "${free_mb_before}" -ge "${MIN_FREE_DISK_MB}" ]; then
+    return
+  fi
+
+  if [ "${DOCKER_PRUNE_BEFORE_BUILD}" = "1" ]; then
+    cleanup_docker_build_cache
+    free_mb_after="$(free_disk_mb)"
+    echo "Free disk after Docker prune: ${free_mb_after} MB"
+  else
+    free_mb_after="${free_mb_before}"
+  fi
+
+  if [ "${free_mb_after}" -lt "${MIN_FREE_DISK_MB}" ]; then
+    echo "Insufficient disk space for deployment build." >&2
+    echo "Need at least ${MIN_FREE_DISK_MB} MB free, found ${free_mb_after} MB." >&2
+    echo "Free up VPS disk space (old logs, backups, unused images/volumes) and retry." >&2
+    show_disk_usage >&2
+    exit 1
+  fi
 }
 
 cleanup_stale_recreate_containers() {
@@ -479,13 +525,14 @@ fi
 
 apply_requested_overrides
 cleanup_stale_recreate_containers
+ensure_disk_space_for_build
 ensure_app_key
 ensure_reverb_credentials
 ensure_meilisearch_key
 ensure_domain_defaults
 configure_caddy_runtime
 
-compose build
+compose build --progress plain
 compose up -d --remove-orphans redis db meilisearch rembg gotenberg
 compose up -d backend
 

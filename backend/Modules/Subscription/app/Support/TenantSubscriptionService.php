@@ -129,31 +129,46 @@ class TenantSubscriptionService
     public function currentForTenant(Tenant $tenant, array $pendingModules = []): array
     {
         $subscription = $this->refreshState($this->ensureForTenant($tenant));
-        $summary = SubscriptionLifecycle::summary($subscription->expires_at, $subscription->grace_ends_at);
+        return $this->buildSubscriptionSnapshot($tenant, $subscription, $pendingModules);
+    }
 
-        return [
-            'id' => $subscription->id,
-            'tenant_id' => $tenant->id,
-            'plan' => $subscription->plan,
-            'status' => $summary['status'],
-            'billing_cycle' => $subscription->billing_cycle,
-            'renewal_mode' => $subscription->renewal_mode,
-            'started_at' => optional($subscription->started_at)->toIso8601String(),
-            'renewal_window_starts_at' => optional($subscription->renewal_window_starts_at)->toIso8601String(),
-            'expires_at' => optional($subscription->expires_at)->toIso8601String(),
-            'grace_ends_at' => optional($subscription->grace_ends_at)->toIso8601String(),
-            'last_renewed_at' => optional($subscription->last_renewed_at)->toIso8601String(),
-            'days_until_expiration' => $summary['days_until_expiration'],
-            'is_expiring_soon' => $summary['is_expiring_soon'],
-            'needs_renewal' => $summary['needs_renewal'],
-            'term_days' => SubscriptionLifecycle::termDays($subscription->plan),
-            'grace_period_days' => SubscriptionLifecycle::gracePeriodDays($subscription->plan),
-            'module_subscriptions' => TenantModuleCatalog::resolve(
-                is_array($subscription->module_subscriptions) ? $subscription->module_subscriptions : null,
-                $subscription->plan,
-                $pendingModules
-            ),
-        ];
+    public function currentSnapshotForTenant(Tenant $tenant, array $pendingModules = []): array
+    {
+        $subscription = TenantSubscription::query()
+            ->where('tenant_id', $tenant->id)
+            ->first();
+
+        if (! $subscription) {
+            $plan = strtolower((string) ($tenant->plan ?: 'business'));
+            $window = SubscriptionLifecycle::startWindow($plan, $tenant->created_at ?? now());
+            $summary = SubscriptionLifecycle::summary($window['expires_at'], $window['grace_ends_at']);
+
+            return [
+                'id' => null,
+                'tenant_id' => $tenant->id,
+                'plan' => $plan,
+                'status' => $summary['status'],
+                'billing_cycle' => 'monthly',
+                'renewal_mode' => 'manual',
+                'started_at' => optional($window['started_at'])->toIso8601String(),
+                'renewal_window_starts_at' => optional($window['renewal_window_starts_at'])->toIso8601String(),
+                'expires_at' => optional($window['expires_at'])->toIso8601String(),
+                'grace_ends_at' => optional($window['grace_ends_at'])->toIso8601String(),
+                'last_renewed_at' => optional($window['started_at'])->toIso8601String(),
+                'days_until_expiration' => $summary['days_until_expiration'],
+                'is_expiring_soon' => $summary['is_expiring_soon'],
+                'needs_renewal' => $summary['needs_renewal'],
+                'term_days' => SubscriptionLifecycle::termDays($plan),
+                'grace_period_days' => SubscriptionLifecycle::gracePeriodDays($plan),
+                'module_subscriptions' => TenantModuleCatalog::resolve(
+                    null,
+                    $plan,
+                    $pendingModules
+                ),
+            ];
+        }
+
+        return $this->buildSubscriptionSnapshot($tenant, $subscription, $pendingModules);
     }
 
     public function buildModuleAccess(Tenant $tenant): array
@@ -192,6 +207,35 @@ class TenantSubscriptionService
             'catalog_version' => (int) ($payload['catalog_version'] ?? TenantModuleCatalog::VERSION),
             'updated_at' => $payload['updated_at'] ?? null,
             'updated_by' => $payload['updated_by'] ?? $updatedBy,
+        ];
+    }
+
+    private function buildSubscriptionSnapshot(Tenant $tenant, TenantSubscription $subscription, array $pendingModules = []): array
+    {
+        $summary = SubscriptionLifecycle::summary($subscription->expires_at, $subscription->grace_ends_at);
+
+        return [
+            'id' => $subscription->id,
+            'tenant_id' => $tenant->id,
+            'plan' => $subscription->plan,
+            'status' => $summary['status'],
+            'billing_cycle' => $subscription->billing_cycle,
+            'renewal_mode' => $subscription->renewal_mode,
+            'started_at' => optional($subscription->started_at)->toIso8601String(),
+            'renewal_window_starts_at' => optional($subscription->renewal_window_starts_at)->toIso8601String(),
+            'expires_at' => optional($subscription->expires_at)->toIso8601String(),
+            'grace_ends_at' => optional($subscription->grace_ends_at)->toIso8601String(),
+            'last_renewed_at' => optional($subscription->last_renewed_at)->toIso8601String(),
+            'days_until_expiration' => $summary['days_until_expiration'],
+            'is_expiring_soon' => $summary['is_expiring_soon'],
+            'needs_renewal' => $summary['needs_renewal'],
+            'term_days' => SubscriptionLifecycle::termDays($subscription->plan),
+            'grace_period_days' => SubscriptionLifecycle::gracePeriodDays($subscription->plan),
+            'module_subscriptions' => TenantModuleCatalog::resolve(
+                is_array($subscription->module_subscriptions) ? $subscription->module_subscriptions : null,
+                $subscription->plan,
+                $pendingModules
+            ),
         ];
     }
 }

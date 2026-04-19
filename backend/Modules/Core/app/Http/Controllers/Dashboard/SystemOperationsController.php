@@ -3,17 +3,22 @@
 namespace Modules\Core\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
+use App\Support\TemporaryDownloadSignature;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
-use Laravel\Sanctum\PersonalAccessToken;
 use Modules\Core\Jobs\RunSystemBackup;
 use Modules\Core\Models\Setting;
 use Modules\Core\Support\SystemBackupCatalog;
 
 class SystemOperationsController extends Controller
 {
+    public function __construct(
+        private readonly TemporaryDownloadSignature $temporaryDownloadSignature
+    ) {
+    }
+
     private function userHasPermission($user, string $permission): bool
     {
         if (! $user) {
@@ -133,20 +138,75 @@ class SystemOperationsController extends Controller
         ]);
     }
 
+    public function signedBackupDownloadUrl(Request $request, string $id): JsonResponse
+    {
+        if ($response = $this->ensureCentralBackupWorkspace()) {
+            return $response;
+        }
+
+        $path = $this->resolveBackupPath($id);
+        if (! $path) {
+            return response()->json(['error' => 'Invalid backup archive reference.'], 404);
+        }
+
+        $user = $request->user();
+        if (! $this->userHasPermission($user, 'view_backups') && ! $this->userHasPermission($user, 'manage_backups')) {
+            return response()->json(['error' => 'Forbidden. Missing backup access permission.'], 403);
+        }
+
+        $expiresAt = now()->addMinutes(5)->timestamp;
+        $payload = [
+            'id' => $id,
+            'uid' => (int) $user->id,
+            'exp' => $expiresAt,
+            'scope' => 'backup_download',
+        ];
+
+        return response()->json([
+            'url' => url('/api/v1/system/backups/'.$id.'/download?'.http_build_query([
+                'uid' => (int) $user->id,
+                'exp' => $expiresAt,
+                'scope' => 'backup_download',
+                'sig' => $this->temporaryDownloadSignature->sign($payload),
+            ])),
+            'expires_at' => $expiresAt,
+        ]);
+    }
+
     public function downloadBackup(Request $request, string $id): JsonResponse|\Symfony\Component\HttpFoundation\StreamedResponse
     {
         if ($response = $this->ensureCentralBackupWorkspace()) {
             return $response;
         }
 
-        $tokenStr = str_replace('Bearer ', '', (string) $request->query('token'));
-        $token = PersonalAccessToken::findToken($tokenStr);
+        $userId = (int) $request->query('uid', 0);
+        $expiresAt = (int) $request->query('exp', 0);
+        $scope = (string) $request->query('scope', '');
+        $signature = (string) $request->query('sig', '');
 
-        if (! $token || ! $token->tokenable) {
-            return response()->json(['error' => 'Unauthorized or expired token.'], 401);
+        if ($userId <= 0 || $expiresAt <= 0 || $scope !== 'backup_download' || $signature === '') {
+            return response()->json(['error' => 'Missing or invalid download authorization.'], 401);
         }
 
-        $user = $token->tokenable;
+        if ($expiresAt < now()->timestamp) {
+            return response()->json(['error' => 'Download URL expired.'], 401);
+        }
+
+        $payload = [
+            'id' => $id,
+            'uid' => $userId,
+            'exp' => $expiresAt,
+            'scope' => $scope,
+        ];
+
+        if (! $this->temporaryDownloadSignature->matches($payload, $signature)) {
+            return response()->json(['error' => 'Invalid download signature.'], 403);
+        }
+
+        $user = \Modules\Identity\Models\User::query()->find($userId);
+        if (! $user) {
+            return response()->json(['error' => 'Unauthorized or expired user context.'], 401);
+        }
 
         if (! $this->userHasPermission($user, 'view_backups') && ! $this->userHasPermission($user, 'manage_backups')) {
             return response()->json(['error' => 'Forbidden. Missing backup access permission.'], 403);

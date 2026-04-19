@@ -563,7 +563,7 @@ class TenantController extends Controller implements HasMiddleware
         $fallbackDomain = $tenant->fallbackDomain();
         $expectedFallbackDomain = $this->tenantDomains->expectedFallbackDomain($tenant);
 
-        $currentSubscription = $this->subscriptions->currentForTenant($tenant);
+        $currentSubscription = $this->subscriptions->currentSnapshotForTenant($tenant);
         $subscriptions = $currentSubscription['module_subscriptions'];
         $businessType = $this->landingTemplates->normalizeBusinessType($tenant->business_type ?? null);
 

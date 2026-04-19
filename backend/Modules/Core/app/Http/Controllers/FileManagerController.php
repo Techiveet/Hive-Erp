@@ -3,6 +3,7 @@
 namespace Modules\Core\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Support\TemporaryDownloadSignature;
 use Modules\Core\Models\Folder;
 use Modules\Core\Models\FileEntry;
 use Modules\Core\Jobs\PrepareVideoDownloadAsset;
@@ -23,7 +24,8 @@ use Intervention\Image\Drivers\Gd\Driver;
 class FileManagerController extends Controller
 {
     public function __construct(
-        private readonly VideoWatermarkService $videoWatermarkService
+        private readonly VideoWatermarkService $videoWatermarkService,
+        private readonly TemporaryDownloadSignature $temporaryDownloadSignature
     ) {}
 
     // =========================================================================
@@ -35,6 +37,7 @@ class FileManagerController extends Controller
         $folderId = $request->input('folder_id');
         $filter = $request->input('filter', 'all');
         $userId = auth()->id();
+        $pageSize = max(1, min(100, (int) $request->input('page_size', 50)));
 
         $foldersQuery = Folder::where('user_id', $userId);
         $filesQuery = FileEntry::with('media')->where('user_id', $userId);
@@ -61,49 +64,54 @@ class FileManagerController extends Controller
             }
         }
 
-        $mediaItems = DB::table('media')
-            ->join('file_entries', 'media.model_id', '=', 'file_entries.id')
-            ->where('media.model_type', FileEntry::class)
-            ->where('file_entries.user_id', $userId)
-            ->whereNull('file_entries.deleted_at')
-            ->select('media.mime_type', 'media.size')
-            ->get();
+        $metrics = Cache::remember(
+            "file_metrics_{$this->currentTenantContextId()}_{$userId}",
+            now()->addMinutes(5),
+            fn () => $this->buildMetricsForUser((int) $userId)
+        );
 
-        $metrics = [
-            'total_used' => 0,
-            'images' => ['size' => 0, 'count' => 0],
-            'videos' => ['size' => 0, 'count' => 0],
-            'docs' => ['size' => 0, 'count' => 0],
-            'audio_other' => ['size' => 0, 'count' => 0],
-        ];
-
-        foreach ($mediaItems as $item) {
-            $metrics['total_used'] += $item->size;
-            if (str_starts_with($item->mime_type, 'image/')) {
-                $metrics['images']['size'] += $item->size;
-                $metrics['images']['count']++;
-            } elseif (str_starts_with($item->mime_type, 'video/')) {
-                $metrics['videos']['size'] += $item->size;
-                $metrics['videos']['count']++;
-            } elseif (preg_match('/(pdf|document|text|msword|excel|spreadsheet|powerpoint|presentation|csv)/i', $item->mime_type)) {
-                $metrics['docs']['size'] += $item->size;
-                $metrics['docs']['count']++;
-            } else {
-                $metrics['audio_other']['size'] += $item->size;
-                $metrics['audio_other']['count']++;
-            }
-        }
-
-        $folders = $foldersQuery->orderBy('name')->get();
-        $files = $filesQuery->orderBy('created_at', 'desc')->get();
+        $folders = $foldersQuery->orderBy('name')->limit($pageSize)->get();
+        $files = $filesQuery->orderBy('created_at', 'desc')->limit($pageSize)->get();
         $this->queueMissingVideoStreams($files);
 
         return response()->json([
             'data' => [
                 'folders' => $folders,
                 'files' => $files,
+                'page_size' => $pageSize,
             ],
             'metrics' => $metrics
+        ]);
+    }
+
+    public function signedStreamUrl(Request $request, int $id)
+    {
+        $fileEntry = FileEntry::findOrFail($id);
+        $user = auth()->user();
+        $isAdmin = (bool) ($user && method_exists($user, 'hasAdministrativeRole') && $user->hasAdministrativeRole());
+
+        if (! $isAdmin && $fileEntry->user_id !== $user?->id) {
+            abort(403, 'Unauthorized');
+        }
+
+        $tenantId = $this->currentTenantContextId();
+        $expiresAt = now()->addMinutes(5)->timestamp;
+        $payload = [
+            'id' => $id,
+            'tenant' => $tenantId,
+            'uid' => (int) $user->id,
+            'exp' => $expiresAt,
+        ];
+
+        return response()->json([
+            'url' => url('/api/v1/media/stream/'.$id.'?'.http_build_query([
+                'tenant' => $tenantId,
+                'uid' => (int) $user->id,
+                'exp' => $expiresAt,
+                'sig' => $this->temporaryDownloadSignature->sign($payload),
+                'signature' => $tenantId === 'central' ? null : app(\App\Support\TenantRequestSignature::class)->sign($tenantId),
+            ])),
+            'expires_at' => $expiresAt,
         ]);
     }
 
@@ -766,6 +774,44 @@ class FileManagerController extends Controller
                 $this->dispatchVideoStreamPreparation($fileEntry);
             }
         }
+    }
+
+    private function buildMetricsForUser(int $userId): array
+    {
+        $mediaItems = DB::table('media')
+            ->join('file_entries', 'media.model_id', '=', 'file_entries.id')
+            ->where('media.model_type', FileEntry::class)
+            ->where('file_entries.user_id', $userId)
+            ->whereNull('file_entries.deleted_at')
+            ->select('media.mime_type', 'media.size')
+            ->get();
+
+        $metrics = [
+            'total_used' => 0,
+            'images' => ['size' => 0, 'count' => 0],
+            'videos' => ['size' => 0, 'count' => 0],
+            'docs' => ['size' => 0, 'count' => 0],
+            'audio_other' => ['size' => 0, 'count' => 0],
+        ];
+
+        foreach ($mediaItems as $item) {
+            $metrics['total_used'] += (int) $item->size;
+            if (str_starts_with((string) $item->mime_type, 'image/')) {
+                $metrics['images']['size'] += (int) $item->size;
+                $metrics['images']['count']++;
+            } elseif (str_starts_with((string) $item->mime_type, 'video/')) {
+                $metrics['videos']['size'] += (int) $item->size;
+                $metrics['videos']['count']++;
+            } elseif (preg_match('/(pdf|document|text|msword|excel|spreadsheet|powerpoint|presentation|csv)/i', (string) $item->mime_type)) {
+                $metrics['docs']['size'] += (int) $item->size;
+                $metrics['docs']['count']++;
+            } else {
+                $metrics['audio_other']['size'] += (int) $item->size;
+                $metrics['audio_other']['count']++;
+            }
+        }
+
+        return $metrics;
     }
 
     // =========================================================================

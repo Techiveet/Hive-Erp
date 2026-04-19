@@ -170,9 +170,17 @@ export function BackupSettings({ isCentralNode }: BackupSettingsProps) {
   }, [formData.backup_day, formData.backup_frequency, formData.backup_time]);
 
   const handleDownload = (id: string) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("hive_token") : null;
-    const url = `${getBackendApiRoot()}/system/backups/${id}/download?token=${token}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    apiFetch(`/system/backups/${id}/signed-download-url`, { method: "POST" })
+      .then((payload) => {
+        const url = payload?.url;
+        if (!url) {
+          throw new Error("Failed to generate secure download link.");
+        }
+        window.open(url, "_blank", "noopener,noreferrer");
+      })
+      .catch((error: any) => {
+        toast.error(error?.message || "Unable to start download.");
+      });
   };
 
   if (!canViewBackups) {

@@ -20,9 +20,14 @@ class HandleQueryToken
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // If the Authorization header is missing but a token query parameter is provided,
-        // inject it into the header so Sanctum/Passport can use it.
-        if (!$request->hasHeader('Authorization') && $request->has('token')) {
+        // Backward compatibility only for legacy media stream URLs.
+        $isLegacyMediaStream = str_contains($request->path(), 'api/v1/media/stream/');
+
+        if (
+            $isLegacyMediaStream
+            && !$request->hasHeader('Authorization')
+            && $request->has('token')
+        ) {
             $request->headers->set('Authorization', 'Bearer ' . $request->query('token'));
         }
 

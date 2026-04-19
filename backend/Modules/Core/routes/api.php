@@ -60,7 +60,7 @@ foreach ($centralDomains as $domain) {
             return response()->json(['message' => $message]);
         });
 
-        // 🚀 LARGE FILE DOWNLOAD ROUTE (Token Auth to avoid browser memory crash)
+        // Public signed-download endpoint (requires valid short-lived signature).
         Route::get('/system/backups/{id}/download', [SystemOperationsController::class, 'downloadBackup']);
 
         Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
@@ -76,6 +76,7 @@ foreach ($centralDomains as $domain) {
                 Route::post('/trigger-backup', [SystemOperationsController::class, 'triggerBackup'])->middleware('permission:manage_backups,sanctum');
                 Route::post('/backup/schedule', [SystemOperationsController::class, 'updateSchedule'])->middleware('permission:manage_backups,sanctum');
                 Route::get('/backups', [SystemOperationsController::class, 'getBackups'])->middleware('permission:view_backups|manage_backups,sanctum');
+                Route::post('/backups/{id}/signed-download-url', [SystemOperationsController::class, 'signedBackupDownloadUrl'])->middleware('permission:view_backups|manage_backups,sanctum');
                 Route::delete('/backups/{id}', [SystemOperationsController::class, 'deleteBackup'])->middleware('permission:manage_backups,sanctum');
                 Route::get('/alerts', [SystemAlertController::class, 'index'])->middleware('permission:view_alerts,sanctum');
                 Route::delete('/alerts/{id}', [SystemAlertController::class, 'destroy'])->middleware('permission:manage_alerts,sanctum');
@@ -149,6 +150,7 @@ foreach ($centralDomains as $domain) {
                 Route::get('/{id}/serve', [FileManagerController::class, 'serveMedia'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
                 Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
                 Route::get('/{id}/prepare-download', [FileManagerController::class, 'prepareDownload'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+                Route::post('/{id}/signed-stream-url', [FileManagerController::class, 'signedStreamUrl'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
                 Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
                 Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
                 Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
@@ -195,7 +197,7 @@ Route::middleware([
             });
         });
 
-    // 🚀 LARGE FILE DOWNLOAD ROUTE (Tenant)
+    // Public signed-download endpoint (requires valid short-lived signature).
     Route::get('/system/backups/{id}/download', [SystemOperationsController::class, 'downloadBackup']);
 
     // 🎬 MEDIA STREAM ROUTE: Token-in-URL for native browser <video>/<audio> playback.
@@ -216,6 +218,7 @@ Route::middleware([
             Route::post('/trigger-backup', [SystemOperationsController::class, 'triggerBackup'])->middleware('permission:manage_backups,sanctum');
             Route::post('/backup/schedule', [SystemOperationsController::class, 'updateSchedule'])->middleware('permission:manage_backups,sanctum');
             Route::get('/backups', [SystemOperationsController::class, 'getBackups'])->middleware('permission:view_backups|manage_backups,sanctum');
+            Route::post('/backups/{id}/signed-download-url', [SystemOperationsController::class, 'signedBackupDownloadUrl'])->middleware('permission:view_backups|manage_backups,sanctum');
             Route::delete('/backups/{id}', [SystemOperationsController::class, 'deleteBackup'])->middleware('permission:manage_backups,sanctum');
             Route::get('/alerts', [SystemAlertController::class, 'index'])->middleware('permission:view_alerts,sanctum');
             Route::delete('/alerts/{id}', [SystemAlertController::class, 'destroy'])->middleware('permission:manage_alerts,sanctum');
@@ -268,6 +271,7 @@ Route::middleware([
             Route::get('/{id}/serve', [FileManagerController::class, 'serveMedia'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
             Route::get('/{id}/download', [FileManagerController::class, 'downloadMedia'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
             Route::get('/{id}/prepare-download', [FileManagerController::class, 'prepareDownload'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
+            Route::post('/{id}/signed-stream-url', [FileManagerController::class, 'signedStreamUrl'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
             Route::post('/{type}/{id}/share', [FileManagerController::class, 'generateShareLink'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
             Route::post('/{type}/{id}/favorite', [FileManagerController::class, 'toggleFavorite'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
             Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');

@@ -3,43 +3,58 @@
 namespace Modules\Core\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Support\AuthContext;
+use App\Support\TemporaryDownloadSignature;
 use App\Support\TenantRequestSignature;
 use Illuminate\Http\Request;
+use Laravel\Sanctum\PersonalAccessToken;
 use Modules\Core\Models\FileEntry;
 use Modules\Tenancy\Models\Tenant;
 use Stancl\Tenancy\Tenancy;
-use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * MediaStreamController
  *
- * Serves media files (audio, video) using a token passed via query string.
- * This is needed because browser native <audio> and <video> elements cannot
- * send custom Authorization headers — they must use URLs.
+ * Serves media files (audio, video) using a short-lived signed URL.
  *
- * IMPORTANT: Tenant must be initialized BEFORE looking up the token because
- * personal_access_tokens live in the tenant database, not central.
- *
- * Route: GET /api/v1/media/stream/{id}?token=xxx[&tenant=xxx]
+ * Route: GET /api/v1/media/stream/{id}?tenant=...&uid=...&exp=...&sig=...
  */
 class MediaStreamController extends Controller
 {
     public function __construct(
         private readonly Tenancy $tenancy,
-        private readonly AuthContext $authContext,
-        private readonly TenantRequestSignature $tenantRequestSignature
+        private readonly TenantRequestSignature $tenantRequestSignature,
+        private readonly TemporaryDownloadSignature $temporaryDownloadSignature
     ) {}
 
     public function stream(Request $request, $id)
     {
-        $rawToken = $request->query('token');
-        if (!$rawToken) {
-            abort(401, 'Missing media token.');
+        $tenantId = (string) ($request->query('tenant') ?: 'central');
+        $user = null;
+
+        $userId = (int) $request->query('uid', 0);
+        $expiresAt = (int) $request->query('exp', 0);
+        $signature = (string) $request->query('sig', '');
+
+        if ($userId > 0 && $expiresAt > 0 && $signature !== '') {
+            if ($expiresAt < now()->timestamp) {
+                abort(401, 'Stream URL expired.');
+            }
+
+            $signedPayload = [
+                'id' => (int) $id,
+                'tenant' => $tenantId,
+                'uid' => $userId,
+                'exp' => $expiresAt,
+            ];
+
+            if (! $this->temporaryDownloadSignature->matches($signedPayload, $signature)) {
+                abort(403, 'Invalid stream signature.');
+            }
+
+            $user = \Modules\Identity\Models\User::query()->find($userId);
         }
 
-        // 1. Initialize tenant context FIRST (tokens live in the tenant DB)
-        $tenantId = (string) ($request->query('tenant') ?: 'central');
+        // Initialize tenant context before querying tenant-scoped data.
         $tenantSignature = $request->query('signature');
 
         if (
@@ -59,24 +74,17 @@ class MediaStreamController extends Controller
             $this->tenancy->end();
         }
 
-        // 2. Look up the token AFTER tenant context is initialized
-        $accessToken = PersonalAccessToken::findToken($rawToken);
-        if (!$accessToken || !$accessToken->tokenable) {
-            abort(401, 'Invalid or expired media token.');
+        if (! $user) {
+            $rawToken = (string) $request->query('token', '');
+            $accessToken = $rawToken !== '' ? PersonalAccessToken::findToken($rawToken) : null;
+            $user = $accessToken?->tokenable;
         }
 
-        $requiredAbility = $this->authContext->ability($tenantId);
-        $tokenAbilities = $accessToken->abilities ?? [];
-        if (
-            !in_array('*', $tokenAbilities, true)
-            && !in_array($requiredAbility, $tokenAbilities, true)
-        ) {
-            abort(403, 'Invalid media token context.');
+        if (! $user) {
+            abort(401, 'Stream user not found or not authorized.');
         }
 
-        $user = $accessToken->tokenable;
-
-        // 3. Find the file entry — admins can stream any file, users only their own
+        // Find the file entry — admins can stream any file, users only their own.
         $isAdmin = method_exists($user, 'hasAdministrativeRole') && $user->hasAdministrativeRole();
         $fileQuery = FileEntry::query();
         if (!$isAdmin) {

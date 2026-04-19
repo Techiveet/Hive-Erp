@@ -48,10 +48,10 @@ foreach ($centralDomains as $domain) {
         });
 
         // Public Auth
-        Route::post('/login', [AuthController::class, 'login']);
-        Route::post('/verify-2fa', [AuthController::class, 'verify2FA']);
+        Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
+        Route::post('/verify-2fa', [AuthController::class, 'verify2FA'])->middleware('throttle:auth-2fa');
         Route::get('/password-policy', [AuthController::class, 'passwordPolicy']);
-        Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+        Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-password-reset');
 
         // Protected Auth
         Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
@@ -129,14 +129,14 @@ Route::middleware([
     });
 
     // Public Auth
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/tenant/login', [AuthController::class, 'login']);
-    Route::post('/verify-2fa', [AuthController::class, 'verify2FA']);
-    Route::post('/tenant/verify-2fa', [AuthController::class, 'verify2FA']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
+    Route::post('/tenant/login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
+    Route::post('/verify-2fa', [AuthController::class, 'verify2FA'])->middleware('throttle:auth-2fa');
+    Route::post('/tenant/verify-2fa', [AuthController::class, 'verify2FA'])->middleware('throttle:auth-2fa');
     Route::get('/password-policy', [AuthController::class, 'passwordPolicy']);
     Route::get('/tenant/password-policy', [AuthController::class, 'passwordPolicy']);
-    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
-    Route::post('/tenant/reset-password', [AuthController::class, 'resetPassword']);
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-password-reset');
+    Route::post('/tenant/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-password-reset');
 
     // Protected Auth
     Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {

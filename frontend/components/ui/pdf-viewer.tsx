@@ -3,11 +3,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Download, ExternalLink, Printer, FileText, Loader2, Maximize, Minimize, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { authenticatedDownload } from '@/lib/authenticated-download';
 
 interface PdfViewerProps {
   src: string;
   title?: string;
   className?: string;
+  fetchUrl?: string;
+  fetchHeaders?: Record<string, string>;
+  downloadUrl?: string;
   allowDownload?: boolean;   // LMS Feature: Toggle downloading
   allowPrint?: boolean;      // LMS Feature: Toggle printing
   requireTime?: number;      // LMS Feature: Seconds required before marking complete
@@ -18,6 +22,9 @@ export function PdfViewer({
   src, 
   title = "PDF Document", 
   className, 
+  fetchUrl,
+  fetchHeaders,
+  downloadUrl,
   allowDownload = true, 
   allowPrint = true,
   requireTime = 0,
@@ -27,7 +34,78 @@ export function PdfViewer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [timeSpent, setTimeSpent] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [resolvedSrc, setResolvedSrc] = useState(src);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const revokeObjectUrl = () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+
+    if (!fetchUrl) {
+      revokeObjectUrl();
+      setResolvedSrc(src);
+      setErrorMessage(null);
+      setIsLoading(true);
+
+      return () => {
+        active = false;
+        revokeObjectUrl();
+      };
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+    setResolvedSrc('');
+
+    (async () => {
+      try {
+        const response = await fetch(fetchUrl, {
+          headers: fetchHeaders ?? {},
+        });
+
+        if (!response.ok) {
+          throw new Error(response.status === 401 || response.status === 403
+            ? 'Secure preview authorization failed.'
+            : 'Failed to load the PDF preview.');
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+
+        if (!active) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+
+        revokeObjectUrl();
+        objectUrlRef.current = objectUrl;
+        setResolvedSrc(objectUrl);
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to load the PDF preview.');
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+      revokeObjectUrl();
+    };
+  }, [src, fetchUrl, JSON.stringify(fetchHeaders ?? {})]);
 
   // LMS Tracking Timer
   useEffect(() => {
@@ -49,17 +127,37 @@ export function PdfViewer({
   }, [requireTime, isCompleted, isLoading, onComplete]);
 
   const handlePrint = () => {
-    if (!allowPrint) return;
-    const printWindow = window.open(src, '_blank');
+    if (!allowPrint || !resolvedSrc) return;
+    const printWindow = window.open(resolvedSrc, '_blank');
     if (printWindow) {
       printWindow.onload = () => printWindow.print();
     }
   };
 
-  const triggerDownload = () => {
+  const triggerDownload = async () => {
     if (!allowDownload) return;
+
+    const secureDownloadTarget = downloadUrl ?? fetchUrl;
+
+    if (secureDownloadTarget) {
+      try {
+        await authenticatedDownload(secureDownloadTarget, {
+          filename: title,
+          headers: fetchHeaders,
+        });
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to download this document.');
+      }
+
+      return;
+    }
+
+    if (!resolvedSrc) {
+      return;
+    }
+
     const link = document.createElement('a');
-    link.href = src;
+    link.href = resolvedSrc;
     link.download = title;
     document.body.appendChild(link);
     link.click();
@@ -155,14 +253,26 @@ export function PdfViewer({
             <p className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Rendering Document...</p>
           </div>
         )}
-        
-        <iframe 
-          // Appending #toolbar=0 prevents students from using the browser's built-in download/print buttons
-          src={`${src}#toolbar=0&navpanes=0&scrollbar=0`} 
-          className="w-full h-full border-none absolute inset-0" 
-          title={title}
-          onLoad={() => setIsLoading(false)}
-        />
+
+        {errorMessage && !isLoading ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/90 px-6 text-center">
+            <FileText className="h-10 w-10 text-red-500/70" />
+            <p className="text-sm font-bold text-foreground">Preview unavailable</p>
+            <p className="max-w-md text-xs text-muted-foreground">{errorMessage}</p>
+            {allowDownload ? (
+              <Button onClick={triggerDownload} className="rounded-xl">
+                <Download className="mr-2 h-4 w-4" /> Download PDF
+              </Button>
+            ) : null}
+          </div>
+        ) : resolvedSrc ? (
+          <iframe 
+            src={`${resolvedSrc}#toolbar=0&navpanes=0&scrollbar=0`} 
+            className="w-full h-full border-none absolute inset-0" 
+            title={title}
+            onLoad={() => setIsLoading(false)}
+          />
+        ) : null}
       </div>
     </div>
   );
