@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Support\TemporaryDownloadSignature;
 use App\Support\TenantRequestSignature;
 use Illuminate\Http\Request;
-use Laravel\Sanctum\PersonalAccessToken;
 use Modules\Core\Models\FileEntry;
 use Modules\Tenancy\Models\Tenant;
 use Stancl\Tenancy\Tenancy;
@@ -29,29 +28,27 @@ class MediaStreamController extends Controller
     public function stream(Request $request, $id)
     {
         $tenantId = (string) ($request->query('tenant') ?: 'central');
-        $user = null;
-
         $userId = (int) $request->query('uid', 0);
         $expiresAt = (int) $request->query('exp', 0);
         $signature = (string) $request->query('sig', '');
 
-        if ($userId > 0 && $expiresAt > 0 && $signature !== '') {
-            if ($expiresAt < now()->timestamp) {
-                abort(401, 'Stream URL expired.');
-            }
+        if ($userId <= 0 || $expiresAt <= 0 || $signature === '') {
+            abort(401, 'Missing stream authorization parameters.');
+        }
 
-            $signedPayload = [
-                'id' => (int) $id,
-                'tenant' => $tenantId,
-                'uid' => $userId,
-                'exp' => $expiresAt,
-            ];
+        if ($expiresAt < now()->timestamp) {
+            abort(401, 'Stream URL expired.');
+        }
 
-            if (! $this->temporaryDownloadSignature->matches($signedPayload, $signature)) {
-                abort(403, 'Invalid stream signature.');
-            }
+        $signedPayload = [
+            'id' => (int) $id,
+            'tenant' => $tenantId,
+            'uid' => $userId,
+            'exp' => $expiresAt,
+        ];
 
-            $user = \Modules\Identity\Models\User::query()->find($userId);
+        if (! $this->temporaryDownloadSignature->matches($signedPayload, $signature)) {
+            abort(403, 'Invalid stream signature.');
         }
 
         // Initialize tenant context before querying tenant-scoped data.
@@ -74,14 +71,9 @@ class MediaStreamController extends Controller
             $this->tenancy->end();
         }
 
+        $user = \Modules\Identity\Models\User::query()->find($userId);
         if (! $user) {
-            $rawToken = (string) $request->query('token', '');
-            $accessToken = $rawToken !== '' ? PersonalAccessToken::findToken($rawToken) : null;
-            $user = $accessToken?->tokenable;
-        }
-
-        if (! $user) {
-            abort(401, 'Stream user not found or not authorized.');
+            abort(401, 'Stream user not found.');
         }
 
         // Find the file entry — admins can stream any file, users only their own.

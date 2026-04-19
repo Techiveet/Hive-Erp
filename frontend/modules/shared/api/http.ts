@@ -1,6 +1,6 @@
 import axios from "axios";
 import { clearHiveSession } from "@/lib/auth-sync";
-import { getBackendApiRoot, getTenantHeaders } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot, getTenantHeaders } from "@/lib/runtime-context";
 
 export const api = axios.create({
   headers: {
@@ -10,7 +10,7 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("hive_token");
+    const token = getAccessToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
 
     config.baseURL = getBackendApiRoot();

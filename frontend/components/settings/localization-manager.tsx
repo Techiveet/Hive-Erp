@@ -12,7 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { SettingsPanelSkeleton } from "@/components/ui/loading-states";
-import { getBackendApiRoot } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot } from "@/lib/runtime-context";
 
 import {
   AlertDialog,
@@ -96,7 +96,7 @@ export function LocalizationManager() {
         const manualFetch = async () => {
             setIsFallbackLoading(true);
             try {
-                const token = localStorage.getItem('hive_token');
+                const token = getAccessToken();
                 
                 // Fetch Target Language
                 const targetRes = await fetch(`${getApiUrl()}/localization/languages/${activeTargetCode}/translations`, { headers: { Authorization: `Bearer ${token}` }});

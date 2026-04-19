@@ -200,9 +200,7 @@ Route::middleware([
     // Public signed-download endpoint (requires valid short-lived signature).
     Route::get('/system/backups/{id}/download', [SystemOperationsController::class, 'downloadBackup']);
 
-    // 🎬 MEDIA STREAM ROUTE: Token-in-URL for native browser <video>/<audio> playback.
-    // Auth is handled internally via ?token= query param since browser media elements
-    // cannot set custom Authorization headers.
+    // 🎬 MEDIA STREAM ROUTE: short-lived signed URL for native playback.
     Route::get('/media/stream/{id}', [MediaStreamController::class, 'stream']);
 
     Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {

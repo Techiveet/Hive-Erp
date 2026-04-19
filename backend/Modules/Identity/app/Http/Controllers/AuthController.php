@@ -63,12 +63,18 @@ class AuthController extends Controller
             'email'    => 'required|email',
             'password' => 'required',
         ]);
+        $email = strtolower((string) $request->input('email'));
 
-        $user = User::where('email', $request->email)->first();
+        if ($this->isTemporarilyLocked('login', $request, $email)) {
+            return response()->json(['message' => 'Too many failed attempts. Try again in a few minutes.'], 423);
+        }
+
+        $user = User::where('email', $email)->first();
         $currentTenant = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
 
         // 🛡️ LOG: FAILED LOGIN
         if (!$user || !Hash::check($request->password, $user->password)) {
+            $this->recordFailedAttempt('login', $request, $email, 5, 300);
             activity('Security & Access')
                 ->tap(function($activity) use ($currentTenant) { $activity->tenant_id = $currentTenant; })
                 ->withProperties([
@@ -81,6 +87,7 @@ class AuthController extends Controller
 
             return response()->json(['message' => 'Invalid credentials.'], 401);
         }
+        $this->clearFailedAttempts('login', $request, $email);
 
         // 🛡️ LOG: DEACTIVATED ACCOUNT ATTEMPT
         if (!$user->is_active) {
@@ -193,6 +200,11 @@ class AuthController extends Controller
             'two_factor_token' => 'required|string',
             'code'             => 'required|string',
         ]);
+        $email = strtolower((string) $request->input('email'));
+
+        if ($this->isTemporarilyLocked('2fa', $request, $email)) {
+            return response()->json(['message' => 'Too many invalid codes. Try again in a few minutes.'], 423);
+        }
 
         $currentTenant = function_exists('tenant') && tenant('id') ? tenant('id') : 'central';
         $userId = Cache::get('2fa_auth_' . $request->two_factor_token);
@@ -204,6 +216,7 @@ class AuthController extends Controller
         $user = User::find($userId);
 
         if (!$user || $user->email !== $request->email) {
+            $this->recordFailedAttempt('2fa', $request, $email, 6, 300);
             return response()->json(['message' => 'Invalid session data.'], 401);
         }
 
@@ -212,6 +225,7 @@ class AuthController extends Controller
             $google2fa = new Google2FA();
 
             if (!$google2fa->verifyKey($secret, $request->code)) {
+                $this->recordFailedAttempt('2fa', $request, $email, 6, 300);
                 activity('Security & Access')
                     ->causedBy($user)
                     ->tap(function($activity) use ($currentTenant) { $activity->tenant_id = $currentTenant; })
@@ -224,6 +238,7 @@ class AuthController extends Controller
 
                 return response()->json(['message' => 'Invalid authentication code.'], 401);
             }
+            $this->clearFailedAttempts('2fa', $request, $email);
 
             if (is_null($user->two_factor_confirmed_at)) {
                 $user->two_factor_confirmed_at = now();
@@ -265,6 +280,49 @@ class AuthController extends Controller
                     : $this->tenantRequestSignature->sign($currentTenant),
             ]
         ], 200);
+    }
+
+    private function isTemporarilyLocked(string $scope, Request $request, string $email): bool
+    {
+        $keys = $this->attemptKeys($scope, $request, $email);
+        $ipUntil = (int) Cache::get("{$keys['ip']}:locked_until", 0);
+        $emailUntil = (int) Cache::get("{$keys['email']}:locked_until", 0);
+
+        return $ipUntil > now()->timestamp || $emailUntil > now()->timestamp;
+    }
+
+    private function recordFailedAttempt(string $scope, Request $request, string $email, int $threshold, int $lockSeconds): void
+    {
+        $keys = $this->attemptKeys($scope, $request, $email);
+        $ttl = now()->addSeconds($lockSeconds);
+
+        foreach (['ip', 'email'] as $type) {
+            $attemptKey = "{$keys[$type]}:attempts";
+            $attempts = (int) Cache::increment($attemptKey);
+            Cache::put($attemptKey, $attempts, $ttl);
+
+            if ($attempts >= $threshold) {
+                Cache::put("{$keys[$type]}:locked_until", now()->addSeconds($lockSeconds)->timestamp, $ttl);
+            }
+        }
+    }
+
+    private function clearFailedAttempts(string $scope, Request $request, string $email): void
+    {
+        $keys = $this->attemptKeys($scope, $request, $email);
+        foreach (['ip', 'email'] as $type) {
+            Cache::forget("{$keys[$type]}:attempts");
+            Cache::forget("{$keys[$type]}:locked_until");
+        }
+    }
+
+    private function attemptKeys(string $scope, Request $request, string $email): array
+    {
+        $normalizedEmail = strtolower(trim($email ?: 'unknown'));
+        return [
+            'ip' => "auth_lock:{$scope}:ip:".$request->ip(),
+            'email' => "auth_lock:{$scope}:email:{$normalizedEmail}",
+        ];
     }
 
     /**

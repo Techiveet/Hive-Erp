@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { useTranslation } from '@/store/use-translation';
 import { cn } from "@/lib/utils";
 import { logFrontendAction } from "@/lib/api";
-import { extractStorageRelativePath, getBackendOrigin, getBackendStorageUrl } from "@/lib/runtime-context";
+import { extractStorageRelativePath, getAccessToken, getBackendOrigin, getBackendStorageUrl } from "@/lib/runtime-context";
 
 const getApiUrl = () => {
     return `${getBackendOrigin()}/api`;
@@ -46,7 +46,7 @@ function BrandAssetPickerModal({ isOpen, onClose, onSelect }: { isOpen: boolean,
   const { data, isLoading } = useQuery({
     queryKey: ["files", "all"],
     queryFn: async () => {
-      const token = localStorage.getItem('hive_token');
+      const token = getAccessToken();
       const res = await fetch(`${getApiUrl()}/v1/files?filter=all`, {
         headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       });
@@ -64,7 +64,7 @@ function BrandAssetPickerModal({ isOpen, onClose, onSelect }: { isOpen: boolean,
   // 3. Handle Direct Upload
   const uploadMut = useMutation({
     mutationFn: async (file: File) => {
-      const token = localStorage.getItem('hive_token');
+      const token = getAccessToken();
       const formData = new FormData();
       formData.append("file", file);
       formData.append("chunk_index", "0");
@@ -197,7 +197,7 @@ export function BrandSettings() {
     const { data: settingsData, isLoading: isFetching } = useQuery({
         queryKey: ['brandSettings'],
         queryFn: async () => {
-            const token = localStorage.getItem('hive_token');
+            const token = getAccessToken();
             const res = await fetch(`${getApiUrl()}/v1/settings/brand`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -216,7 +216,7 @@ export function BrandSettings() {
 
     const saveSettingsMut = useMutation({
         mutationFn: async () => {
-            const token = localStorage.getItem('hive_token');
+            const token = getAccessToken();
             const res = await fetch(`${getApiUrl()}/v1/settings/brand`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },

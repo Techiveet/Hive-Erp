@@ -10,7 +10,7 @@ import { ShieldCheck, ShieldAlert, Loader2, KeyRound, Copy, Check } from "lucide
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { logFrontendAction } from "@/lib/api"; 
-import { getBackendApiRoot } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot } from "@/lib/runtime-context";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +40,7 @@ export function TwoFactorSetupClient() {
   };
 
   const getHeaders = () => ({
-    "Authorization": `Bearer ${localStorage.getItem("hive_token")}`,
+    "Authorization": `Bearer ${getAccessToken()}`,
     "Accept": "application/json",
     "Content-Type": "application/json"
   });

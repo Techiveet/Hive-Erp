@@ -6,7 +6,7 @@ import { ShieldAlert } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { SystemOffline } from "@/components/auth/system-offline";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
-import { getAuthHeaders, getBackendApiRoot } from "@/lib/runtime-context";
+import { getAccessToken, getAuthHeaders, getBackendApiRoot } from "@/lib/runtime-context";
 
 // 🚀 Interfaces
 export interface SystemSettings {
@@ -66,7 +66,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const { data, isLoading } = useQuery({
         queryKey: ["globalSystemSettings"],
         queryFn: async () => {
-            const token = localStorage.getItem("hive_token");
+            const token = getAccessToken();
 
             if (!token) {
                 return { data: null };

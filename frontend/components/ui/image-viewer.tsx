@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge'; 
 import { toast } from 'sonner';
-import { getBackendOrigin } from '@/lib/runtime-context';
+import { getAuthHeaders, getBackendOrigin } from '@/lib/runtime-context';
 
 import { removeBackground } from "@imgly/background-removal";
 
@@ -102,13 +102,7 @@ export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, o
       }
       setIsLoadingBlob(true);
       try {
-        const token = localStorage.getItem('hive_token');
-        const tenantId = localStorage.getItem('hive_context');
-        const headers: Record<string, string> = { 'Authorization': `Bearer ${token}` };
-        if (tenantId && tenantId !== 'central') {
-          headers['X-Tenant'] = tenantId;
-        }
-        const response = await fetch(fetchUrl, { headers });
+        const response = await fetch(fetchUrl, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error("Failed to secure image");
         const blob = await response.blob();
         setBlobSrc(URL.createObjectURL(blob));
@@ -331,11 +325,9 @@ export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, o
           const formData = new FormData();
           formData.append('file', imageBlob, 'image.png');
 
-          const token = localStorage.getItem('hive_token');
-          
           const apiRes = await fetch(`${getApiUrl()}/v1/files/remove-logo-background`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+            headers: getAuthHeaders(),
             body: formData
           });
 
@@ -387,11 +379,9 @@ export function ImageViewer({ src, fetchUrl, alt = "Image preview", className, o
           const formData = new FormData();
           formData.append('file', blob, 'image.png');
 
-          const token = localStorage.getItem('hive_token');
-          
           const apiRes = await fetch(`${getApiUrl()}/v1/files/remove-background`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+            headers: getAuthHeaders(),
             body: formData
           });
 

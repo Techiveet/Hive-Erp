@@ -26,7 +26,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
 import { fetchCurrentTenantSubscriptions } from "@/modules/subscription/api";
 import { ModuleSubscriptionCheckoutDialog } from "@/modules/subscription/components/module-subscription-checkout-dialog";
-import { getBackendApiRoot, getTenantId } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot, getTenantId } from "@/lib/runtime-context";
 
 const getApiUrl = () => {
     return getBackendApiRoot();
@@ -263,7 +263,7 @@ export default function FileConverterPage() {
         const toastId = toast.loading(mode === 'html' ? t('tools.toast_downloading_html', "Downloading HTML...") : t('tools.toast_downloading_asset', "Downloading asset..."));
 
         try {
-            const token = localStorage.getItem('hive_token');
+            const token = getAccessToken();
             const downloadUrl = `${getApiUrl()}/files/${serverFile.id}/download`;
             const res = await fetch(downloadUrl, { headers: { 'Authorization': `Bearer ${token}` } });
             if (!res.ok) throw new Error(t('tools.toast_fetch_failed', "Fetch failed."));
@@ -315,7 +315,7 @@ export default function FileConverterPage() {
         const toastId = toast.loading(t('tools.toast_transpiling', "Gotenberg Engine is transpiling your document..."));
 
         try {
-            const token = localStorage.getItem('hive_token');
+            const token = getAccessToken();
             const url = `${getApiUrl()}/convert/html-to-pdf`;
 
             formData.append('file', finalHtmlFile);
@@ -367,7 +367,7 @@ export default function FileConverterPage() {
         const toastId = toast.loading(t('tools.toast_saving_cloud', "Saving to File Manager..."));
         
         try {
-            const token = localStorage.getItem('hive_token');
+            const token = getAccessToken();
             const formData = new FormData();
             const fileObj = new File([pdfBlob], pdfFilename, { type: 'application/pdf' });
             

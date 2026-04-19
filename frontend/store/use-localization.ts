@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getBackendApiRoot } from '@/lib/runtime-context';
+import { getAccessToken, getBackendApiRoot } from '@/lib/runtime-context';
 
 interface Language {
   id: number;
@@ -32,7 +32,7 @@ const getApiUrl = (endpoint: string) => `${getBackendApiRoot()}${endpoint}`;
 const getHeaders = () => ({
   'Accept': 'application/json',
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('hive_token') : ''}`
+  'Authorization': `Bearer ${getAccessToken() || ''}`
 });
 
 export const useLocalization = create<LocalizationState>((set, get) => ({

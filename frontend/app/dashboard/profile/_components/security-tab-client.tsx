@@ -12,7 +12,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { logFrontendAction } from "@/lib/api";
 import { usePermissions } from "@/hooks/use-permissions";
-import { getBackendApiRoot } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot } from "@/lib/runtime-context";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +46,7 @@ export function SecurityTabClient() {
   };
 
   const getHeaders = () => ({
-    Authorization: `Bearer ${localStorage.getItem("hive_token")}`,
+    Authorization: `Bearer ${getAccessToken()}`,
     Accept: "application/json",
     "Content-Type": "application/json",
   });

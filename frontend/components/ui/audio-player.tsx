@@ -80,6 +80,7 @@ export function AudioPlayer({
 }: AudioPlayerProps) {
   const {
     currentTrack,
+    hideFloatingPlayer,
     isPlaying,
     playTrack,
     playNext,
@@ -163,6 +164,14 @@ export function AudioPlayer({
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [localFavorite, setLocalFavorite] = useState(Boolean(resolvedTrack?.isFavorite));
   const previousExternalTrackRef = useRef<Track | null>(externalTrack);
+  const isMiniVariant = variant === "mini";
+
+  const ghostButtonClass =
+    "text-muted-foreground transition-all hover:bg-muted/70 hover:text-foreground dark:hover:bg-white/5";
+  const softPanelClass =
+    "border border-border/60 bg-background/70 dark:border-white/10 dark:bg-white/5";
+  const overlayClass =
+    "absolute inset-0 z-30 flex flex-col border border-border/60 bg-background/95 text-foreground backdrop-blur-2xl animate-in duration-300 dark:border-white/10 dark:bg-black/90";
 
   useEffect(() => {
     setLocalFavorite(Boolean(resolvedTrack?.isFavorite ?? propIsFavorite));
@@ -178,17 +187,19 @@ export function AudioPlayer({
     const wasDrivingPlayback = sameTrack(previousExternalTrack, currentTrack) && isPlaying;
 
     if (autoPlay && !currentTrack) {
+      hideFloatingPlayer();
       playTrack(externalTrack, resolvedPlaylist);
     } else if (
       previousExternalTrack &&
       !sameTrack(previousExternalTrack, externalTrack) &&
       wasDrivingPlayback
     ) {
+      hideFloatingPlayer();
       playTrack(externalTrack, resolvedPlaylist);
     }
 
     previousExternalTrackRef.current = externalTrack;
-  }, [autoPlay, currentTrack, externalTrack, isPlaying, playTrack, resolvedPlaylist]);
+  }, [autoPlay, currentTrack, externalTrack, hideFloatingPlayer, isPlaying, playTrack, resolvedPlaylist]);
 
   const activeFavorite = resolvedTrack
     ? isCurrentResolvedTrack && currentTrack
@@ -214,11 +225,45 @@ export function AudioPlayer({
     }
 
     if (isExternalMode && !isCurrentResolvedTrack) {
+      hideFloatingPlayer();
       playTrack(resolvedTrack, resolvedPlaylist);
       return;
     }
 
     togglePlay();
+  };
+
+  const handleQueueToggle = () => {
+    setShowQueue((previous) => {
+      const nextState = !previous;
+      if (nextState) {
+        setShowMenu(false);
+        setShowPlaylists(false);
+      }
+      return nextState;
+    });
+  };
+
+  const handlePlaylistsToggle = () => {
+    setShowPlaylists((previous) => {
+      const nextState = !previous;
+      if (nextState) {
+        setShowQueue(false);
+        setShowMenu(false);
+      }
+      return nextState;
+    });
+  };
+
+  const handleMenuToggle = () => {
+    setShowMenu((previous) => {
+      const nextState = !previous;
+      if (nextState) {
+        setShowQueue(false);
+        setShowPlaylists(false);
+      }
+      return nextState;
+    });
   };
 
   const handlePrevious = () => {
@@ -308,10 +353,17 @@ export function AudioPlayer({
   return (
     <div
       className={cn(
-        "relative overflow-hidden border border-white/10 bg-card/85 text-foreground shadow-2xl backdrop-blur-3xl transition-all",
-        variant === "default"
-          ? "w-full max-w-md rounded-[2.4rem] p-6"
-          : "flex w-[340px] items-center gap-2 rounded-full p-2",
+        "relative overflow-hidden text-foreground ring-1 ring-black/5 shadow-[0_28px_80px_-36px_rgba(15,23,42,0.45)] transition-all dark:ring-white/5",
+        "border border-border/60 bg-background/95 backdrop-blur-3xl dark:border-white/10 dark:bg-card/85",
+        isMiniVariant
+          ? "flex w-[340px] items-center gap-2 rounded-full p-2"
+          : "w-full max-w-md rounded-[2.4rem] p-6",
+        !isMiniVariant
+          ? "bg-gradient-to-br from-background via-background/95 to-muted/60 dark:from-card/95 dark:via-card/90 dark:to-card/70"
+          : "",
+        !isMiniVariant
+          ? "supports-[backdrop-filter]:bg-background/85 dark:supports-[backdrop-filter]:bg-card/80"
+          : "supports-[backdrop-filter]:bg-background/90 dark:supports-[backdrop-filter]:bg-card/80",
         className,
       )}
     >
@@ -333,7 +385,7 @@ export function AudioPlayer({
               data-audio-drag-handle
               {...dragProps}
               className={cn(
-                "flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-full bg-white/5 text-muted-foreground active:cursor-grabbing",
+                "flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-full bg-muted/70 text-muted-foreground active:cursor-grabbing dark:bg-white/5",
                 dragProps.className,
               )}
             >
@@ -341,7 +393,7 @@ export function AudioPlayer({
             </div>
           ) : null}
 
-          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10">
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/60 dark:border-white/10">
             {resolvedTrack.coverArt ? (
               <img
                 src={resolvedTrack.coverArt}
@@ -355,8 +407,8 @@ export function AudioPlayer({
               <Music className="h-4 w-4 text-emerald-500" />
             )}
             {effectiveBuffering ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-sm">
-                <Loader2 className="h-4 w-4 animate-spin text-white" />
+              <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm dark:bg-black/45">
+                <Loader2 className="h-4 w-4 animate-spin text-foreground" />
               </div>
             ) : null}
           </div>
@@ -371,7 +423,7 @@ export function AudioPlayer({
           <div className="flex items-center gap-1.5">
             <button
               onClick={handlePrevious}
-              className="rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground dark:hover:bg-white/5"
               title="Previous"
             >
               <SkipBack className="h-3.5 w-3.5 fill-current" />
@@ -389,7 +441,7 @@ export function AudioPlayer({
             </button>
             <button
               onClick={handleNext}
-              className="rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground dark:hover:bg-white/5"
               title="Next"
             >
               <SkipForward className="h-3.5 w-3.5 fill-current" />
@@ -406,11 +458,11 @@ export function AudioPlayer({
             </button>
           </div>
 
-          <div className="flex items-center gap-1 border-l border-white/10 pl-2">
+          <div className="flex items-center gap-1 border-l border-border/60 pl-2 dark:border-white/10">
             {onToggleMinimize ? (
               <button
                 onClick={onToggleMinimize}
-                className="rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+                className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground dark:hover:bg-white/5"
                 title="Expand player"
               >
                 <Maximize2 className="h-3.5 w-3.5" />
@@ -436,7 +488,7 @@ export function AudioPlayer({
                   data-audio-drag-handle
                   {...dragProps}
                   className={cn(
-                    "flex h-9 w-9 cursor-grab items-center justify-center rounded-2xl bg-white/5 text-muted-foreground active:cursor-grabbing",
+                    "flex h-9 w-9 cursor-grab items-center justify-center rounded-2xl bg-muted/70 text-muted-foreground active:cursor-grabbing dark:bg-white/5",
                     dragProps.className,
                   )}
                   title="Move player"
@@ -459,12 +511,12 @@ export function AudioPlayer({
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowQueue((previous) => !previous)}
+                onClick={handleQueueToggle}
                 className={cn(
                   "relative rounded-2xl p-2 transition-all",
                   showQueue
                     ? "bg-emerald-500/15 text-emerald-500"
-                    : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                    : ghostButtonClass,
                 )}
                 title="Queue"
               >
@@ -478,7 +530,7 @@ export function AudioPlayer({
               {onToggleMinimize ? (
                 <button
                   onClick={onToggleMinimize}
-                  className="rounded-2xl p-2 text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
+                  className={cn("rounded-2xl p-2", ghostButtonClass)}
                   title="Minimize"
                 >
                   <Maximize2 className="h-4 w-4 rotate-180" />
@@ -497,7 +549,7 @@ export function AudioPlayer({
           </div>
 
           <div className="flex items-center gap-5">
-            <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl">
+            <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-[2rem] border border-border/60 shadow-2xl dark:border-white/10">
               {resolvedTrack.coverArt ? (
                 <img
                   src={resolvedTrack.coverArt}
@@ -513,7 +565,7 @@ export function AudioPlayer({
                 </div>
               )}
               {effectiveBuffering ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm dark:bg-black/55">
                   <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
                 </div>
               ) : null}
@@ -534,7 +586,7 @@ export function AudioPlayer({
                     "rounded-xl p-1.5 transition-all",
                     isShuffle
                       ? "bg-emerald-500/10 text-emerald-500"
-                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                      : ghostButtonClass,
                   )}
                   title="Shuffle"
                 >
@@ -546,7 +598,7 @@ export function AudioPlayer({
                     "relative rounded-xl p-1.5 transition-all",
                     repeatMode !== "none"
                       ? "bg-emerald-500/10 text-emerald-500"
-                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                      : ghostButtonClass,
                   )}
                   title="Repeat"
                 >
@@ -559,7 +611,7 @@ export function AudioPlayer({
                 </button>
                 <button
                   onClick={cyclePlaybackRate}
-                  className="rounded-xl bg-white/5 px-2 py-1 text-[10px] font-black text-muted-foreground transition-all hover:bg-white/10 hover:text-foreground"
+                  className="rounded-xl bg-muted/70 px-2 py-1 text-[10px] font-black text-muted-foreground transition-all hover:bg-muted hover:text-foreground dark:bg-white/5 dark:hover:bg-white/10"
                   title="Playback speed"
                 >
                   {playbackRate}x
@@ -567,7 +619,7 @@ export function AudioPlayer({
                 <button
                   onClick={() => seekBy(-10)}
                   disabled={!canManipulateTimeline}
-                  className="rounded-xl p-1.5 text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-xl p-1.5 text-muted-foreground transition-all hover:bg-muted/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/5"
                   title="Back 10 seconds"
                 >
                   <SkipBack className="h-4 w-4" />
@@ -575,7 +627,7 @@ export function AudioPlayer({
                 <button
                   onClick={() => seekBy(10)}
                   disabled={!canManipulateTimeline}
-                  className="rounded-xl p-1.5 text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-xl p-1.5 text-muted-foreground transition-all hover:bg-muted/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/5"
                   title="Forward 10 seconds"
                 >
                   <SkipForward className="h-4 w-4" />
@@ -585,16 +637,16 @@ export function AudioPlayer({
           </div>
 
           <div className="space-y-2">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="0.1"
-              value={effectiveProgress}
-              disabled={!canManipulateTimeline}
-              onChange={(event) => seekToPercent(Number(event.target.value))}
-              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-            />
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="0.1"
+                value={effectiveProgress}
+                disabled={!canManipulateTimeline}
+                onChange={(event) => seekToPercent(Number(event.target.value))}
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/10"
+              />
             <div className="flex items-center justify-between px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70">
               <span>{formatTime(effectiveCurrentTime)}</span>
               <span>{formatTime(effectiveDuration)}</span>
@@ -621,14 +673,14 @@ export function AudioPlayer({
                 step="0.01"
                 value={isMuted ? 0 : volume}
                 onChange={(event) => setVolume(Number(event.target.value))}
-                className="h-1 w-16 cursor-pointer appearance-none rounded-full bg-white/10 accent-emerald-500"
+                className="h-1 w-16 cursor-pointer appearance-none rounded-full bg-muted accent-emerald-500 dark:bg-white/10"
               />
             </div>
 
             <div className="flex items-center gap-8">
               <button
                 onClick={handlePrevious}
-                className="text-white/60 transition-all hover:scale-110 hover:text-emerald-500 active:scale-90"
+                className="text-muted-foreground transition-all hover:scale-110 hover:text-emerald-500 active:scale-90"
                 title="Previous"
               >
                 <SkipBack className="h-6 w-6 fill-current" />
@@ -646,7 +698,7 @@ export function AudioPlayer({
               </button>
               <button
                 onClick={handleNext}
-                className="text-white/60 transition-all hover:scale-110 hover:text-emerald-500 active:scale-90"
+                className="text-muted-foreground transition-all hover:scale-110 hover:text-emerald-500 active:scale-90"
                 title="Next"
               >
                 <SkipForward className="h-6 w-6 fill-current" />
@@ -660,31 +712,31 @@ export function AudioPlayer({
                   "rounded-xl p-2 transition-all",
                   activeFavorite
                     ? "scale-110 text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.45)]"
-                    : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                    : ghostButtonClass,
                 )}
                 title={activeFavorite ? "Unfavorite" : "Favorite"}
               >
                 <Heart className={cn("h-5 w-5", activeFavorite && "fill-current")} />
               </button>
               <button
-                onClick={() => setShowPlaylists((previous) => !previous)}
+                onClick={handlePlaylistsToggle}
                 className={cn(
                   "rounded-xl p-2 transition-all",
                   showPlaylists
                     ? "bg-emerald-500/15 text-emerald-500"
-                    : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                    : ghostButtonClass,
                 )}
                 title="Playlists"
               >
                 <Plus className="h-5 w-5" />
               </button>
               <button
-                onClick={() => setShowMenu((previous) => !previous)}
+                onClick={handleMenuToggle}
                 className={cn(
                   "rounded-xl p-2 transition-all",
                   showMenu
-                    ? "bg-white/10 text-foreground"
-                    : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                    ? "bg-muted text-foreground dark:bg-white/10"
+                    : ghostButtonClass,
                 )}
                 title="Track options"
               >
@@ -702,14 +754,14 @@ export function AudioPlayer({
       ) : null}
 
       {showMenu ? (
-        <div className="absolute inset-0 z-30 flex flex-col justify-center bg-black/95 p-6 backdrop-blur-2xl animate-in fade-in zoom-in duration-300">
+        <div className={cn(overlayClass, "justify-center p-6 fade-in zoom-in")}>
           <div className="mb-8 flex items-center justify-between">
-            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white/50">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground">
               Track Options
             </h3>
             <button
               onClick={() => setShowMenu(false)}
-              className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
+              className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground dark:hover:bg-white/10"
             >
               <X className="h-4 w-4" />
             </button>
@@ -721,7 +773,10 @@ export function AudioPlayer({
                 setShowMenu(false);
                 setShowPlaylists(true);
               }}
-              className="group flex items-center gap-4 rounded-3xl border border-white/5 bg-white/5 p-5 transition-all hover:border-emerald-500/20 hover:bg-emerald-500/10"
+              className={cn(
+                "group flex items-center gap-4 rounded-3xl p-5 transition-all hover:border-emerald-500/20 hover:bg-emerald-500/10",
+                softPanelClass,
+              )}
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-500 transition-transform group-hover:scale-110">
                 <FolderPlus className="h-5 w-5" />
@@ -738,7 +793,10 @@ export function AudioPlayer({
 
             <button
               onClick={handleAddToQueue}
-              className="group flex items-center gap-4 rounded-3xl border border-white/5 bg-white/5 p-5 transition-all hover:border-sky-500/20 hover:bg-sky-500/10"
+              className={cn(
+                "group flex items-center gap-4 rounded-3xl p-5 transition-all hover:border-sky-500/20 hover:bg-sky-500/10",
+                softPanelClass,
+              )}
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-400 transition-transform group-hover:scale-110">
                 <ListMusic className="h-5 w-5" />
@@ -756,7 +814,10 @@ export function AudioPlayer({
                 void handleDownload();
                 setShowMenu(false);
               }}
-              className="group flex items-center gap-4 rounded-3xl border border-white/5 bg-white/5 p-5 transition-all hover:border-blue-500/20 hover:bg-blue-500/10"
+              className={cn(
+                "group flex items-center gap-4 rounded-3xl p-5 transition-all hover:border-blue-500/20 hover:bg-blue-500/10",
+                softPanelClass,
+              )}
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-400 transition-transform group-hover:scale-110">
                 <Download className="h-5 w-5" />
@@ -773,14 +834,14 @@ export function AudioPlayer({
       ) : null}
 
       {showPlaylists ? (
-        <div className="absolute inset-0 z-30 flex flex-col bg-black/95 p-6 backdrop-blur-2xl animate-in fade-in slide-in-from-right-10 duration-300">
+        <div className={cn(overlayClass, "p-6 fade-in slide-in-from-right-10")}>
           <div className="mb-6 flex items-center justify-between">
             <h3 className="text-sm font-black uppercase tracking-[0.2em] text-emerald-500">
               Playlists
             </h3>
             <button
               onClick={() => setShowPlaylists(false)}
-              className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
+              className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground dark:hover:bg-white/10"
             >
               <X className="h-4 w-4" />
             </button>
@@ -788,7 +849,7 @@ export function AudioPlayer({
 
           <div className="custom-scrollbar flex-1 space-y-3 overflow-y-auto pr-2">
             {playlists.length === 0 ? (
-              <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/10 text-muted-foreground">
+              <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border/70 text-muted-foreground dark:border-white/10">
                 <FolderPlus className="h-7 w-7" />
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em]">
                   No playlists yet
@@ -808,7 +869,7 @@ export function AudioPlayer({
                         "flex flex-1 items-center justify-between rounded-2xl border p-4 transition-all",
                         included
                           ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-500"
-                          : "border-white/5 bg-white/5 hover:border-emerald-500/20 hover:bg-emerald-500/10",
+                          : "border-border/60 bg-background/70 hover:border-emerald-500/20 hover:bg-emerald-500/10 dark:border-white/10 dark:bg-white/5",
                       )}
                     >
                       <span className="text-sm font-bold text-left text-foreground">
@@ -822,7 +883,7 @@ export function AudioPlayer({
                     </button>
                     <button
                       onClick={() => void deletePlaylist(playlistItem.id)}
-                      className="rounded-2xl border border-white/5 bg-white/5 p-4 text-muted-foreground transition-all hover:border-rose-500/20 hover:bg-rose-500/10 hover:text-rose-500"
+                      className="rounded-2xl border border-border/60 bg-background/70 p-4 text-muted-foreground transition-all hover:border-rose-500/20 hover:bg-rose-500/10 hover:text-rose-500 dark:border-white/10 dark:bg-white/5"
                       title="Delete playlist"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -833,7 +894,7 @@ export function AudioPlayer({
             )}
           </div>
 
-          <div className="mt-6 border-t border-white/10 pt-5">
+          <div className="mt-6 border-t border-border/60 pt-5 dark:border-white/10">
             <div className="flex gap-2">
               <input
                 value={newPlaylistName}
@@ -844,7 +905,7 @@ export function AudioPlayer({
                   }
                 }}
                 placeholder="New playlist name..."
-                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm outline-none transition-all focus:border-emerald-500/40"
+                className="flex-1 rounded-xl border border-border/60 bg-background/80 px-4 py-2 text-sm text-foreground outline-none transition-all focus:border-emerald-500/40 dark:border-white/10 dark:bg-white/5"
               />
               <button
                 onClick={() => void handleCreatePlaylist()}
@@ -861,9 +922,10 @@ export function AudioPlayer({
       {showQueue ? (
         <div
           className={cn(
-            "custom-scrollbar absolute inset-0 z-30 flex flex-col bg-black/85 p-6 backdrop-blur-2xl animate-in fade-in zoom-in duration-300",
-            variant === "mini" &&
-              "fixed inset-auto bottom-20 left-1/2 max-h-[420px] w-[360px] -translate-x-1/2 rounded-[2rem] border border-white/10 shadow-2xl",
+            overlayClass,
+            "custom-scrollbar p-6 fade-in zoom-in",
+            isMiniVariant &&
+              "fixed inset-auto bottom-20 left-1/2 max-h-[420px] w-[360px] -translate-x-1/2 rounded-[2rem] shadow-2xl",
           )}
         >
           <div className="mb-4 flex items-center justify-between">
@@ -879,14 +941,14 @@ export function AudioPlayer({
               {queue.length > 0 ? (
                 <button
                   onClick={clearQueue}
-                  className="rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+                  className="rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground dark:hover:bg-white/10"
                 >
                   Clear
                 </button>
               ) : null}
               <button
                 onClick={() => setShowQueue(false)}
-                className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
+                className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground dark:hover:bg-white/10"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -905,13 +967,13 @@ export function AudioPlayer({
               queue.map((trackItem, index) => (
                 <div
                   key={`${trackItem.id}-${index}`}
-                  className="group flex items-center gap-3 rounded-2xl border border-transparent p-2 transition-all hover:border-white/10 hover:bg-white/5"
+                  className="group flex items-center gap-3 rounded-2xl border border-transparent p-2 transition-all hover:border-border/60 hover:bg-muted/70 dark:hover:border-white/10 dark:hover:bg-white/5"
                 >
                   <button
                     onClick={() => handleQueuePick(trackItem)}
                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-muted">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted dark:border-white/10">
                       {trackItem.coverArt ? (
                         <img
                           src={trackItem.coverArt}
@@ -951,8 +1013,12 @@ export function AudioPlayer({
         }
 
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.12);
+          background: rgba(100, 116, 139, 0.45);
           border-radius: 999px;
+        }
+
+        :global(.dark) .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.12);
         }
       `}</style>
     </div>

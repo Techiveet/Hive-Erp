@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { getBackendOrigin, getStoredHiveContextSignature, getTenantHeaders, getTenantId } from "@/lib/runtime-context";
+import { getAccessToken, getBackendOrigin, getStoredHiveContextSignature, getTenantHeaders, getTenantId } from "@/lib/runtime-context";
 import { cn } from "@/lib/utils";
 import { Home, ExternalLink, ShieldCheck, Network, ServerCog, RefreshCcw, Braces } from "lucide-react";
 
@@ -80,7 +80,7 @@ export default function ApiDocsPage() {
   }, []);
 
   useEffect(() => {
-    const savedToken = window.localStorage.getItem("hive_token") || "";
+    const savedToken = getAccessToken() || "";
     const savedTenant = getTenantId() || "";
     const savedTenantSignature = getStoredHiveContextSignature() || "";
     const savedMode = savedTenant ? "tenant" : "central";
@@ -188,7 +188,7 @@ export default function ApiDocsPage() {
   }, [backendOrigin, mode, ready, specUrl, tenant, tenantSignature, token]);
 
   const applySessionDefaults = () => {
-    const savedToken = window.localStorage.getItem("hive_token") || "";
+    const savedToken = getAccessToken() || "";
     const savedTenant = getTenantId() || "";
     const savedTenantSignature = getStoredHiveContextSignature() || "";
     setToken(savedToken);

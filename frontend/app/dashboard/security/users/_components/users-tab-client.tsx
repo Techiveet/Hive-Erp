@@ -39,7 +39,7 @@ import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTranslation } from "@/store/use-translation";
-import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, persistHiveContext } from "@/lib/runtime-context";
+import { getAccessToken, getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, persistHiveContext } from "@/lib/runtime-context";
 
 import { FileManagerClient } from "@/components/dashboard/file-manager-client";
 
@@ -256,7 +256,7 @@ export function UsersTabClient(props: Props) {
 
   const impersonateMut = useMutation({
     mutationFn: async (userId: string) => {
-      const token = localStorage.getItem('hive_token');
+      const token = getAccessToken();
       const apiRoot = getBackendApiRoot();
       const endpoint = tenantId
         ? `${apiRoot}/users/${userId}/impersonate`
@@ -271,7 +271,7 @@ export function UsersTabClient(props: Props) {
     },
     onSuccess: (data) => {
       if (data.data?.token) {
-        const currentToken = localStorage.getItem('hive_token');
+        const currentToken = getAccessToken();
         if (currentToken && !localStorage.getItem('hive_original_token')) {
           localStorage.setItem('hive_original_token', currentToken);
         }

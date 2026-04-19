@@ -39,4 +39,15 @@ if [ "$needs_install" -eq 1 ]; then
   printf '%s' "$current_hash" > "$STAMP_FILE"
 fi
 
-exec npm run dev
+# The Docker dev container bind-mounts the repo, so stale Turbopack state can
+# survive across container restarts and cause generic 500s on localhost:3000.
+if [ -d "$APP_DIR/.next" ] || [ -d "$APP_DIR/.next-dev" ]; then
+  echo "Resetting Next.js dev cache for Docker startup..."
+  rm -rf \
+    "$APP_DIR/.next/dev" \
+    "$APP_DIR/.next/cache/turbopack" \
+    "$APP_DIR/.next/turbopack" \
+    "$APP_DIR/.next-dev"
+fi
+
+exec npm run dev -- --webpack

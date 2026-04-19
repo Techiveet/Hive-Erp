@@ -8,7 +8,7 @@ import ComposeModal from './compose-modal';
 import { useMailStore } from '@/store/mail-store';
 import { cn } from '@/lib/utils';
 import { initEcho } from '@/lib/echo';
-import { getTenantId } from '@/lib/runtime-context';
+import { getAccessToken, getTenantId } from '@/lib/runtime-context';
 import { toast } from 'sonner';
 
 export default function MailLayout() {
@@ -20,7 +20,7 @@ export default function MailLayout() {
   } = useMailStore();
 
   useEffect(() => {
-    const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
+    const token = getAccessToken() || localStorage.getItem('token');
     if (!token) return;
 
     try {

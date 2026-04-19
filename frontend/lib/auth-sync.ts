@@ -1,4 +1,4 @@
-import { getBackendApiRoot, getTenantHeaders, isTenantSession } from "./runtime-context";
+import { getAccessToken, getBackendApiRoot, getTenantHeaders, isTenantSession } from "./runtime-context";
 import { clearSessionActivity } from "./session-activity";
 import { clearOfflineState } from "@/lib/offline/storage";
 
@@ -58,7 +58,7 @@ export const syncUserSession = async () => {
   try {
     if (typeof window === "undefined") return;
 
-    const token = localStorage.getItem("hive_token");
+    const token = getAccessToken();
     if (!token) return;
 
     const endpoint = isTenantSession() ? "/tenant/user" : "/user";

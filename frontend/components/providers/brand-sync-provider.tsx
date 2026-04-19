@@ -3,7 +3,7 @@
 
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl } from "@/lib/runtime-context";
+import { getAccessToken, getAuthHeaders, getBackendApiRoot, getBackendStorageUrl } from "@/lib/runtime-context";
 import { applyBrandRuntime } from "@/lib/brand-theme";
 import { handleAuthFailureResponse } from "@/lib/auth-sync";
 
@@ -12,7 +12,7 @@ export function BrandSyncProvider() {
     const { data: brandData } = useQuery({
       queryKey: ['brandSettings'],
       queryFn: async () => {
-          const token = localStorage.getItem('hive_token');
+          const token = getAccessToken();
           if (!token) return null;
 
           const res = await fetch(`${getBackendApiRoot()}/settings/brand`, {

@@ -97,8 +97,26 @@
     @apply bg-background text-foreground;
     font-family: var(--brand-font-family, var(--font-inter), sans-serif);
     font-feature-settings: "rlig" 1, "calt" 1;
-    cursor: none;
+    cursor: var(--cursor-default, auto);
   }
+}
+
+a,
+button,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+select,
+label[for],
+summary {
+  cursor: var(--cursor-pointer, pointer);
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  cursor: text;
 }
 
 /* Hide scrollbar */
@@ -198,78 +216,7 @@
   background: radial-gradient(circle at center, transparent 0%, hsl(var(--background)) 100%);
 }
 
-/* =========================
-   CUSTOM CURSOR
-   ========================= */
-
-.cursor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-  z-index: 2147483647;
-  will-change: transform;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-}
-
-.cursor-outer {
-  position: absolute;
-  top: -20px;
-  left: -20px;
-  width: 40px;
-  height: 40px;
-  border: 2px solid hsl(var(--primary));
-  clip-path: polygon(
-    30% 0%,
-    70% 0%,
-    100% 30%,
-    100% 70%,
-    70% 100%,
-    30% 100%,
-    0% 70%,
-    0% 30%
-  );
-  mix-blend-mode: exclusion;
-  transform-origin: center;
-  transition:
-    transform 0.08s ease,
-    background-color 0.08s ease,
-    opacity 0.08s ease;
-  will-change: transform;
-}
-
-.cursor-inner {
-  position: absolute;
-  top: -3px;
-  left: -3px;
-  width: 6px;
-  height: 6px;
-  background: hsl(var(--primary));
-  border-radius: 9999px;
-  transition:
-    transform 0.06s ease,
-    opacity 0.06s ease;
-  will-change: transform;
-}
-
-body.cursor-hovering .cursor-outer {
-  transform: scale(1.35) rotate(22.5deg);
-  background-color: hsl(var(--primary) / 0.12);
-}
-
-body.cursor-clicking .cursor-outer {
-  transform: scale(0.82);
-  background-color: hsl(var(--primary) / 0.25);
-}
-
-body.cursor-clicking .cursor-inner {
-  transform: scale(0);
-}
-
-/* Optional: disable custom cursor on touch devices */
+/* Keep native cursor behavior on touch devices */
 @media (hover: none), (pointer: coarse) {
   body {
     cursor: auto;

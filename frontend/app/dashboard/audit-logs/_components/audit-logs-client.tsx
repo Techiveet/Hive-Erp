@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useTour } from "@/components/providers/tour-provider"; 
 import { useTranslation } from "@/store/use-translation";
-import { isTenantSession } from "@/lib/runtime-context";
+import { getAccessToken, isTenantSession } from "@/lib/runtime-context";
 import { cn } from "@/lib/utils"; 
 import { usePermissions } from "@/hooks/use-permissions";
 
@@ -130,7 +130,7 @@ export function AuditLogsClient() {
         globalActionLock[payloadKey] = now;
 
         try {
-            const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
+            const token = getAccessToken() || localStorage.getItem('token');
             if (!token) return;
             await logFrontendAction({ module: 'System Audit', action, description });
             if (!['filtered', 'copied', 'printed', 'exported', 'viewed'].includes(action)) {

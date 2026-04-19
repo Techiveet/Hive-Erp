@@ -40,6 +40,7 @@ type AudioContextType = {
   queue: Track[];
   history: Track[];
   playlists: Playlist[];
+  isFloatingPlayerOpen: boolean;
   isPlaying: boolean;
   isShuffle: boolean;
   repeatMode: RepeatMode;
@@ -55,6 +56,8 @@ type AudioContextType = {
   playNext: () => void;
   playPrevious: () => void;
   togglePlay: () => void;
+  showFloatingPlayer: () => void;
+  hideFloatingPlayer: () => void;
   closePlayer: () => void;
   toggleShuffle: () => void;
   setRepeatMode: (mode: RepeatMode) => void;
@@ -181,6 +184,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const [queue, setQueue] = useState<Track[]>([]);
   const [history, setHistory] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [isFloatingPlayerOpen, setIsFloatingPlayerOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isShuffle, setIsShuffle] = useState(defaultSettings.isShuffle);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>(defaultSettings.repeatMode);
@@ -549,6 +553,14 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     setIsPlaying(false);
   }, [startTrack]);
 
+  const showFloatingPlayer = useCallback(() => {
+    setIsFloatingPlayerOpen(true);
+  }, []);
+
+  const hideFloatingPlayer = useCallback(() => {
+    setIsFloatingPlayerOpen(false);
+  }, []);
+
   const closePlayer = useCallback(() => {
     audioRef.current?.pause();
     pendingSeekRef.current = null;
@@ -561,6 +573,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     setDuration(0);
     setHasError(false);
     setIsBuffering(false);
+    setIsFloatingPlayerOpen(false);
 
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -1081,6 +1094,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       queue,
       history,
       playlists,
+      isFloatingPlayerOpen,
       isPlaying,
       isShuffle,
       repeatMode,
@@ -1096,6 +1110,8 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       playNext,
       playPrevious,
       togglePlay,
+      showFloatingPlayer,
+      hideFloatingPlayer,
       closePlayer,
       toggleShuffle,
       setRepeatMode,
@@ -1131,7 +1147,9 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       duration,
       hasError,
       history,
+      hideFloatingPlayer,
       isBuffering,
+      isFloatingPlayerOpen,
       isMuted,
       isPlaying,
       isShuffle,
@@ -1152,6 +1170,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       setPlaybackRate,
       setRepeatMode,
       setVolume,
+      showFloatingPlayer,
       syncTrackFavorite,
       toggleFavorite,
       toggleMute,

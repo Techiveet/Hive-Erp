@@ -6,7 +6,7 @@ import { Mail, Check, Circle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getBackendApiRoot, getTenantHeaders, getTenantId, isTenantSession } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot, getTenantHeaders, getTenantId, isTenantSession } from "@/lib/runtime-context";
 import { initEcho } from "@/lib/echo";
 import { toast } from "sonner";
 import { useMailStore } from "@/store/mail-store";
@@ -31,7 +31,7 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
   const { data: unreadMailData } = useQuery({
     queryKey: ['unreadMailCount'],
     queryFn: async () => {
-        const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
+        const token = getAccessToken() || localStorage.getItem('token');
         if (!token) throw new Error("No token");
         const res = await fetch(getTenantAwareEndpoint('/mail/unread-count'), {
             headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() } as Record<string, string>
@@ -45,7 +45,7 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
   const { data: recentMailsData, isLoading: isLoadingRecent } = useQuery({
     queryKey: ['recentMails'],
     queryFn: async () => {
-        const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
+        const token = getAccessToken() || localStorage.getItem('token');
         if (!token) throw new Error("No token");
         const res = await fetch(getTenantAwareEndpoint('/mail?folder=inbox'), {
             headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() } as Record<string, string>
@@ -61,7 +61,7 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
 
   useEffect(() => {
     if (!activeUser?.id) return;
-    const token = localStorage.getItem('hive_token') || localStorage.getItem('token');
+    const token = getAccessToken() || localStorage.getItem('token');
     if (!token) return;
 
     try {

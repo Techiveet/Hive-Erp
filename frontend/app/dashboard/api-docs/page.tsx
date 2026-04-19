@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { getAuthHeaders, getBackendOrigin, getStoredHiveContextSignature, getTenantHeaders, getTenantId } from "@/lib/runtime-context";
+import { getAccessToken, getAuthHeaders, getBackendOrigin, getStoredHiveContextSignature, getTenantHeaders, getTenantId } from "@/lib/runtime-context";
 import { cn } from "@/lib/utils";
 import { ModulePageSkeleton } from "@/components/ui/loading-states";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -86,7 +86,7 @@ const { hasAnyPermission, isLoaded } = usePermissions();
   }, []);
 
   useEffect(() => {
-    const savedToken = window.localStorage.getItem("hive_token") || "";
+    const savedToken = getAccessToken() || "";
     const savedTenant = getTenantId() || "";
     const savedTenantSignature = getStoredHiveContextSignature() || "";
     const savedMode = savedTenant ? "tenant" : "central";
@@ -193,7 +193,7 @@ const { hasAnyPermission, isLoaded } = usePermissions();
   }, [backendOrigin, mode, ready, specUrl, tenant, tenantSignature, token]);
 
   const applySessionDefaults = () => {
-    const savedToken = window.localStorage.getItem("hive_token") || "";
+    const savedToken = getAccessToken() || "";
     const savedTenant = getTenantId() || "";
     const savedTenantSignature = getStoredHiveContextSignature() || "";
     setToken(savedToken);

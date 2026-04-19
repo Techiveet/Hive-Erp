@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSystemSettings } from "@/components/providers/settings-provider";
 import { handleAuthFailureResponse } from "@/lib/auth-sync";
-import { getBackendApiRoot, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { FullScreenPlaceholder } from "@/components/ui/loading-states";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -19,7 +19,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     let isMounted = true;
 
     const validateSession = async () => {
-      const token = localStorage.getItem("hive_token");
+      const token = getAccessToken();
 
       if (!token) {
         if (!isMounted) return;

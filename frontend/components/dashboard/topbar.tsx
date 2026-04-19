@@ -19,7 +19,7 @@ import { LanguageSwitcher } from "../layout/language-switcher";
 import { GlobalSearch } from "./global-search";
 import { TopbarMailIcon } from "./topbar-mail";
 import { TopbarNotificationsIcon } from "./topbar-notifications";
-import { getBackendApiRoot, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PROFILE_ROUTE_PERMISSIONS } from "@/lib/route-permissions";
@@ -55,7 +55,7 @@ const SecureTopbarAvatar = ({ user, fallbackInitials, canViewProfile }: { user: 
         const fetchSecureAvatar = async () => {
             setIsFetching(true);
             try {
-                const token = localStorage.getItem('hive_token');
+                const token = getAccessToken();
                 const res = await fetch(`${getTenantAwareEndpoint('/profile/avatar')}?cb=${Date.now()}`, {
                     headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }
                 });
@@ -106,7 +106,7 @@ export function DashboardTopbar() {
   const { data: serverUser } = useQuery({
       queryKey: ['authUserProfile'],
       queryFn: async () => {
-          const token = localStorage.getItem('hive_token');
+          const token = getAccessToken();
           if (!token) throw new Error("No token");
           const res = await fetch(getTenantAwareEndpoint('/user'), {
               headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() }

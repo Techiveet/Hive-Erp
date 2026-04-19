@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { initEcho } from "@/lib/echo";
-import { getAuthHeaders, getBackendApiRoot } from "@/lib/runtime-context";
+import { getAccessToken, getAuthHeaders, getBackendApiRoot } from "@/lib/runtime-context";
 
 type TopbarNotification = {
   id: string;
@@ -97,7 +97,7 @@ export function TopbarNotificationsIcon({ activeUser }: { activeUser: any }) {
   useEffect(() => {
     if (!activeUser?.id) return;
 
-    const token = localStorage.getItem("hive_token");
+    const token = getAccessToken();
     if (!token) return;
 
     try {

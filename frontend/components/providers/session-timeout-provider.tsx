@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ShieldAlert, Clock } from "lucide-react";
 import { useSystemSettings } from "@/components/providers/settings-provider"; 
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
-import { getBackendApiRoot, getTenantHeaders } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot, getTenantHeaders } from "@/lib/runtime-context";
 import {
     AlertDialog,
     AlertDialogContent,
@@ -41,7 +41,7 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
 
   // 🚀 2. SECURE LOGOUT HANDLER
   const performLogout = useCallback(async () => {
-    const token = localStorage.getItem("hive_token");
+    const token = getAccessToken();
     if (!token) return;
 
     try {
@@ -72,7 +72,7 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
 
   // 🚀 3. SANCTUM HEARTBEAT
   const pingBackend = useCallback(async () => {
-    const token = localStorage.getItem("hive_token");
+    const token = getAccessToken();
     if (!token) return;
 
     try {

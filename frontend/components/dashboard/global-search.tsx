@@ -8,7 +8,7 @@ import { useTranslation } from "@/store/use-translation";
 import { useDebounce } from "@/hooks/use-debounce";
 import { usePermissions } from "@/hooks/use-permissions";
 import { canAccessDashboardRoute } from "@/lib/route-permissions";
-import { getBackendApiRoot, getTenantHeaders } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot, getTenantHeaders } from "@/lib/runtime-context";
 
 interface SearchResultItem {
   id: string | number;
@@ -82,7 +82,7 @@ export function GlobalSearch() {
     const fetchResults = async () => {
       setIsLoading(true);
       try {
-        const token = localStorage.getItem('hive_token');
+        const token = getAccessToken();
         const apiUrl = getBackendApiRoot();
         const res = await fetch(`${apiUrl}/search?q=${encodeURIComponent(debouncedQuery)}`, {
           headers: {

@@ -25,7 +25,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertsFeedSkeleton } from "@/components/ui/loading-states";
 import { usePermissions } from "@/hooks/use-permissions";
-import { getBackendApiRoot } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot } from "@/lib/runtime-context";
 
 // --- API Helper ---
 const getApiUrl = () => {
@@ -34,7 +34,7 @@ const getApiUrl = () => {
 };
 
 const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
-    const token = localStorage.getItem('hive_token');
+    const token = getAccessToken();
     const url = `${getApiUrl()}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
     const headers: HeadersInit = {
         'Accept': 'application/json',

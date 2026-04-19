@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getBackendApiRoot } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot } from "@/lib/runtime-context";
 
 const getApiUrl = () => {
   return getBackendApiRoot();
@@ -24,7 +24,7 @@ export function useAvatarUrl(user: { avatar_path?: string | null; name?: string 
         return;
       }
 
-      const token = localStorage.getItem("hive_token");
+      const token = getAccessToken();
       if (!token) {
         if (isMounted) setAvatarSrc(getFallback(user?.name));
         return;

@@ -24,7 +24,7 @@ import { useTour } from "@/components/providers/tour-provider";
 import { useTranslation } from "@/store/use-translation"; 
 import { cn } from '@/lib/utils';
 import { initEcho } from '@/lib/echo';
-import { getBackendApiRoot, getTenantHeaders, getTenantId, isTenantSession } from '@/lib/runtime-context';
+import { getAccessToken, getBackendApiRoot, getTenantHeaders, getTenantId, isTenantSession } from '@/lib/runtime-context';
 import { DashboardOverviewPlaceholder } from "@/components/ui/loading-states";
 import { usePermissions } from "@/hooks/use-permissions";
 import { handleAuthFailureResponse } from "@/lib/auth-sync";
@@ -135,7 +135,7 @@ export default function DashboardHome() {
     const { data: dashboardPayload, error, isLoading } = useQuery({
         queryKey: ['dashboardMetrics', tenantName],
         queryFn: async () => {
-            const token = localStorage.getItem('hive_token');
+            const token = getAccessToken();
             const endpoint = `${getBackendApiRoot()}${isTenantSession() ? '/tenant/dashboard' : '/dashboard'}`;
             
             const res = await fetch(endpoint, {
@@ -170,7 +170,7 @@ export default function DashboardHome() {
 
     useEffect(() => {
         if (!isMounted || !data || !tenantName) return;
-        const token = localStorage.getItem('hive_token'); 
+        const token = getAccessToken(); 
         if (!token) return;
 
         try {

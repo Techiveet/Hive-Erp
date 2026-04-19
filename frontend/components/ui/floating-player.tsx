@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Music, Pause, Play, X } from "lucide-react";
 
 import { useGlobalAudio } from "@/context/global-audio-context";
 import { AudioPlayer } from "./audio-player";
@@ -42,7 +43,14 @@ const getDefaultPosition = (width: number, height: number): PlayerPosition =>
   );
 
 export function FloatingPlayer() {
-  const { currentTrack, closePlayer } = useGlobalAudio();
+  const {
+    currentTrack,
+    closePlayer,
+    isFloatingPlayerOpen,
+    showFloatingPlayer,
+    isPlaying,
+    togglePlay,
+  } = useGlobalAudio();
 
   const [isMinimized, setIsMinimized] = useState(false);
   const [position, setPosition] = useState<PlayerPosition | null>(null);
@@ -181,7 +189,82 @@ export function FloatingPlayer() {
     });
   };
 
-  if (!currentTrack || !position) {
+  const handleOpenPlayer = () => {
+    if (!position && typeof window !== "undefined") {
+      setPosition(getDefaultPosition(widthHint, isMinimized ? 68 : 520));
+    }
+
+    showFloatingPlayer();
+  };
+
+  if (!currentTrack) {
+    return null;
+  }
+
+  if (!isFloatingPlayerOpen) {
+    return (
+      <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+        <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background/95 p-2 pr-3 text-foreground shadow-[0_28px_80px_-36px_rgba(15,23,42,0.45)] backdrop-blur-2xl dark:border-white/10 dark:bg-card/90">
+          <button
+            onClick={togglePlay}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-emerald-950 shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-400 active:scale-95"
+            title={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? (
+              <Pause className="h-4 w-4 fill-current" />
+            ) : (
+              <Play className="ml-0.5 h-4 w-4 fill-current" />
+            )}
+          </button>
+
+          <button
+            onClick={handleOpenPlayer}
+            className="flex min-w-0 items-center gap-3 rounded-full px-2 py-1 text-left transition-colors hover:bg-muted/70 dark:hover:bg-white/5"
+            title="Open player"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted dark:border-white/10">
+              {currentTrack.coverArt ? (
+                <img
+                  src={currentTrack.coverArt}
+                  alt={currentTrack.title}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <Music className="h-4 w-4 text-emerald-500" />
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <p className="max-w-[180px] truncate text-xs font-black leading-tight">
+                {currentTrack.title}
+              </p>
+              <p className="max-w-[180px] truncate text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                {isPlaying ? "Playing in background" : currentTrack.artist || "HIVE.OS Audio"}
+              </p>
+            </div>
+          </button>
+
+          <button
+            onClick={handleOpenPlayer}
+            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground dark:hover:bg-white/5"
+            title="Expand player"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+
+          <button
+            onClick={closePlayer}
+            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-destructive hover:text-white"
+            title="Stop playback"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!position) {
     return null;
   }
 

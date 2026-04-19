@@ -296,14 +296,21 @@ export const getAuthHeaders = (extras: Record<string, string> = {}): Record<stri
     ...extras,
   };
 
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("hive_token");
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
+  const token = getAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   return headers;
+};
+
+export const getAccessToken = (): string | null => {
+  if (typeof window === "undefined") return null;
+  const token = localStorage.getItem("hive_token");
+  if (!token || token === "undefined" || token === "null") {
+    return null;
+  }
+  return token;
 };
 
 export const getBackendStorageUrl = (url: string | null | undefined): string | null => {

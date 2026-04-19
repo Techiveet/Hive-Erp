@@ -187,7 +187,7 @@ const PartnerSlider = ({ partners }: { partners: any[] }) => {
   );
 };
 
-export default function LandingUI({
+function LandingUI({
   initialPortalName = "HIVE.OS",
   initialTenantSlug = "hive",
   initialIsTenant = false,
@@ -1764,4 +1764,8 @@ export default function LandingUI({
       </footer>
     </div>
   );
+}
+
+export default function Page() {
+  return <LandingUI />;
 }

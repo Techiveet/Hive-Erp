@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-import Joyride, { Step, CallBackProps, STATUS, EVENTS, TooltipRenderProps } from "react-joyride";
+import { Joyride, type EventData, type Step, STATUS, EVENTS, type TooltipRenderProps } from "react-joyride";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 
@@ -118,7 +118,7 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
 
     const startTour = useCallback((newSteps: Step[], type: 'welcome' | 'system' = 'system') => {
         setTourType(type);
-        setSteps(newSteps.map(step => ({ ...step, disableBeacon: true })));
+        setSteps(newSteps.map(step => ({ ...step, skipBeacon: true })));
         setStepIndex(0);
         setTimeout(() => setRun(true), 300); 
     }, []);
@@ -130,7 +130,8 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
 
     const syncTourCompletion = async () => {
         try {
-            const token = localStorage.getItem('hive_token');
+            const { getAccessToken } = await import("@/lib/runtime-context");
+            const token = getAccessToken();
             if (!token) return;
 
             const { getBackendApiRoot, getTenantHeaders, isTenantSession } = await import("@/lib/runtime-context");
@@ -150,7 +151,7 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
-    const handleJoyrideCallback = (data: CallBackProps) => {
+    const handleJoyrideEvent = (data: EventData) => {
         const { status, type, action, index } = data;
 
         if (type === EVENTS.TARGET_NOT_FOUND) {
@@ -182,28 +183,24 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
                     steps={steps}
                     run={run}
                     stepIndex={stepIndex}
-                    callback={handleJoyrideCallback}
+                    onEvent={handleJoyrideEvent}
                     continuous={true}
-                    hideCloseButton={true}
-                    disableOverlayClose={true}
-                    showSkipButton={true}
-                    showProgress={false}
-                    scrollOffset={150} 
-                    disableScrollParentFix={true}
+                    options={{
+                        buttons: ["skip", "back", "close", "primary"],
+                        overlayClickAction: false,
+                        scrollOffset: 150,
+                        showProgress: false,
+                        zIndex: 999999,
+                        overlayColor: "rgba(0, 0, 0, 0.5)",
+                        primaryColor: "hsl(var(--primary))",
+                        backgroundColor: "hsl(var(--card))",
+                        textColor: "hsl(var(--foreground))",
+                        spotlightRadius: 32,
+                    }}
                     tooltipComponent={CustomTooltip}
-                    floaterProps={{ 
+                    floatingOptions={{ 
                         hideArrow: true,
-                        offset: 20,
-                        disableAnimation: true, // Prevents laggy tooltip repositioning
-                        styles: { popper: { zIndex: 999999 } }
-                    } as any}
-                    styles={{
-                        options: { 
-                            overlayColor: 'rgba(0, 0, 0, 0.5)', 
-                            zIndex: 999999,
-                            primaryColor: 'hsl(var(--primary))'
-                        },
-                        spotlight: { borderRadius: '2rem' }
+                        shiftOptions: { padding: 20 },
                     }}
                 />
             )}

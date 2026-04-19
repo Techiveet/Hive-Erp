@@ -14,7 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTranslation } from '@/store/use-translation';
 import { cn } from "@/lib/utils";
-import { getBackendApiRoot, isTenantSession } from "@/lib/runtime-context";
+import { getAccessToken, getBackendApiRoot, isTenantSession } from "@/lib/runtime-context";
 
 // ==========================================
 // 🚀 BULLETPROOF API ROUTING & FETCH WRAPPER
@@ -24,7 +24,7 @@ const getApiUrl = () => {
 };
 
 const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
-    const token = localStorage.getItem('hive_token');
+    const token = getAccessToken();
     const url = `${getApiUrl()}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
     
     const headers: HeadersInit = {
