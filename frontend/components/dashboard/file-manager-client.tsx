@@ -149,17 +149,27 @@ const getStorageUrl = (url: string | null | undefined) => {
   return getBackendStorageUrl(url) || '';
 };
 
+const extractFileIdFromServeUrl = (url: string | null | undefined): number | null => {
+  if (!url) return null;
+  const match = url.match(/\/api\/v1\/files\/(\d+)\/serve/);
+  return match?.[1] ? Number.parseInt(match[1], 10) : null;
+};
+
+const toCollectionItems = <T,>(value: any): T[] => {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.data)) return value.data;
+  return [];
+};
+
 /**
- * Converts a /files/{id}/serve URL to a streamable /media/stream/{id}?token=xxx&tenant=xxx URL.
- * Browser <video> and <audio> elements cannot send custom headers, so we embed auth
- * credentials in the query string for native playback. For central/plain storage URLs
- * the original URL is returned unchanged.
+ * Tenant media URLs need query credentials for native audio/video playback.
+ * Central or plain storage URLs can be used as-is.
  */
 const getStreamUrl = (url: string | null | undefined, apiRoot: string): string => {
   if (!url) return '';
-  // Check if this is a tenant serve URL: http://...//api/v1/files/{id}/serve
+
   const match = url.match(/\/api\/v1\/files\/(\d+)\/serve/);
-  if (!match) return url; // central or plain storage URL — use as-is
+  if (!match) return url;
 
   const fileId = match[1];
   const token = typeof window !== 'undefined' ? localStorage.getItem('hive_token') : null;
@@ -1177,12 +1187,15 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     enabled: canRead,
   });
 
+  const folderItems = React.useMemo(() => toCollectionItems<any>(data?.data?.folders), [data?.data?.folders]);
+  const fileItems = React.useMemo(() => toCollectionItems<any>(data?.data?.files), [data?.data?.files]);
+
   React.useEffect(() => {
-    if (!selectedFile || !data?.data?.files) {
+    if (!selectedFile || fileItems.length === 0) {
       return;
     }
 
-    const refreshedFile = data.data.files.find((file: any) => file.id === selectedFile.id);
+    const refreshedFile = fileItems.find((file: any) => file.id === selectedFile.id);
     if (!refreshedFile) {
       return;
     }
@@ -1200,7 +1213,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     if (didMediaStateChange) {
       setSelectedFile(refreshedFile);
     }
-  }, [data, selectedFile]);
+  }, [fileItems, selectedFile]);
 
   React.useEffect(() => {
     const waitingForAdaptiveQuality = Boolean(
@@ -1497,6 +1510,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
               throw Object.assign(new Error(data.message || "Subscription required."), { module: data.module });
             }
           } catch(e) {}
+          setUploadProgress(0);
           throw new Error(errMsg);
         }
         setUploadProgress(Math.round(((chunkIndex + 1) / totalChunks) * 100));
@@ -1587,8 +1601,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
 
   // --- Rendering & Filtering Logic ---
   const metrics = data?.metrics || { total_used: 0 };
-  let folders = data?.data?.folders || [];
-  let allFiles = data?.data?.files || [];
+  let folders = [...folderItems];
+  let allFiles = [...fileItems];
 
   // 🚀 Sorting Execution
   const sortData = (a: any, b: any) => {
@@ -1683,7 +1697,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     }
     
     if (mime.startsWith('video/')) {
-      const videoFiles = data?.data?.files?.filter((f: any) => f.media_details?.mime_type?.startsWith('video/')) || [];
+      const videoFiles = fileItems.filter((f: any) => f.media_details?.mime_type?.startsWith('video/'));
       const currentIndex = videoFiles.findIndex((f: any) => f.id === file.id);
       const handleNext = () => { if (currentIndex < videoFiles.length - 1) setSelectedFile(videoFiles[currentIndex + 1]); };
       const handlePrev = () => { if (currentIndex > 0) setSelectedFile(videoFiles[currentIndex - 1]); };
@@ -1742,7 +1756,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     }
 
     if (mime.startsWith('audio/')) {
-      const audioFiles = data?.data?.files?.filter((f: any) => f.media_details?.mime_type?.startsWith('audio/')) || [];
+      const audioFiles = fileItems.filter((f: any) => f.media_details?.mime_type?.startsWith('audio/'));
       const currentIndex = audioFiles.findIndex((f: any) => f.id === file.id);
       const handleNext = () => { if (currentIndex < audioFiles.length - 1) setSelectedFile(audioFiles[currentIndex + 1]); };
       const handlePrev = () => { if (currentIndex > 0) setSelectedFile(audioFiles[currentIndex - 1]); };
@@ -2154,7 +2168,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
                   >
                     <option value="root">Root Directory</option>
                     {/* Ensure we aren't allowing a user to move a folder into itself */}
-                    {data?.data?.folders?.map((f: any) => {
+                {folderItems.map((f: any) => {
                         const isMovingSelf = itemsToMove.some(i => i.type === 'folder' && i.id === f.id);
                         return <option key={f.id} value={f.id.toString()} disabled={isMovingSelf}>{isMovingSelf ? `🚫 ` : `📁 `} {f.name}</option>
                     })}
@@ -2333,7 +2347,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
           <DialogHeader className="shrink-0 border-b border-border/50 pb-4"><DialogTitle className="flex items-center gap-2"><UploadCloud className="h-5 w-5 text-emerald-500" /> Upload File</DialogTitle></DialogHeader>
           <form id="upload-file-form" onSubmit={handleUploadFile} className="flex-1 overflow-y-auto scrollbar-thin">
             <div className="space-y-5 py-4 px-1">
-              <div className="grid grid-cols-2 gap-4 min-w-0"><div className="space-y-2 min-w-0"><label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Save in Folder</label><select value={uploadTargetFolder} onChange={(e) => setUploadTargetFolder(e.target.value)} className="w-full bg-muted/30 border border-border/50 h-10 rounded-xl text-sm px-3 focus:ring-2 focus:ring-emerald-500 outline-none truncate font-medium"><option value="root">Root Directory</option>{currentFolderId && <option value={currentFolderId.toString()}>Current Folder (ID: {currentFolderId})</option>}{data?.data?.folders?.map((f: any) => (<option key={f.id} value={f.id.toString()}>Subfolder: {f.name}</option>))}</select></div><div className="space-y-2 min-w-0"><label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Base Name</label><Input value={uploadBaseName} onChange={e => setUploadBaseName(e.target.value)} placeholder="Optional" className="bg-muted/50 border-border/50 h-10 rounded-xl text-sm min-w-0" /></div></div>
+         <div className="grid grid-cols-2 gap-4 min-w-0"><div className="space-y-2 min-w-0"><label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Save in Folder</label><select value={uploadTargetFolder} onChange={(e) => setUploadTargetFolder(e.target.value)} className="w-full bg-muted/30 border border-border/50 h-10 rounded-xl text-sm px-3 focus:ring-2 focus:ring-emerald-500 outline-none truncate font-medium"><option value="root">Root Directory</option>{currentFolderId && <option value={currentFolderId.toString()}>Current Folder (ID: {currentFolderId})</option>}{folderItems.map((f: any) => (<option key={f.id} value={f.id.toString()}>Subfolder: {f.name}</option>))}</select></div><div className="space-y-2 min-w-0"><label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Base Name</label><Input value={uploadBaseName} onChange={e => setUploadBaseName(e.target.value)} placeholder="Optional" className="bg-muted/50 border-border/50 h-10 rounded-xl text-sm min-w-0" /></div></div>
               <div className="pt-2 min-w-0 w-full"><div onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={handleFileDrop} onClick={() => !uploadFileMut.isPending && fileInputRef.current?.click()} className={cn("border-2 border-dashed rounded-3xl p-6 flex flex-col items-center justify-center text-center transition-all overflow-hidden w-full relative min-h-[160px]", isDragging ? "border-emerald-500 bg-emerald-500/10 scale-[1.02]" : "border-border/50 bg-muted/20", !uploadFileMut.isPending && "cursor-pointer hover:bg-muted/40 hover:border-emerald-500/50")}><input type="file" className="hidden" ref={fileInputRef} onChange={(e) => e.target.files && setUploadFile(e.target.files[0])} disabled={uploadFileMut.isPending} />{uploadFile ? (<div className="flex flex-col items-center w-full min-w-0 overflow-hidden relative z-10"><div className="relative"><FileIcon className={cn("h-12 w-12 text-emerald-500 mb-3 shrink-0 transition-transform duration-500", uploadProgress > 0 && "scale-110 animate-bounce")} /></div><p className="text-sm font-bold text-foreground truncate w-full text-center px-2 max-w-full drop-shadow-sm">{uploadFile.name}</p><p className="text-[10px] text-muted-foreground font-mono mt-1">{formatBytes(uploadFile.size)}</p>{uploadProgress > 0 && (<div className="w-full mt-6 space-y-2 px-2 shrink-0 animate-in fade-in zoom-in duration-300"><div className="flex justify-between items-end mb-1"><span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/80 animate-pulse">Processing Chunk</span><span className="text-xl font-black text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">{uploadProgress}%</span></div><div className="relative h-3 w-full bg-background rounded-full overflow-hidden shadow-inner border border-border/50"><div className="absolute top-0 left-0 h-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-emerald-300 rounded-full transition-all duration-300 ease-out shadow-[0_0_15px_rgba(52,211,153,0.8)]" style={{ width: `${uploadProgress}%` }}><div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite] bg-[length:200%_100%]" /></div></div></div>)}</div>) : (<div className="flex flex-col items-center opacity-70 group-hover:opacity-100 transition-opacity"><div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4 shadow-sm"><UploadCloud className="h-7 w-7 text-emerald-500" /></div><p className="text-sm font-bold text-foreground shrink-0">Click or drag a file to this area to upload</p><p className="text-xs text-muted-foreground mt-2">Support for videos, documents, and images</p></div>)}</div></div>
               {uploadFile && !uploadFile.type.startsWith('image/') && (
                 <div className="space-y-2 pt-4 border-t border-border/50 overflow-hidden min-w-0"><label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground flex items-center gap-2"><ImagePlus className="h-3 w-3 shrink-0" /> Custom Thumbnail (Optional)</label><div className="flex items-center gap-3 w-full min-w-0"><Button type="button" variant="outline" className="h-10 border-dashed shrink-0 rounded-xl" onClick={() => thumbInputRef.current?.click()} disabled={uploadFileMut.isPending}>Select Cover</Button><span className="text-xs font-mono text-muted-foreground truncate flex-1 min-w-0" title={customThumbnail ? customThumbnail.name : 'None selected'}>{customThumbnail ? customThumbnail.name : 'None selected'}</span><input type="file" accept="image/*" className="hidden" ref={thumbInputRef} onChange={(e) => e.target.files && setCustomThumbnail(e.target.files[0])} /></div></div>

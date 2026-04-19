@@ -6,7 +6,7 @@ import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import Providers from "@/components/providers";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
-import CustomCursor from "@/components/custom-cursor";
+import BrandCursor from "@/components/brand-cursor";
 import { PublicBrandSyncProvider } from "@/components/providers/public-brand-sync-provider";
 
 // 🚀 IMPORT OUR NEW GLOBAL SETTINGS PROVIDER
@@ -40,6 +40,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans bg-background text-foreground antialiased overflow-x-hidden`}
       >
         <Providers>
@@ -52,7 +53,7 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <PublicBrandSyncProvider />
-              <CustomCursor />
+              <BrandCursor />
               {children}
               <Toaster />
             </ThemeProvider>

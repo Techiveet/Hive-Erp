@@ -38,6 +38,7 @@ class FileManagerController extends Controller
         $filter = $request->input('filter', 'all');
         $userId = auth()->id();
         $pageSize = max(1, min(100, (int) $request->input('page_size', 50)));
+        $page = max(1, (int) $request->input('page', 1));
 
         $foldersQuery = Folder::where('user_id', $userId);
         $filesQuery = FileEntry::with('media')->where('user_id', $userId);
@@ -59,8 +60,13 @@ class FileManagerController extends Controller
                 });
                 $foldersQuery->whereRaw('1 = 0'); // No folders in playlist view
             } else {
-                $foldersQuery->where('parent_id', $folderId);
-                $filesQuery->where('folder_id', $folderId);
+                if ($folderId === null) {
+                    $foldersQuery->whereNull('parent_id');
+                    $filesQuery->whereNull('folder_id');
+                } else {
+                    $foldersQuery->where('parent_id', $folderId);
+                    $filesQuery->where('folder_id', $folderId);
+                }
             }
         }
 
@@ -70,15 +76,28 @@ class FileManagerController extends Controller
             fn () => $this->buildMetricsForUser((int) $userId)
         );
 
-        $folders = $foldersQuery->orderBy('name')->limit($pageSize)->get();
-        $files = $filesQuery->orderBy('created_at', 'desc')->limit($pageSize)->get();
-        $this->queueMissingVideoStreams($files);
+        $folders = $foldersQuery->orderBy('name')->paginate($pageSize, ['*'], 'page', $page);
+        $files = $filesQuery->orderBy('created_at', 'desc')->paginate($pageSize, ['*'], 'page', $page);
+        $this->queueMissingVideoStreams($files->items());
 
         return response()->json([
             'data' => [
                 'folders' => $folders,
                 'files' => $files,
                 'page_size' => $pageSize,
+                'page' => $page,
+            ],
+            'meta' => [
+                'folders' => [
+                    'total' => $folders->total(),
+                    'current_page' => $folders->currentPage(),
+                    'last_page' => $folders->lastPage(),
+                ],
+                'files' => [
+                    'total' => $files->total(),
+                    'current_page' => $files->currentPage(),
+                    'last_page' => $files->lastPage(),
+                ],
             ],
             'metrics' => $metrics
         ]);
@@ -129,10 +148,11 @@ class FileManagerController extends Controller
         $this->assertOwnedFolderId($request->input('parent_id'));
 
         $folder = Folder::create([
-            'name' => $request->name,
-            'parent_id' => $request->parent_id,
+            'name' => $request->input('name'),
+            'parent_id' => $request->input('parent_id'),
             'user_id' => auth()->id(),
         ]);
+        $this->forgetMetricsCacheForCurrentUser();
 
         return response()->json(['message' => 'Folder created', 'folder' => $folder], 201);
     }
@@ -174,7 +194,7 @@ class FileManagerController extends Controller
 
         try {
             $fileEntry = FileEntry::create([
-                'folder_id' => $request->folder_id,
+                'folder_id' => $request->input('folder_id'),
                 'user_id' => auth()->id(),
             ]);
 
@@ -193,6 +213,7 @@ class FileManagerController extends Controller
                 $this->dispatchVideoStreamPreparation($fileEntry);
                 $this->dispatchVideoDownloadPreparation($fileEntry);
             }
+            $this->forgetMetricsCacheForCurrentUser();
 
             if (file_exists($tempPath)) {
                 unlink($tempPath);
@@ -258,18 +279,19 @@ class FileManagerController extends Controller
             'name' => 'required|string|max:255'
         ]);
 
-        $model = $request->type === 'folder' ? Folder::findOrFail($request->id) : FileEntry::findOrFail($request->id);
+        $model = $request->type === 'folder' ? Folder::findOrFail($request->input('id')) : FileEntry::findOrFail($request->input('id'));
 
         if ($model->user_id !== auth()->id()) abort(403);
 
+        $inputName = $request->input('name');
         if ($request->type === 'folder') {
-            $model->update(['name' => $request->name]);
+            $model->update(['name' => $inputName]);
         } else {
             $media = $model->getFirstMedia('file');
             if ($media) {
                 $extension = pathinfo($media->file_name, PATHINFO_EXTENSION);
-                $media->name = $request->name;
-                $media->file_name = $request->name . ($extension ? '.' . $extension : '');
+                $media->name = $inputName;
+                $media->file_name = $inputName . ($extension ? '.' . $extension : '');
                 $media->save();
 
             }
@@ -284,7 +306,7 @@ class FileManagerController extends Controller
             'destination_folder_id' => 'nullable|integer|exists:folders,id'
         ]);
 
-        $destId = $request->destination_folder_id;
+        $destId = $request->input('destination_folder_id');
         $this->assertOwnedFolderId($destId);
 
         foreach ($request->items as $item) {
@@ -323,6 +345,7 @@ class FileManagerController extends Controller
         $model = $type === 'folder' ? Folder::findOrFail($id) : FileEntry::findOrFail($id);
         if ($model->user_id !== auth()->id()) abort(403);
         $model->delete();
+        $this->forgetMetricsCacheForCurrentUser();
         return response()->json(['message' => ucfirst($type) . ' moved to recycle bin']);
     }
 
@@ -333,6 +356,7 @@ class FileManagerController extends Controller
             $model = $item['type'] === 'folder' ? Folder::onlyTrashed()->find($item['id']) : FileEntry::onlyTrashed()->find($item['id']);
             if ($model && $model->user_id === auth()->id()) $model->restore();
         }
+        $this->forgetMetricsCacheForCurrentUser();
         return response()->json(['message' => 'Items restored']);
     }
 
@@ -343,6 +367,7 @@ class FileManagerController extends Controller
             $model = $item['type'] === 'folder' ? Folder::onlyTrashed()->find($item['id']) : FileEntry::onlyTrashed()->find($item['id']);
             if ($model && $model->user_id === auth()->id()) $model->forceDelete();
         }
+        $this->forgetMetricsCacheForCurrentUser();
         return response()->json(['message' => 'Items permanently deleted']);
     }
 
@@ -351,6 +376,7 @@ class FileManagerController extends Controller
         $userId = auth()->id();
         Folder::onlyTrashed()->where('user_id', $userId)->forceDelete();
         FileEntry::onlyTrashed()->where('user_id', $userId)->forceDelete();
+        $this->forgetMetricsCacheForCurrentUser();
         return response()->json(['message' => 'Recycle bin emptied']);
     }
 
@@ -812,6 +838,16 @@ class FileManagerController extends Controller
         }
 
         return $metrics;
+    }
+
+    private function forgetMetricsCacheForCurrentUser(): void
+    {
+        $userId = auth()->id();
+        if (! $userId) {
+            return;
+        }
+
+        Cache::forget("file_metrics_{$this->currentTenantContextId()}_{$userId}");
     }
 
     // =========================================================================
