@@ -7,6 +7,7 @@ use Modules\Core\Models\Folder;
 use Modules\Core\Models\FileEntry;
 use Modules\Core\Jobs\PrepareVideoDownloadAsset;
 use Modules\Core\Jobs\TranscodeVideoForStreaming;
+use Modules\Core\Support\TenantMediaStorage;
 use Modules\Core\Support\VideoWatermarkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -23,7 +24,8 @@ use Intervention\Image\Drivers\Gd\Driver;
 class FileManagerController extends Controller
 {
     public function __construct(
-        private readonly VideoWatermarkService $videoWatermarkService
+        private readonly VideoWatermarkService $videoWatermarkService,
+        private readonly TenantMediaStorage $mediaStorage
     ) {}
 
     // =========================================================================
@@ -175,10 +177,11 @@ class FileManagerController extends Controller
                                        ->usingName($request->input('base_name') ?: pathinfo($originalName, PATHINFO_FILENAME))
                                        ->usingFileName($originalName);
 
-            $media = $mediaUploader->toMediaCollection('file');
+            $media = $mediaUploader->toMediaCollection('file', $this->mediaStorage->mediaDisk());
 
             if ($request->hasFile('custom_thumbnail')) {
-                $fileEntry->addMedia($request->file('custom_thumbnail'))->toMediaCollection('custom_thumbnail');
+                $fileEntry->addMedia($request->file('custom_thumbnail'))
+                    ->toMediaCollection('custom_thumbnail', $this->mediaStorage->mediaDisk());
             }
 
             if (str_starts_with($media->mime_type, 'video/')) {
@@ -226,7 +229,7 @@ class FileManagerController extends Controller
             $newFileEntry->addMedia($uploadedFile)
                          ->usingName($newName)
                          ->usingFileName($newName)
-                         ->toMediaCollection('file');
+                         ->toMediaCollection('file', $this->mediaStorage->mediaDisk());
 
             return response()->json([
                 'message' => 'Edited image saved successfully',
@@ -369,7 +372,7 @@ class FileManagerController extends Controller
                       'label' => $request->label,
                       'default' => $isFirst
                   ])
-                  ->toMediaCollection('subtitles');
+                  ->toMediaCollection('subtitles', $this->mediaStorage->mediaDisk());
 
         return response()->json(['message' => 'Subtitle track added!', 'file' => $fileEntry->load('media')]);
     }
@@ -387,13 +390,17 @@ class FileManagerController extends Controller
             ->where('user_id', auth()->id())
             ->firstOrFail();
 
-        if (!$fileEntry || !file_exists($media->getPath())) {
+        $disk = $this->mediaStorage->mediaDisk($media);
+        $relativePath = $this->mediaStorage->mediaRelativePath($media);
+
+        if (!Storage::disk($disk)->exists($relativePath)) {
             abort(404, 'Subtitle not found.');
         }
 
-        return response(file_get_contents($media->getPath()), 200, [
+        return $this->mediaStorage->streamResponse($disk, $relativePath, [
             'Content-Type' => 'text/vtt',
-            'Access-Control-Allow-Origin' => '*'
+            'Access-Control-Allow-Origin' => '*',
+            'Cache-Control' => 'private, max-age=86400',
         ]);
     }
 
@@ -430,19 +437,43 @@ class FileManagerController extends Controller
 
         if ($thumb === 'custom') {
             $media = $fileEntry->getFirstMedia('custom_thumbnail');
-        } elseif ($thumb === '1') {
-            $media = $fileEntry->getFirstMedia('file');
-            // getPath() with conversion name serves the thumbnail conversion
-            $path = $media?->getPath('thumbnail');
-            if (!$media || !$path || !file_exists($path)) {
-                // Fallback to original
-                $path = $media?->getPath();
-            }
-            if (!$media || !$path || !file_exists($path)) {
+            if (!$media) {
                 abort(404, 'Thumbnail not found.');
             }
-            return response()->file($path, [
-                'Content-Type'  => 'image/jpeg',
+
+            $disk = $this->mediaStorage->mediaDisk($media);
+            $relativePath = $this->mediaStorage->mediaRelativePath($media);
+
+            if (!Storage::disk($disk)->exists($relativePath)) {
+                abort(404, 'Thumbnail not found.');
+            }
+
+            return $this->mediaStorage->streamResponse($disk, $relativePath, [
+                'Content-Type' => $media->mime_type ?: 'image/png',
+                'Cache-Control' => 'private, max-age=86400',
+                'Access-Control-Allow-Origin' => '*',
+            ]);
+        } elseif ($thumb === '1') {
+            $media = $fileEntry->getFirstMedia('file');
+            if (!$media) {
+                abort(404, 'Thumbnail not found.');
+            }
+
+            $disk = $this->mediaStorage->mediaDisk($media);
+            $relativePath = $media->hasGeneratedConversion('thumbnail')
+                ? $this->mediaStorage->mediaRelativePath($media, ['thumbnail'])
+                : $this->mediaStorage->mediaRelativePath($media);
+
+            if (!Storage::disk($disk)->exists($relativePath)) {
+                $relativePath = $this->mediaStorage->mediaRelativePath($media);
+            }
+
+            if (!Storage::disk($disk)->exists($relativePath)) {
+                abort(404, 'Thumbnail not found.');
+            }
+
+            return $this->mediaStorage->streamResponse($disk, $relativePath, [
+                'Content-Type'  => $media->hasGeneratedConversion('thumbnail') ? 'image/jpeg' : ($media->mime_type ?: 'application/octet-stream'),
                 'Cache-Control' => 'private, max-age=86400',
                 'Access-Control-Allow-Origin' => '*',
             ]);
@@ -452,16 +483,16 @@ class FileManagerController extends Controller
 
         if (!$media) abort(404, 'File not found.');
 
-        // getPath() uses the already-initialized (tenant-aware) disk
-        $path = $media->getPath();
+        $disk = $this->mediaStorage->mediaDisk($media);
+        $relativePath = $this->mediaStorage->mediaRelativePath($media);
 
-        if (!file_exists($path)) {
+        if (!Storage::disk($disk)->exists($relativePath)) {
             abort(404, 'File not found on disk.');
         }
 
         $mimeType = $media->mime_type ?: 'application/octet-stream';
 
-        return response()->file($path, [
+        return $this->mediaStorage->streamResponse($disk, $relativePath, [
             'Content-Type'  => $mimeType,
             'Cache-Control' => 'private, max-age=86400',
             'Access-Control-Allow-Origin' => '*',
@@ -477,23 +508,30 @@ class FileManagerController extends Controller
             abort(404, 'Stream chunk not found.');
         }
 
-        $ownsStream = FileEntry::query()
+        $fileEntry = FileEntry::query()
             ->where('user_id', auth()->id())
             ->where('hls_path', 'like', $mediaId . '/processed/%')
-            ->exists();
+            ->first();
 
-        if (!$ownsStream) {
+        if (!$fileEntry) {
             abort(403, 'Unauthorized');
         }
 
-        $relativePath = "{$mediaId}/processed/{$safeFilename}";
-        $path = Storage::disk('public')->path($relativePath);
+        $media = $fileEntry->getFirstMedia('file');
+        if (!$media) {
+            abort(404, 'Stream source not found.');
+        }
 
-        if (!file_exists($path)) abort(404, "Stream chunk not found.");
+        $disk = $this->mediaStorage->mediaDisk($media);
+        $relativePath = "{$mediaId}/processed/{$safeFilename}";
+
+        if (!Storage::disk($disk)->exists($relativePath)) {
+            abort(404, 'Stream chunk not found.');
+        }
 
         $mime = str_ends_with($safeFilename, '.m3u8') ? 'application/vnd.apple.mpegurl' : 'video/MP2T';
 
-        return response()->file($path, [
+        return $this->mediaStorage->streamResponse($disk, $relativePath, [
             'Content-Type' => $mime,
             'Access-Control-Allow-Origin' => '*',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
@@ -558,19 +596,11 @@ class FileManagerController extends Controller
             }
         }
 
-        $disk = $media->disk ?: config('media-library.disk_name', 'public');
-        $relativePath = $media->id . '/' . $media->file_name;
+        $disk = $this->mediaStorage->mediaDisk($media);
+        $relativePath = $this->mediaStorage->mediaRelativePath($media);
 
         if (!Storage::disk($disk)->exists($relativePath)) {
-            // Fallback to absolute path if manual relative path check fails (Spatie usually uses this)
-            $filePath = $media->getPath();
-            if (!is_file($filePath)) {
-                abort(404, 'File not found on disk.');
-            }
-            return response()->download($filePath, $media->file_name, $headers + [
-                'Content-Type' => $media->mime_type ?: 'application/octet-stream',
-                'X-Hive-Video-Download' => 'original',
-            ]);
+            abort(404, 'File not found on disk.');
         }
 
         return Storage::disk($disk)->download($relativePath, $media->file_name, $headers + [
@@ -587,6 +617,7 @@ class FileManagerController extends Controller
             ->findOrFail($id);
         $media = $fileEntry->getFirstMedia('file');
         if (!$media) abort(404);
+        $disk = $this->mediaStorage->mediaDisk($media);
 
         if (
             str_starts_with((string) $media->mime_type, 'video/')
@@ -598,16 +629,13 @@ class FileManagerController extends Controller
 
         if (
             str_starts_with((string) $media->mime_type, 'video/')
-            && (!$fileEntry->hls_path || !Storage::disk($media->disk ?: config('media-library.disk_name', 'public'))->exists($fileEntry->hls_path))
+            && (!$fileEntry->hls_path || !Storage::disk($disk)->exists($fileEntry->hls_path))
         ) {
             $this->dispatchVideoStreamPreparation($fileEntry);
         }
 
         $qualities = [
-            'original' => $media->getUrl(),
-            'q_720p'   => $media->hasGeneratedConversion('720p') ? $media->getUrl('720p') : null,
-            'q_1080p'  => $media->hasGeneratedConversion('1080p') ? $media->getUrl('1080p') : null,
-            'q_4k'     => $media->hasGeneratedConversion('4k') ? $media->getUrl('4k') : null,
+            'original' => url("/api/v1/files/{$fileEntry->id}/serve"),
         ];
 
         return response()->json([
@@ -759,7 +787,7 @@ class FileManagerController extends Controller
                 continue;
             }
 
-            $disk = $media->disk ?: config('media-library.disk_name', 'public');
+            $disk = $this->mediaStorage->mediaDisk($media);
             $needsStreamPreparation = !$fileEntry->hls_path || !Storage::disk($disk)->exists($fileEntry->hls_path);
 
             if ($needsStreamPreparation) {

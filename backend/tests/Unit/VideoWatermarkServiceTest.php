@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Modules\Core\Support\BrandSettingsStore;
+use Modules\Core\Support\TenantMediaStorage;
 use Modules\Core\Support\VideoWatermarkService;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
@@ -12,7 +13,7 @@ class VideoWatermarkServiceTest extends TestCase
 {
     public function test_it_keeps_the_original_video_name_for_downloads(): void
     {
-        $service = new VideoWatermarkService(new BrandSettingsStore());
+        $service = new VideoWatermarkService(new BrandSettingsStore(), new TenantMediaStorage());
         $media = new Media();
         $media->file_name = 'lesson-one.final-cut.mov';
 
@@ -24,7 +25,7 @@ class VideoWatermarkServiceTest extends TestCase
 
     public function test_it_builds_a_single_bottom_corner_watermark_filter(): void
     {
-        $service = new VideoWatermarkService(new BrandSettingsStore());
+        $service = new VideoWatermarkService(new BrandSettingsStore(), new TenantMediaStorage());
 
         $method = new ReflectionMethod($service, 'buildFilterGraph');
         $method->setAccessible(true);
@@ -39,7 +40,7 @@ class VideoWatermarkServiceTest extends TestCase
 
     public function test_it_builds_a_bottom_corner_overlay_filter_for_brand_exports(): void
     {
-        $service = new VideoWatermarkService(new BrandSettingsStore());
+        $service = new VideoWatermarkService(new BrandSettingsStore(), new TenantMediaStorage());
 
         $method = new ReflectionMethod($service, 'buildOverlayFilterGraph');
         $method->setAccessible(true);
@@ -50,5 +51,26 @@ class VideoWatermarkServiceTest extends TestCase
             '[0:v:0][1:v:0]overlay=x=main_w-overlay_w-10:y=main_h-overlay_h-10:format=auto:eof_action=repeat[branded]',
             $graph
         );
+    }
+
+    public function test_it_builds_ffmpeg_commands_from_a_staged_source_path(): void
+    {
+        $service = new VideoWatermarkService(new BrandSettingsStore(), new TenantMediaStorage());
+
+        $method = new ReflectionMethod($service, 'buildFfmpegCommand');
+        $method->setAccessible(true);
+
+        $command = $method->invoke(
+            $service,
+            '/usr/bin/ffmpeg',
+            '/tmp/source-video.mp4',
+            '/tmp/output-video.mp4',
+            'Acme Academy',
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+            null
+        );
+
+        $this->assertContains('/tmp/source-video.mp4', $command);
+        $this->assertSame('/tmp/output-video.mp4', $command[array_key_last($command)]);
     }
 }

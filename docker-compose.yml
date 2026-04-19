@@ -76,7 +76,68 @@ services:
     networks:
       - hive-network
 
-  # 6. THE BRAIN (Laravel 12 + Octane)
+  # 6. OBJECT STORAGE (SeaweedFS)
+  seaweedfs:
+    image: chrislusf/seaweedfs:3.94
+    container_name: hive-seaweedfs
+    restart: unless-stopped
+    command: server -dir=/data -s3
+    ports:
+      - "${SEAWEEDFS_S3_HOST_PORT:-8333}:8333"
+      - "${SEAWEEDFS_FILER_HOST_PORT:-8888}:8888"
+      - "${SEAWEEDFS_MASTER_HOST_PORT:-9333}:9333"
+    environment:
+      AWS_ACCESS_KEY_ID: ${SEAWEEDFS_ACCESS_KEY:-seaweedfs}
+      AWS_SECRET_ACCESS_KEY: ${SEAWEEDFS_SECRET_KEY:-change-this-seaweedfs-secret}
+    volumes:
+      - hive-seaweedfs-data:/data
+    networks:
+      - hive-network
+
+  seaweedfs-bootstrap:
+    image: minio/mc:latest
+    container_name: hive-seaweedfs-bootstrap
+    depends_on:
+      seaweedfs:
+        condition: service_started
+    restart: "no"
+    environment:
+      SEAWEEDFS_ACCESS_KEY: ${SEAWEEDFS_ACCESS_KEY:-seaweedfs}
+      SEAWEEDFS_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY:-change-this-seaweedfs-secret}
+    entrypoint: >
+      /bin/sh -ec "
+      until mc alias set local http://seaweedfs:8333 ${SEAWEEDFS_ACCESS_KEY:-seaweedfs} ${SEAWEEDFS_SECRET_KEY:-change-this-seaweedfs-secret} >/dev/null 2>&1; do
+        sleep 2;
+      done &&
+      mc mb --ignore-existing local/${SEAWEEDFS_BUCKET:-hive-local} >/dev/null 2>&1 || true
+      "
+    networks:
+      - hive-network
+
+  seaweedfs-browser:
+    image: cloudlena/s3manager:v0.5.0
+    container_name: hive-seaweedfs-browser
+    restart: unless-stopped
+    ports:
+      - "${SEAWEEDFS_BROWSER_HOST_PORT:-9091}:8080"
+    environment:
+      ENDPOINT: seaweedfs:8333
+      REGION: us-east-1
+      ACCESS_KEY_ID: ${SEAWEEDFS_ACCESS_KEY:-seaweedfs}
+      SECRET_ACCESS_KEY: ${SEAWEEDFS_SECRET_KEY:-change-this-seaweedfs-secret}
+      USE_SSL: "false"
+      SIGNATURE_TYPE: V4
+      FORCE_DOWNLOAD: "false"
+      ALLOW_DELETE: "true"
+    depends_on:
+      seaweedfs:
+        condition: service_started
+      seaweedfs-bootstrap:
+        condition: service_completed_successfully
+    networks:
+      - hive-network
+
+  # 7. THE BRAIN (Laravel 12 + Octane)
   backend:
     build:
       context: ./backend
@@ -106,6 +167,16 @@ services:
       REDIS_HOST: redis
       CACHE_STORE: redis
       QUEUE_CONNECTION: redis
+      FILESYSTEM_DISK: s3
+      MEDIA_DISK: s3
+      AWS_ACCESS_KEY_ID: ${SEAWEEDFS_ACCESS_KEY:-seaweedfs}
+      AWS_SECRET_ACCESS_KEY: ${SEAWEEDFS_SECRET_KEY:-change-this-seaweedfs-secret}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: ${SEAWEEDFS_BUCKET:-hive-local}
+      AWS_ENDPOINT: http://seaweedfs:8333
+      AWS_URL: http://localhost:${SEAWEEDFS_S3_HOST_PORT:-8333}/${SEAWEEDFS_BUCKET:-hive-local}
+      AWS_ROOT_PREFIX: media
+      AWS_USE_PATH_STYLE_ENDPOINT: "true"
       MAIL_MAILER: smtp
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
@@ -120,6 +191,10 @@ services:
         condition: service_healthy
       meilisearch:
         condition: service_healthy
+      seaweedfs:
+        condition: service_started
+      seaweedfs-bootstrap:
+        condition: service_completed_successfully
       rembg:
         condition: service_started
     command: php artisan octane:start --server=roadrunner --host=0.0.0.0 --port=8000
@@ -130,7 +205,7 @@ services:
           - tesla.localhost
           - spacex.localhost
 
-  # 7. THE WORKER (Background Jobs)
+  # 8. THE WORKER (Background Jobs)
   queue:
     build:
       context: ./backend
@@ -149,6 +224,16 @@ services:
       DB_PASSWORD: password
       REDIS_HOST: redis
       QUEUE_CONNECTION: redis
+      FILESYSTEM_DISK: s3
+      MEDIA_DISK: s3
+      AWS_ACCESS_KEY_ID: ${SEAWEEDFS_ACCESS_KEY:-seaweedfs}
+      AWS_SECRET_ACCESS_KEY: ${SEAWEEDFS_SECRET_KEY:-change-this-seaweedfs-secret}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: ${SEAWEEDFS_BUCKET:-hive-local}
+      AWS_ENDPOINT: http://seaweedfs:8333
+      AWS_URL: http://localhost:${SEAWEEDFS_S3_HOST_PORT:-8333}/${SEAWEEDFS_BUCKET:-hive-local}
+      AWS_ROOT_PREFIX: media
+      AWS_USE_PATH_STYLE_ENDPOINT: "true"
       MAIL_MAILER: smtp
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
@@ -160,13 +245,17 @@ services:
         condition: service_healthy
       db:
         condition: service_healthy
+      seaweedfs:
+        condition: service_started
+      seaweedfs-bootstrap:
+        condition: service_completed_successfully
       rembg:
         condition: service_started
     command: php artisan horizon
     networks:
       - hive-network
 
-  # 8. THE FACE (Next.js 16)
+  # 9. THE FACE (Next.js 16)
   frontend:
     build:
       context: ./frontend
@@ -191,7 +280,7 @@ services:
     networks:
       - hive-network
 
-  # 9. DATABASE GUI (Adminer)
+  # 10. DATABASE GUI (Adminer)
   adminer:
     image: adminer
     container_name: hive-adminer
@@ -206,7 +295,7 @@ services:
     networks:
       - hive-network
 
-  # 🚀 10. WEBSOCKET ENGINE (Reverb)
+  # 🚀 11. WEBSOCKET ENGINE (Reverb)
   reverb:
     build:
       context: ./backend
@@ -226,16 +315,30 @@ services:
       DB_USERNAME: hive
       DB_PASSWORD: password
       REDIS_HOST: redis
+      FILESYSTEM_DISK: s3
+      MEDIA_DISK: s3
+      AWS_ACCESS_KEY_ID: ${SEAWEEDFS_ACCESS_KEY:-seaweedfs}
+      AWS_SECRET_ACCESS_KEY: ${SEAWEEDFS_SECRET_KEY:-change-this-seaweedfs-secret}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: ${SEAWEEDFS_BUCKET:-hive-local}
+      AWS_ENDPOINT: http://seaweedfs:8333
+      AWS_URL: http://localhost:${SEAWEEDFS_S3_HOST_PORT:-8333}/${SEAWEEDFS_BUCKET:-hive-local}
+      AWS_ROOT_PREFIX: media
+      AWS_USE_PATH_STYLE_ENDPOINT: "true"
     depends_on:
       redis:
         condition: service_healthy
       db:
         condition: service_healthy
+      seaweedfs:
+        condition: service_started
+      seaweedfs-bootstrap:
+        condition: service_completed_successfully
     command: php artisan reverb:start --host=0.0.0.0 --port=9000
     networks:
       - hive-network
 
-  # 🚀 11. PDF & DOC CONVERTER (Gotenberg)
+  # 🚀 12. PDF & DOC CONVERTER (Gotenberg)
   gotenberg:
     image: gotenberg/gotenberg:8
     container_name: hive-gotenberg
@@ -252,3 +355,4 @@ networks:
 volumes:
   hive-db-data:
   hive-search-data:
+  hive-seaweedfs-data:

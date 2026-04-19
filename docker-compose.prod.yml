@@ -68,6 +68,65 @@ services:
     networks:
       - hive-network
 
+  # OBJECT STORAGE (SeaweedFS)
+  seaweedfs:
+    image: chrislusf/seaweedfs:3.94
+    container_name: hive-seaweedfs
+    restart: unless-stopped
+    command: server -dir=/data -s3
+    environment:
+      AWS_ACCESS_KEY_ID: ${SEAWEEDFS_ACCESS_KEY:-hive-seaweedfs}
+      AWS_SECRET_ACCESS_KEY: ${SEAWEEDFS_SECRET_KEY:-change-this-seaweedfs-secret}
+    volumes:
+      - ./storage/seaweedfs-data:/data
+    networks:
+      - hive-network
+
+  seaweedfs-bootstrap:
+    image: minio/mc:latest
+    container_name: hive-seaweedfs-bootstrap
+    restart: "no"
+    depends_on:
+      seaweedfs:
+        condition: service_started
+    environment:
+      SEAWEEDFS_ACCESS_KEY: ${SEAWEEDFS_ACCESS_KEY:-hive-seaweedfs}
+      SEAWEEDFS_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY:-change-this-seaweedfs-secret}
+    entrypoint: >
+      /bin/sh -ec "
+      until mc alias set local http://seaweedfs:8333 ${SEAWEEDFS_ACCESS_KEY:-hive-seaweedfs} ${SEAWEEDFS_SECRET_KEY:-change-this-seaweedfs-secret} >/dev/null 2>&1; do
+        sleep 2;
+      done &&
+      mc mb --ignore-existing local/${SEAWEEDFS_BUCKET:-hive-production} >/dev/null 2>&1 || true
+      "
+    networks:
+      - hive-network
+
+  seaweedfs-browser:
+    image: cloudlena/s3manager:v0.5.0
+    container_name: hive-seaweedfs-browser
+    restart: unless-stopped
+    profiles:
+      - ops
+    ports:
+      - "127.0.0.1:${SEAWEEDFS_BROWSER_HOST_PORT:-9091}:8080"
+    environment:
+      ENDPOINT: seaweedfs:8333
+      REGION: us-east-1
+      ACCESS_KEY_ID: ${SEAWEEDFS_ACCESS_KEY:-hive-seaweedfs}
+      SECRET_ACCESS_KEY: ${SEAWEEDFS_SECRET_KEY:-change-this-seaweedfs-secret}
+      USE_SSL: "false"
+      SIGNATURE_TYPE: V4
+      FORCE_DOWNLOAD: "false"
+      ALLOW_DELETE: "true"
+    depends_on:
+      seaweedfs:
+        condition: service_started
+      seaweedfs-bootstrap:
+        condition: service_completed_successfully
+    networks:
+      - hive-network
+
   # SEARCH (Meilisearch)
   meilisearch:
     image: getmeili/meilisearch:v1.10
@@ -110,8 +169,6 @@ services:
       dockerfile: Dockerfile.prod
     container_name: hive-backend
     restart: unless-stopped
-    volumes:
-      - ./storage/app:/var/www/html/storage/app
     env_file:
       - .env
     environment:
@@ -147,6 +204,10 @@ services:
         condition: service_healthy
       db:
         condition: service_healthy
+      seaweedfs:
+        condition: service_started
+      seaweedfs-bootstrap:
+        condition: service_completed_successfully
       meilisearch:
         condition: service_started
     healthcheck:
@@ -165,8 +226,6 @@ services:
       dockerfile: Dockerfile.prod
     container_name: hive-queue
     restart: unless-stopped
-    volumes:
-      - ./storage/app:/var/www/html/storage/app
     env_file:
       - .env
     environment:
@@ -189,6 +248,10 @@ services:
         condition: service_healthy
       db:
         condition: service_healthy
+      seaweedfs:
+        condition: service_started
+      seaweedfs-bootstrap:
+        condition: service_completed_successfully
     command: php artisan horizon
     networks:
       - hive-network

@@ -11,8 +11,9 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Modules\Core\Jobs\Concerns\InteractsWithTenantContext;
-use ProtoneMedia\LaravelFFMpeg\Support\FFMpeg;
 use Modules\Core\Models\FileEntry;
+use Modules\Core\Support\TenantMediaStorage;
+use ProtoneMedia\LaravelFFMpeg\Support\FFMpeg;
 use Stancl\Tenancy\Tenancy;
 use Throwable;
 
@@ -66,7 +67,7 @@ class TranscodeVideoForStreaming implements ShouldQueue
                 return;
             }
 
-            $disk = $media->disk ?: config('media-library.disk_name', 'public');
+            $disk = app(TenantMediaStorage::class)->mediaDisk($media);
             $sourcePath = $media->getPathRelativeToRoot();
             $streamDir = dirname($sourcePath) . '/processed';
             $playlistName = $streamDir . '/playlist.m3u8';
