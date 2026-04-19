@@ -4,3 +4,6 @@
 
 # Windows metadata files
 *Zone.Identifier
+
+# Local runtime storage volumes
+/storage/seaweedfs-data/

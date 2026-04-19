@@ -1,0 +1,9 @@
+Initialized native services in: /home/mike/.gradle/native
+Initialized jansi services in: /home/mike/.gradle/native
+Received JVM installation metadata from '/home/mike/jdk-17': {JAVA_HOME=/home/mike/jdk-17, JAVA_VERSION=17.0.13, JAVA_VENDOR=Azul Systems, Inc., RUNTIME_NAME=OpenJDK Runtime Environment, RUNTIME_VERSION=17.0.13+11-LTS, VM_NAME=OpenJDK 64-Bit Server VM, VM_VERSION=17.0.13+11-LTS, VM_VENDOR=Azul Systems, Inc., OS_ARCH=amd64}
+Waiting for daemons with canceled builds to become available
+Removing 0 daemon stop events from registry
+Starting a Gradle Daemon, 1 busy Daemon could not be reused, use --status for details
+Starting process 'Gradle build daemon'. Working directory: /home/mike/.gradle/daemon/8.3 Command: /home/mike/jdk-17/bin/java -XX:MaxMetaspaceSize=2G -XX:+HeapDumpOnOutOfMemoryError --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED --add-opens=java.base/java.nio.charset=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED -Xmx4G -Dfile.encoding=UTF-8 -Duser.country -Duser.language=en -Duser.variant -cp /home/mike/.gradle/wrapper/dists/gradle-8.3-all/6en3ugtfdg5xnpx44z4qbwgas/gradle-8.3/lib/gradle-launcher-8.3.jar -javaagent:/home/mike/.gradle/wrapper/dists/gradle-8.3-all/6en3ugtfdg5xnpx44z4qbwgas/gradle-8.3/lib/agents/gradle-instrumentation-agent-8.3.jar org.gradle.launcher.daemon.bootstrap.GradleDaemon 8.3
+Successfully started process 'Gradle build daemon'
+An attempt to start the daemon took 1.668 secs.
