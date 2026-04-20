@@ -6,6 +6,9 @@ storage/tenantselam-bistro
 storage/tenanttesla
 storage/tenant*
 
+# Ignore entire framework testing (permissions issues)
+storage/framework/testing
+
 # Keep essential storage dirs only
 !storage/app/.gitkeep
 !storage/framework/.gitkeep

@@ -8,6 +8,9 @@ backend/storage/tenant*
 backend/storage/logs
 backend/storage/debugbar
 
+# Ignore entire framework testing (permissions issues)
+backend/storage/framework/testing
+
 # Logs
 *.log
 *.md
