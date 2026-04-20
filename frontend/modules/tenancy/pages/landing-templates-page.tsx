@@ -162,6 +162,9 @@ export default function LandingTemplatesPage() {
               Multi-template scenarios
             </span>
             <Button asChild variant="outline" className="rounded-xl border-border/60 bg-background/70">
+              <Link href="/dashboard/settings/business-types">Manage Business Types</Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-xl border-border/60 bg-background/70">
               <Link href="/dashboard/tenants">Open Tenant Manager</Link>
             </Button>
           </div>

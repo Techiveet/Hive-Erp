@@ -34,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 import { warehouseApi } from "@/modules/warehouse/api";
+import { fetchInventoryProduct, fetchInventoryProducts } from "@/modules/inventory/api";
 import type { WarehouseLocation } from "@/modules/warehouse/types";
 
 const readPayloadValue = (record: WarehouseLocation, key: string, fallback: any = null): any => {
@@ -55,6 +56,9 @@ export function ShelfBoxesPage() {
 
   const [selectedBox, setSelectedBox] = React.useState<{ row: number; col: number; record?: WarehouseLocation } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [filterOccupied, setFilterOccupied] = React.useState<"all" | "occupied" | "available">("all");
+  const [highlightOccupied, setHighlightOccupied] = React.useState(false);
 
   const shelfQuery = useQuery({
     queryKey: ["warehouse", "locations", "detail", shelfId],
@@ -74,12 +78,39 @@ export function ShelfBoxesPage() {
     enabled: !!shelfId
   });
 
+  const allProductIds = React.useMemo(() => {
+    const boxes = boxesQuery.data || [];
+    const ids = new Set<number>();
+    boxes.forEach((box: any) => {
+      const storableId = box.metadata?.storable_id;
+      if (storableId) ids.add(Number(storableId));
+    });
+    return Array.from(ids);
+  }, [boxesQuery.data]);
+
+  const productsQuery = useQuery({
+    queryKey: ["inventory", "products", "batch", allProductIds],
+    queryFn: async () => {
+      if (allProductIds.length === 0) return {};
+      const promises = allProductIds.map(id => fetchInventoryProduct(id));
+      const results = await Promise.all(promises);
+      const map: Record<number, any> = {};
+      results.forEach((res: any, i) => {
+        if (res?.data) map[allProductIds[i]] = res.data;
+        else if (res) map[allProductIds[i]] = res;
+      });
+      return map;
+    },
+    enabled: allProductIds.length > 0,
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
+      const warehouseId = shelfQuery.data?.warehouse_id;
       if (data.id) {
         return warehouseApi.updateLocation(data.id, data.payload);
       }
-      return warehouseApi.createLocation(data.payload);
+      return warehouseApi.createLocation({ ...data.payload, warehouse_id: warehouseId });
     },
     onSuccess: () => {
       toast.success(t("inventory.common.saved", "Box updated successfully."));
@@ -90,6 +121,68 @@ export function ShelfBoxesPage() {
       toast.error(err?.response?.data?.message ?? t("inventory.common.failed", "Error saving box."));
     }
   });
+
+  const clearBoxMutation = useMutation({
+    mutationFn: async (boxId: number) => {
+      return warehouseApi.updateLocation(boxId, {
+        name: `Box ${selectedBox?.row}x${selectedBox?.col}`,
+        metadata: {
+          row: selectedBox?.row,
+          column: selectedBox?.col,
+          status: "available",
+          storable_type: null,
+          storable_id: null,
+          quantity_stored: 0,
+          notes: ""
+        }
+      });
+    },
+    onSuccess: () => {
+      toast.success("Box cleared successfully.");
+      queryClient.invalidateQueries({ queryKey: ["warehouse", "locations", "boxes", shelfId] });
+      setIsDialogOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message ?? "Error clearing box.");
+    }
+  });
+
+  const deleteBoxMutation = useMutation({
+    mutationFn: async (boxId: number) => {
+      return warehouseApi.deleteLocation(boxId);
+    },
+    onSuccess: () => {
+      toast.success("Box deleted successfully.");
+      queryClient.invalidateQueries({ queryKey: ["warehouse", "locations", "boxes", shelfId] });
+      setIsDialogOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message ?? "Error deleting box.");
+    }
+  });
+
+  const boxesDataAll = boxesQuery.data || [];
+  const occupiedCount = boxesDataAll.filter((b: any) => b.metadata?.status === "occupied").length;
+  const availableCount = boxesDataAll.filter((b: any) => b.metadata?.status !== "occupied").length;
+  const totalStoredQty = boxesDataAll.reduce((sum: number, b: any) => sum + (Number(b.metadata?.quantity_stored) || 0), 0);
+
+  const occupiedBoxes = boxesDataAll.filter((b: any) => b.metadata?.status === "occupied" && b.metadata?.storable_type === "product");
+  const uniqueProductsMap = new Map<number, { product: any; quantity: number; boxes: string[] }>();
+  occupiedBoxes.forEach((box: any) => {
+    const pid = Number(box.metadata?.storable_id);
+    const qty = Number(box.metadata?.quantity_stored) || 0;
+    const pos = `R${box.metadata?.row}C${box.metadata?.column}`;
+    const productsData = productsQuery.data;
+    const productInfo = productsData ? productsData[pid] : null;
+    if (pid && uniqueProductsMap.has(pid)) {
+      const existing = uniqueProductsMap.get(pid)!;
+      existing.quantity += qty;
+      existing.boxes.push(pos);
+    } else if (pid) {
+      uniqueProductsMap.set(pid, { product: productInfo, quantity: qty, boxes: [pos] });
+    }
+  });
+  const uniqueProducts = Array.from(uniqueProductsMap.values());
 
   if (!shelfId) {
     return (
@@ -178,13 +271,60 @@ export function ShelfBoxesPage() {
         </div>
       </div>
 
+      {/* Search and Filter */}
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border/50 bg-background/40 p-4 backdrop-blur-xl">
+        <div className="flex-1 min-w-[200px]">
+          <Input
+            placeholder="Search by product name or SKU..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="rounded-xl bg-background/60"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={filterOccupied === "all" ? "default" : "outline"}
+            className="rounded-full"
+            onClick={() => setFilterOccupied("all")}
+          >
+            All
+          </Button>
+          <Button
+            size="sm"
+            variant={filterOccupied === "occupied" ? "default" : "outline"}
+            className="rounded-full"
+            onClick={() => setFilterOccupied("occupied")}
+          >
+            Occupied
+          </Button>
+          <Button
+            size="sm"
+            variant={filterOccupied === "available" ? "default" : "outline"}
+            className="rounded-full"
+            onClick={() => setFilterOccupied("available")}
+          >
+            Available
+          </Button>
+          <Button
+            size="sm"
+            variant={highlightOccupied ? "default" : "outline"}
+            className={`rounded-full ${highlightOccupied ? "bg-orange-500 hover:bg-orange-600" : ""}`}
+            onClick={() => setHighlightOccupied(!highlightOccupied)}
+          >
+            {highlightOccupied ? "Hide Highlights" : "Show Occupied"}
+          </Button>
+        </div>
+      </div>
+
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
-          { label: t("inventory.shelves.col_rows_cols", "Dimensions"), value: `${rows} × ${columns}`, icon: LayoutGrid, color: "text-blue-500" },
-          { label: t("inventory.shelf_boxes.total_boxes", "Total Boxes"), value: rows * columns, icon: Boxes, color: "text-purple-500" },
-          { label: t("inventory.shelves.col_capacity", "Capacity/Box"), value: `${capacity} ${t("inventory.common.units", "units")}`, icon: BoxIcon, color: "text-orange-500" },
-          { label: t("inventory.shelf_boxes.stored_summary", "Stored Items Summary"), value: boxesData.length || 0, icon: Package, color: "text-emerald-500" }
+          { label: "Dimensions", value: `${rows} × ${columns}`, icon: LayoutGrid, color: "text-blue-500" },
+          { label: "Total Boxes", value: rows * columns, icon: Boxes, color: "text-purple-500" },
+          { label: "Occupied", value: occupiedCount, icon: Package, color: "text-orange-500" },
+          { label: "Available", value: availableCount, icon: BoxIcon, color: "text-green-500" },
+          { label: "Total Stored", value: totalStoredQty, icon: Tag, color: "text-emerald-500" }
         ].map((stat, i) => (
           <div key={i} className="group relative overflow-hidden rounded-[2rem] border border-border/50 bg-background/40 p-6 backdrop-blur-xl transition-all hover:border-primary/30">
             <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-background/80 shadow-sm border border-border/10 ${stat.color}`}>
@@ -195,6 +335,35 @@ export function ShelfBoxesPage() {
           </div>
         ))}
       </div>
+
+      {/* Unique Products Summary */}
+      {uniqueProducts.length > 0 && (
+        <div className="rounded-2xl border border-border/50 bg-background/40 p-6 backdrop-blur-xl">
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Package className="h-5 w-5 text-primary" />
+            Stored Products Summary ({uniqueProducts.length})
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {uniqueProducts.map((item, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/30">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Package className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold truncate">
+                    {item.product?.name || item.product?.product?.name || `Product #${item.product?.id || item.product}`}
+                  </div>
+                  <div className="text-xs text-muted-foreground flex gap-2">
+                    <span>Qty: {item.quantity}</span>
+                    <span>•</span>
+                    <span>Boxes: {item.boxes.join(", ")}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-6 rounded-[1.5rem] border border-border/40 bg-muted/20 px-6 py-4 backdrop-blur-sm">
@@ -233,11 +402,29 @@ export function ShelfBoxesPage() {
             const statusValue = readPayloadValue((box || {}) as WarehouseLocation, "status", "available");
             const storableType = readPayloadValue((box || {}) as WarehouseLocation, "storable_type");
             
-            const statusLabel = statusValue === 'occupied' 
-              ? t("inventory.shelf_boxes.occupied", "occupied") 
-              : statusValue === 'reserved' 
-                ? t("inventory.shelf_boxes.reserved", "reserved") 
+            const statusLabel = statusValue === 'occupied'
+              ? t("inventory.shelf_boxes.occupied", "occupied")
+              : statusValue === "reserved"
+                ? t("inventory.shelf_boxes.reserved", "reserved")
                 : t("inventory.shelf_boxes.available", "available");
+
+            const storableId = box?.metadata?.storable_id;
+            const storableTypeMeta = box?.metadata?.storable_type;
+            const prodInfo = (storableId && storableTypeMeta === 'product' ? (productsQuery.data as any)?.[Number(storableId)] : null);
+            const productName = prodInfo?.name || box?.name || (storableTypeMeta === 'product' ? `Product #${storableId}` : (storableTypeMeta === 'good' ? `Good #${storableId}` : ""));
+            const productSku = prodInfo?.sku || "";
+            const matchesSearch = !searchQuery ||
+              productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              productSku.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesFilter = filterOccupied === "all" ||
+              (filterOccupied === "occupied" && statusValue === "occupied") ||
+              (filterOccupied === "available" && statusValue !== "occupied");
+
+            if (!matchesSearch || !matchesFilter) {
+              return (
+                <div key={`${r}-${c}`} className="aspect-video rounded-[1.5rem] border border-dashed border-transparent" />
+              );
+            }
 
             return (
               <button
@@ -245,6 +432,9 @@ export function ShelfBoxesPage() {
                 onClick={() => handleBoxClick(r, c)}
                 className={`
                   group relative flex aspect-video flex-col items-center justify-center rounded-[1.5rem] border p-4 transition-all duration-300
+                  ${highlightOccupied && statusValue === 'occupied' 
+                    ? 'ring-4 ring-orange-500 ring-offset-2 ring-offset-background' 
+                    : ''}
                   ${box 
                     ? statusValue === 'occupied' 
                       ? 'bg-primary/10 border-primary/30 hover:bg-primary/20 shadow-lg shadow-primary/5' 
@@ -261,9 +451,17 @@ export function ShelfBoxesPage() {
                 {box ? (
                   <>
                     <div className={`mb-2 rounded-xl p-2 transition-transform group-hover:scale-110 ${statusValue === 'occupied' ? 'bg-primary/20 text-primary dark:text-primary-foreground' : statusValue === 'reserved' ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400' : 'bg-muted text-muted-foreground'}`}>
-                      {storableType === 'product' ? <Package className="h-5 w-5" /> : <Tag className="h-5 w-5" />}
+                      {storableTypeMeta === 'product' ? <Package className="h-5 w-5" /> : <Tag className="h-5 w-5" />}
                     </div>
-                    <span className="text-xs font-bold tracking-tight truncate max-w-full px-1 text-foreground">{box.name}</span>
+                    <span className="text-xs font-bold tracking-tight truncate max-w-full px-1 text-foreground">
+                      {storableId ? (
+                        <div className="text-center">
+                          <div className="truncate">{productName}</div>
+                          <div className="text-[9px] font-mono text-muted-foreground">{productSku}</div>
+                          <div className="text-[9px] font-mono text-orange-600">Qty: {readPayloadValue(box, "quantity_stored", 0)}</div>
+                        </div>
+                      ) : box.name}
+                    </span>
                     <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{statusLabel}</span>
                   </>
                 ) : (
@@ -284,12 +482,13 @@ export function ShelfBoxesPage() {
         onSave={saveMutation.mutate}
         isPending={saveMutation.isPending}
         addProductId={addProductId}
+        clearBoxMutation={clearBoxMutation}
       />
     </div>
   );
 }
 
-function BoxAssignmentDialog({ isOpen, onClose, shelfId, boxData, onSave, isPending, addProductId }: any) {
+function BoxAssignmentDialog({ isOpen, onClose, shelfId, boxData, onSave, isPending, addProductId, clearBoxMutation }: any) {
   const { t } = useTranslation();
   const [formData, setFormData] = React.useState({
     name: "",
@@ -300,6 +499,25 @@ function BoxAssignmentDialog({ isOpen, onClose, shelfId, boxData, onSave, isPend
     quantity_stored: "0",
     notes: ""
   });
+  const [productSearch, setProductSearch] = React.useState("");
+
+  const productsQuery = useQuery({
+    queryKey: ["inventory", "products", "list", productSearch],
+    queryFn: async () => {
+      try {
+        const res = await fetchInventoryProducts({ search: productSearch || undefined, per_page: 50 });
+        return res.data || res || [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: true,
+  });
+
+  const selectedProduct = React.useMemo(() => {
+    if (!formData.storable_id || !productsQuery.data) return null;
+    return productsQuery.data.find((p: any) => p.id === Number(formData.storable_id));
+  }, [formData.storable_id, productsQuery.data]);
 
   React.useEffect(() => {
     if (boxData?.record) {
@@ -408,17 +626,40 @@ function BoxAssignmentDialog({ isOpen, onClose, shelfId, boxData, onSave, isPend
                  <SelectItem value="good">{t("inventory.common.good", "Good / Item")}</SelectItem>
                </SelectContent>
              </Select>
-           </div>
-           <div className="space-y-2">
-             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80">{t("inventory.shelf_boxes.storable_id", "Storable ID")}</Label>
-             <Input 
-                type="number"
-                value={formData.storable_id} 
-                onChange={e => setFormData(p => ({ ...p, storable_id: e.target.value }))}
-                placeholder={t("inventory.common.database_id", "Database ID")}
+</div>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80">Select Product</Label>
+              <Input
+                placeholder="Search products..."
+                value={productSearch}
+                onChange={e => setProductSearch(e.target.value)}
                 className="rounded-2xl border-border/40 bg-background/50"
               />
-           </div>
+              {productSearch && (
+                <div className="max-h-40 overflow-y-auto border border-border/40 rounded-xl bg-background">
+                  {productsQuery.data?.map((p: any) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, storable_id: String(p.id), name: p.name }));
+                        setProductSearch(p.name);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-muted text-sm border-b border-border/20 last:border-0"
+                    >
+                      <div className="font-medium">{p.name}</div>
+                      <div className="text-xs text-muted-foreground">SKU: {p.sku} | Qty: {p.quantity}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {selectedProduct && (
+                <div className="mt-2 p-2 rounded-lg bg-primary/10 border border-primary/30">
+                  <div className="text-sm font-bold">{selectedProduct.name}</div>
+                  <div className="text-xs text-muted-foreground">SKU: {selectedProduct.sku}</div>
+                </div>
+              )}
+            </div>
            <div className="space-y-2 md:col-span-2">
              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80">{t("inventory.common.notes", "Notes")}</Label>
              <Textarea 
@@ -431,6 +672,24 @@ function BoxAssignmentDialog({ isOpen, onClose, shelfId, boxData, onSave, isPend
         </div>
 
         <DialogFooter className="border-t border-border/20 bg-muted/20 px-8 py-6">
+          {boxData?.record && (
+            <div className="flex-1">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  if (confirm("Clear this box? This will remove the product/good from this box.")) {
+                    clearBoxMutation.mutate(boxData.record.id);
+                  }
+                }}
+                disabled={clearBoxMutation.isPending || isPending}
+                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-xl"
+              >
+                <Loader2 className={`mr-2 h-4 w-4 ${clearBoxMutation.isPending ? "animate-spin" : ""}`} />
+                Clear Box
+              </Button>
+            </div>
+          )}
           <Button variant="ghost" onClick={onClose} className="rounded-full font-bold">{t("inventory.common.cancel", "Cancel")}</Button>
           <Button 
             onClick={handleSubmit} 

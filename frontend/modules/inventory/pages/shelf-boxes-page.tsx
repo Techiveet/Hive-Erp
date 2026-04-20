@@ -3,8 +3,9 @@
 import * as React from "react";
 import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Link2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, Link2, Pencil, Plus, Trash2, PackageCheck } from "lucide-react";
 import { toast } from "sonner";
+import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@/store/use-translation";
 
 import { DataTable } from "@/components/datatable/data-table";
@@ -112,6 +113,9 @@ const readPayloadStatus = (record: InventoryEntityRecord): "available" | "occupi
 export default function InventoryShelfBoxesPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const addProductId = searchParams.get("add_product_id");
+
   const [tableQuery, setTableQuery] = React.useState<TableQueryState>(DEFAULT_QUERY);
   const [selectedRowIds, setSelectedRowIds] = React.useState<RowSelectionState>({});
   const [open, setOpen] = React.useState(false);
@@ -119,6 +123,30 @@ export default function InventoryShelfBoxesPage() {
   const [assignOpen, setAssignOpen] = React.useState(false);
   const [assignBox, setAssignBox] = React.useState<InventoryEntityRecord | null>(null);
   const [assignForm, setAssignForm] = React.useState({ storableType: "", storableId: "" });
+
+  const [productAssignOpen, setProductAssignOpen] = React.useState(false);
+  const [selectedShelfBoxId, setSelectedShelfBoxId] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (addProductId) {
+      setProductAssignOpen(true);
+    }
+  }, [addProductId]);
+
+  const assignProductToShelfMutation = useMutation({
+    mutationFn: async (shelfBoxId: number) => {
+      const { assignProductToShelf } = await import("@/modules/inventory/api");
+      return assignProductToShelf(Number(addProductId), shelfBoxId);
+    },
+    onSuccess: () => {
+      toast.success(t("inventory.products.shelf_assigned", "Product assigned to shelf successfully."));
+      setProductAssignOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["inventory", "products"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message ?? t("inventory.common.failed", "Failed to assign product to shelf."));
+    },
+  });
 
   const shelfBoxesQuery = useQuery({
     queryKey: ["inventory", "shelf-boxes", tableQuery],
@@ -130,6 +158,15 @@ export default function InventoryShelfBoxesPage() {
         sort_col: tableQuery.sortCol,
         sort_dir: tableQuery.sortDir,
       }),
+  });
+
+  const allShelfBoxesQuery = useQuery({
+    queryKey: ["inventory", "shelf-boxes", "all"],
+    queryFn: () =>
+      fetchInventoryEntityRecords("shelf-boxes", {
+        per_page: 500,
+      }),
+    enabled: productAssignOpen,
   });
 
   const shelvesQuery = useQuery({
@@ -611,6 +648,47 @@ export default function InventoryShelfBoxesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {productAssignOpen && (
+        <Dialog open={productAssignOpen} onOpenChange={(open) => !open && setProductAssignOpen(false)}>
+          <DialogContent className="rounded-[2rem] border-border/60 bg-background/95 backdrop-blur-xl">
+            <DialogHeader>
+              <DialogTitle>{t("inventory.products.add_to_shelf", "Add Product to Shelf")}</DialogTitle>
+              <DialogDescription>
+                {t("inventory.products.select_shelf_box_desc", "Select a shelf box to store this product.")}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-2">
+              <Label>{t("inventory.shelf_boxes.shelf_box", "Shelf Box")}</Label>
+              <select
+                value={selectedShelfBoxId ?? ""}
+                onChange={(e) => setSelectedShelfBoxId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full bg-muted/30 border border-border/50 h-12 rounded-xl text-sm px-4 focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
+              >
+                <option value="">{t("inventory.products.select_shelf_box", "Select a shelf box...")}</option>
+                {allShelfBoxesQuery.data?.data?.map((box) => (
+                  <option key={box.id} value={box.id}>
+                    {box.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" className="rounded-xl" onClick={() => setProductAssignOpen(false)}>
+                {t("inventory.common.cancel", "Cancel")}
+              </Button>
+              <Button
+                className="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950"
+                disabled={!selectedShelfBoxId || assignProductToShelfMutation.isPending}
+                onClick={() => selectedShelfBoxId && assignProductToShelfMutation.mutate(selectedShelfBoxId)}
+              >
+                {assignProductToShelfMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PackageCheck className="mr-2 h-4 w-4" />}
+                {t("inventory.products.assign_to_shelf", "Assign to Shelf")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

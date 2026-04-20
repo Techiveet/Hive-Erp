@@ -4,14 +4,14 @@ import * as React from "react";
 import Link from "next/link";
 import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Box, Loader2, Pencil, Plus, Trash2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
 import { DataTable } from "@/components/datatable/data-table";
 import { Badge } from "@/components/ui/badge";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, 
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
   AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -54,7 +54,7 @@ export default function InventoryProductsPage() {
   const [tableQuery, setTableQuery] = React.useState<TableQueryState>(DEFAULT_QUERY);
   const [selectedRowIds, setSelectedRowIds] = React.useState<RowSelectionState>({});
 
-  const [modalOpen, setModalOpen] = React.useState(false);
+const [modalOpen, setModalOpen] = React.useState(false);
   const [editingProductId, setEditingProductId] = React.useState<number | null>(null);
 
   const selectedIds = React.useMemo(
@@ -192,32 +192,69 @@ export default function InventoryProductsPage() {
     [bulkDeleteMutation, t]
   );
 
-  const columns = React.useMemo<ColumnDef<ProductRecord>[]>(
+const columns = React.useMemo<ColumnDef<ProductRecord>[]>(
     () => [
       {
+        accessorKey: "image",
+        header: "",
+        enableSorting: false,
+        cell: ({ row }) => {
+          const imageUrl = row.original.image;
+          return imageUrl ? (
+            <img src={imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
+          ) : (
+            <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+              <Box className="h-5 w-5 text-muted-foreground" />
+            </div>
+          );
+        },
+        meta: { align: "left" as const },
+      },
+{
         accessorKey: "name",
         header: t("inventory.products.col_name", "Product"),
         cell: ({ row }) => (
-          <div>
-            <Link
-              href={`/dashboard/inventory/catalog/products/${row.original.id}`}
-              className="font-bold text-primary hover:underline"
-            >
-              {row.original.name}
-            </Link>
-            <div className="text-xs text-muted-foreground">{row.original.sku}</div>
-          </div>
+          <Link
+            href={`/dashboard/inventory/catalog/products/${row.original.id}`}
+            className="font-bold text-primary hover:underline"
+          >
+            {row.original.name}
+          </Link>
         ),
       },
       {
+        accessorKey: "sku",
+        header: "SKU",
+        cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.sku}</span>,
+      },
+      {
+        id: "category",
+        header: "Category",
+        cell: ({ row }) => {
+          const cat = (row.original as any).category;
+          return cat ? (
+            <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
+              {cat.name}
+            </span>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          );
+        },
+      },
+      {
+        accessorKey: "stock_code",
+        header: "Stock Code",
+        cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.stock_code || "-"}</span>,
+      },
+      {
         accessorKey: "quantity",
-        header: t("inventory.products.col_qty", "Quantity"),
-        cell: ({ row }) => <span className="font-mono">{row.original.quantity}</span>,
+        header: "Stock Qty",
+        cell: ({ row }) => <span className="font-mono font-bold">{row.original.quantity}</span>,
         meta: { align: "right" as const },
       },
       {
-        accessorKey: "sale_price",
-        header: t("inventory.products.col_price", "Price"),
+        accessorKey: "unit_price",
+        header: "Unit Price",
         cell: ({ row }) => (
           <span className="font-mono font-bold">
             {Number(row.original.unit_price || 0).toFixed(2)}
@@ -248,11 +285,18 @@ export default function InventoryProductsPage() {
         cell: ({ row }) => {
           const product = row.original;
           return (
-            <div className="flex justify-start gap-2">
+<div className="flex justify-start gap-2">
               <Button size="sm" variant="outline" className="rounded-full" onClick={() => openEdit(product.id)}>
                 <Pencil className="mr-1 h-3.5 w-3.5" />
                 {t("inventory.common.edit", "Edit")}
               </Button>
+              <Link
+                href={`/dashboard/warehouse/locations/shelves?add_product_id=${product.id}`}
+                className="inline-flex items-center justify-center rounded-full border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-500 hover:bg-emerald-500/20 transition-colors"
+              >
+                <MapPin className="mr-1 h-3.5 w-3.5" />
+                {t("inventory.products.add_to_shelf", "Add to Shelf")}
+              </Link>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button size="sm" variant="destructive" className="rounded-full" disabled={deleteMutation.isPending}>
@@ -423,7 +467,7 @@ export default function InventoryProductsPage() {
         syncWithUrl={false}
       />
 
-      <ProductFormModal
+<ProductFormModal
         open={modalOpen}
         mode={editingProductId ? "edit" : "create"}
         productId={editingProductId}

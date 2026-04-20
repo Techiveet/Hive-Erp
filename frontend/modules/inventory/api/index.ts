@@ -102,13 +102,13 @@ export const fetchInventoryEntityRecords = async (resource: string, params: List
     })
   ).data;
 
-export const createInventoryEntityRecord = async (resource: string, payload: Record<string, unknown>) =>
+export const createInventoryEntityRecord = async (resource: string, payload: Record<string, unknown> | FormData) =>
   (await api.post<InventoryEntityRecord>(`/inventory/${resource}`, payload)).data;
 
 export const updateInventoryEntityRecord = async (
   resource: string,
   id: number,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown> | FormData
 ) => (await api.patch<InventoryEntityRecord>(`/inventory/${resource}/${id}`, payload)).data;
 
 export const deleteInventoryEntityRecord = async (resource: string, id: number) =>
@@ -183,4 +183,17 @@ export const syncInventoryProductTags = async (productId: number, tagIds: number
     await api.post<ProductRecord>(`/inventory/products/${productId}/tags`, {
       tag_ids: tagIds,
     })
+  ).data;
+
+export type ShelfBoxOption = { id: number; name: string };
+
+export const fetchShelfBoxOptions = async () =>
+  (await api.get<ShelfBoxOption[]>("/inventory/shelf-boxes/options")).data;
+
+export const assignProductToShelf = async (productId: number, shelfBoxId: number) =>
+  (
+    await api.post<{ message: string; product: ProductRecord }>(
+      `/inventory/products/${productId}/assign-shelf`,
+      { shelf_box_id: shelfBoxId }
+    )
   ).data;

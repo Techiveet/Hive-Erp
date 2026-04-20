@@ -56,6 +56,7 @@ export type InventoryEntityRecord = {
   code?: string | null;
   parent_id?: number | null;
   is_active: boolean;
+  image?: string | null;
   payload?: Record<string, unknown> | null;
   parent?: {
     id: number;

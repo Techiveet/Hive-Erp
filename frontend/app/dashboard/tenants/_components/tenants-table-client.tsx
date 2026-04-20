@@ -157,26 +157,49 @@ export function TenantsTableClient({ companySettings, brandingSettings }: Props)
         placeholderData: (prev) => prev,
     });
 
-    const { data: subscriptionCatalogData } = useQuery({
+const { data: subscriptionCatalogData } = useQuery({
         queryKey: ["tenant-subscription-catalog"],
         queryFn: fetchSubscriptionCatalog,
         enabled: canCreate || canEdit,
         staleTime: 300_000,
     });
 
+    // Fetch business types from settings API (custom business types)
+    const { data: settingsBusinessTypes } = useQuery({
+        queryKey: ["settings", "landing-templates"],
+        queryFn: async () => {
+            const res = await fetch(`${getBackendApiRoot()}/settings/landing-templates`);
+            const json = await res.json();
+            return json?.data?.business_types ?? [];
+        },
+        enabled: canCreate || canEdit,
+        staleTime: 60_000, // 1 minute cache
+    });
+
+    // Merge business types: custom from settings take priority, then fallback to subscription catalog
+    const businessTypes = React.useMemo(() => {
+        const customTypes = settingsBusinessTypes ?? [];
+        const catalogTypes = subscriptionCatalogData?.data?.business_types ?? [];
+        // Combine, removing duplicates (custom types override catalog ones)
+        const combined = [...customTypes];
+        catalogTypes.forEach((bt: any) => {
+            if (!combined.find((c: any) => c.key === bt.key)) {
+                combined.push(bt);
+            }
+        });
+        return resolveBusinessTypeCatalog(combined.length > 0 ? combined : FALLBACK_TENANT_BUSINESS_TYPES);
+    }, [settingsBusinessTypes, subscriptionCatalogData]);
+    const businessTypeMap = React.useMemo(
+        () => Object.fromEntries(businessTypes.map((option) => [option.key, option])),
+        [businessTypes]
+);
+    const activeBusinessTypeDefinition = businessTypeMap[formBusinessType] ?? businessTypes[0] ?? FALLBACK_TENANT_BUSINESS_TYPES[0];
+
+    // Also keep plan defaults for module defaults
     const subscriptionPlanDefaults = React.useMemo(
         () => subscriptionCatalogData?.data?.plan_defaults ?? EMPTY_PLAN_DEFAULTS,
         [subscriptionCatalogData]
     );
-    const businessTypes = React.useMemo(
-        () => resolveBusinessTypeCatalog(subscriptionCatalogData?.data?.business_types ?? FALLBACK_TENANT_BUSINESS_TYPES),
-        [subscriptionCatalogData]
-    );
-    const businessTypeMap = React.useMemo(
-        () => Object.fromEntries(businessTypes.map((option) => [option.key, option])),
-        [businessTypes]
-    );
-    const activeBusinessTypeDefinition = businessTypeMap[formBusinessType] ?? businessTypes[0] ?? FALLBACK_TENANT_BUSINESS_TYPES[0];
     const templateVariants = activeBusinessTypeDefinition.templates ?? [];
     const landingTemplateContent = landingTemplateFiles[0]?.content ?? formatLandingTemplateJson(activeBusinessTypeDefinition.default_template);
     const parsedLandingTemplateState = React.useMemo(() => {

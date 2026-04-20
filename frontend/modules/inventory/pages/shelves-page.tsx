@@ -63,6 +63,8 @@ type ShelfForm = {
   capacity: string;
   description: string;
   is_active: boolean;
+  image: File | null;
+  imagePreview: string;
 };
 
 const DEFAULT_QUERY: TableQueryState = {
@@ -82,6 +84,8 @@ const DEFAULT_FORM: ShelfForm = {
   capacity: "1",
   description: "",
   is_active: true,
+  image: null,
+  imagePreview: "",
 };
 
 const readPayloadString = (record: InventoryEntityRecord, key: string, fallback = ""): string => {
@@ -138,7 +142,7 @@ export default function InventoryShelvesPage() {
         per_page: tableQuery.pageSize,
         sort_col: tableQuery.sortCol,
         sort_dir: tableQuery.sortDir,
-        parent_id: tableQuery.warehouse_id,
+        parent_id: tableQuery.warehouse_id || undefined,
       }),
   });
 
@@ -148,23 +152,41 @@ export default function InventoryShelvesPage() {
       fetchInventoryEntityRecords("warehouses", {
         per_page: 200,
       }),
-    enabled: open,
+    enabled: open || !!addProductId,
   });
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = {
-        name: form.name.trim(),
-        code: form.code.trim() || null,
-        parent_id: form.parent_id ? Number(form.parent_id) : null,
-        is_active: form.is_active,
-        payload: {
-          rows: Number(form.rows || "1"),
-          columns: Number(form.columns || "1"),
-          capacity: Number(form.capacity || "1"),
-          description: form.description.trim() || null,
-        },
-      };
+      const isMultipart = form.image instanceof File;
+
+      const payload = isMultipart
+        ? (() => {
+            const formData = new FormData();
+            formData.append("name", form.name.trim());
+            if (form.code) formData.append("code", form.code.trim());
+            if (form.parent_id) formData.append("parent_id", form.parent_id);
+            formData.append("is_active", String(form.is_active));
+            formData.append("payload", JSON.stringify({
+              rows: Number(form.rows || "1"),
+              columns: Number(form.columns || "1"),
+              capacity: Number(form.capacity || "1"),
+              description: form.description.trim() || null,
+            }));
+            if (form.image) formData.append("image", form.image);
+            return formData;
+          })()
+        : {
+            name: form.name.trim(),
+            code: form.code.trim() || null,
+            parent_id: form.parent_id ? Number(form.parent_id) : null,
+            is_active: form.is_active,
+            payload: {
+              rows: Number(form.rows || "1"),
+              columns: Number(form.columns || "1"),
+              capacity: Number(form.capacity || "1"),
+              description: form.description.trim() || null,
+            },
+          };
 
       if (form.id) {
         return updateInventoryEntityRecord("shelves", form.id, payload);
@@ -247,6 +269,8 @@ export default function InventoryShelvesPage() {
       capacity: readPayloadString(shelf, "capacity", "1"),
       description: readPayloadString(shelf, "description", ""),
       is_active: shelf.is_active,
+      image: null,
+      imagePreview: (shelf.image as string) || ((shelf.payload?.image as string) || ""),
     });
     setOpen(true);
   }, []);
@@ -266,6 +290,22 @@ export default function InventoryShelvesPage() {
 
   const columns = React.useMemo<ColumnDef<InventoryEntityRecord>[]>(
     () => [
+      {
+        accessorKey: "image",
+        header: "",
+        enableSorting: false,
+        cell: ({ row }) => {
+          const imageUrl = (row.original.image as string) || (row.original.payload?.image as string);
+          return imageUrl ? (
+            <img src={imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
+          ) : (
+            <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+              <Box className="h-5 w-5 text-muted-foreground" />
+            </div>
+          );
+        },
+        meta: { align: "left" as const },
+      },
       {
         accessorKey: "name",
         header: t("inventory.shelves.col_name", "Shelf"),
@@ -524,10 +564,45 @@ export default function InventoryShelvesPage() {
                         {warehouse.name}
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
+</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>{t("inventory.shelves.image_label", "Shelf Image")}</Label>
+                  <div className="flex items-center gap-4">
+                    {(form.imagePreview || form.image) && (
+                      <div className="relative h-20 w-20 overflow-hidden rounded-xl border">
+                        <img
+                          src={form.imagePreview || URL.createObjectURL(form.image!)}
+                          alt="Shelf preview"
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <label className="flex h-20 w-full cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border hover:border-primary transition-colors">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setForm((prev) => ({
+                              ...prev,
+                              image: file,
+                              imagePreview: URL.createObjectURL(file),
+                            }));
+                          }
+                        }}
+                      />
+                      <div className="text-center">
+                        <Box className="mx-auto h-6 w-6 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Click to upload</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+                <div className="space-y-2">
                 <Label htmlFor="shelf-rows">{t("inventory.shelves.rows_label", "Rows")}</Label>
                 <Input
                   id="shelf-rows"

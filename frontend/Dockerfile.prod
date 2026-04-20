@@ -46,7 +46,7 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     INTERNAL_API_URL=$INTERNAL_API_URL
 
 # Build the application
-RUN npx next build --no-turbopack
+RUN npx next build
 
 # Production image, copy all the files and run next
 FROM base AS runner

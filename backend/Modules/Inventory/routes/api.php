@@ -230,6 +230,15 @@ Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout', 'tenant_m
         Route::post('products/{id}/tags', [ProductController::class, 'syncTags'])
             ->middleware('permission:manage_inventory,sanctum')
             ->name('products.tags');
+        Route::post('products/{id}/assign-shelf', [ProductController::class, 'assignShelf'])
+            ->middleware('permission:manage_inventory,sanctum')
+            ->name('products.assign-shelf');
+        Route::get('shelf-boxes/options', fn() => response()->json(
+            \Modules\Inventory\Models\InventoryEntityRecord::query()
+                ->where('entity_type', 'shelf_boxes')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+        ))->middleware('permission:manage_inventory,sanctum');
 
         Route::group(['middleware' => 'permission:manage_inventory,sanctum'], function () {
             // Explicit routes using closures to ensure correct parameter mapping

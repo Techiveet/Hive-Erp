@@ -150,6 +150,27 @@ export function ShelvesPage() {
     enabled: true,
   });
 
+  const { data: boxCountsData } = useQuery({
+    queryKey: ["warehouse", "locations", "box-counts"],
+    queryFn: async () => {
+      const res = await warehouseApi.listLocations({ type: "box", limit: 1000 });
+      const boxes = res.data?.data || res.data || [];
+      const counts: Record<number, { total: number; occupied: number }> = {};
+      boxes.forEach((box: any) => {
+        const parentId = box.parent_id;
+        if (!counts[parentId]) {
+          counts[parentId] = { total: 0, occupied: 0 };
+        }
+        counts[parentId].total++;
+        const status = box.metadata?.status;
+        if (status === "occupied") {
+          counts[parentId].occupied++;
+        }
+      });
+      return counts;
+    },
+  });
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload: Partial<WarehouseLocation> = {
@@ -303,13 +324,43 @@ export function ShelvesPage() {
       },
       {
         id: "total_boxes",
-        header: t("inventory.shelves.col_total_boxes", "Total Boxes"),
+        header: "Total",
         enableSorting: false,
         cell: ({ row }) => {
           const total = calculateTotalBoxes(row.original);
           return (
             <span className="font-semibold text-primary">
               {total > 0 ? total : "—"}
+            </span>
+          );
+        },
+        meta: { align: "right" as const },
+      },
+      {
+        id: "occupied",
+        header: "Occupied",
+        enableSorting: false,
+        cell: ({ row }) => {
+          const counts = boxCountsData?.[row.original.id];
+          return (
+            <span className="font-mono text-orange-600 font-semibold">
+              {counts?.occupied ?? "—"}
+            </span>
+          );
+        },
+        meta: { align: "right" as const },
+      },
+      {
+        id: "available",
+        header: "Available",
+        enableSorting: false,
+        cell: ({ row }) => {
+          const total = calculateTotalBoxes(row.original);
+          const occupied = boxCountsData?.[row.original.id]?.occupied || 0;
+          const available = total - occupied;
+          return (
+            <span className="font-mono text-green-600 font-semibold">
+              {total > 0 ? available : "—"}
             </span>
           );
         },

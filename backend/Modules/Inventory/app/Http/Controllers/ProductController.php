@@ -232,6 +232,36 @@ class ProductController extends Controller
         ]);
     }
 
+    public function assignShelf(Request $request, $id)
+    {
+        $product = Product::query()->findOrFail($id);
+
+        $validated = $request->validate([
+            'shelf_box_id' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $shelfBox = \Modules\Inventory\Models\InventoryEntityRecord::query()
+            ->where('entity_type', 'shelf_boxes')
+            ->where('id', $validated['shelf_box_id'])
+            ->firstOrFail();
+
+        $product->update([
+            'metadata' => array_merge($product->metadata ?? [], [
+                'assigned_shelf_box' => [
+                    'shelf_box_id' => $shelfBox->id,
+                    'shelf_box_name' => $shelfBox->name,
+                    'assigned_at' => now()->toIso8601String(),
+                    'assigned_by' => auth()->id(),
+                ],
+            ]),
+        ]);
+
+        return response()->json([
+            'message' => 'Shelf assigned successfully',
+            'product' => $product->fresh(),
+        ]);
+    }
+
     public function bulkUpdateStatus(Request $request)
     {
         $validated = $request->validate([
