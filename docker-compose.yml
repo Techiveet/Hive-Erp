@@ -267,7 +267,9 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - /app/.next
     environment:
+      NODE_ENV: development
       NEXT_PUBLIC_API_URL: http://localhost:8085/api/v1
       INTERNAL_API_URL: http://backend:8000/api/v1
       WATCHPACK_POLLING: "true"

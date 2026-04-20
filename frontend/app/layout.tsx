@@ -43,22 +43,22 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans bg-background text-foreground antialiased overflow-x-hidden`}
       >
-        <Providers>
-          {/* 🚀 WRAP THE APP IN SETTINGS SO AUTH-GUARD CAN READ THE TIMEOUT */}
-          <SettingsProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="dark"
-              enableSystem
-              disableTransitionOnChange
-            >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Providers>
+            {/* 🚀 WRAP THE APP IN SETTINGS SO AUTH-GUARD CAN READ THE TIMEOUT */}
+            <SettingsProvider>
               <PublicBrandSyncProvider />
               <BrandCursor />
               {children}
               <Toaster />
-            </ThemeProvider>
-          </SettingsProvider>
-        </Providers>
+            </SettingsProvider>
+          </Providers>
+        </ThemeProvider>
       </body>
     </html>
   );
