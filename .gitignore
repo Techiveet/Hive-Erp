@@ -5,5 +5,20 @@
 # Windows metadata files
 *Zone.Identifier
 
-# Local runtime storage volumes
+# Local runtime storage volumes & Data
+# Exclude database and search directories which may have restrictive permissions
+/storage/db-data/
+/storage/search-data/
+/storage/caddy_data/
+/storage/caddy_config/
+/storage/caddy_runtime/
 /storage/seaweedfs-data/
+
+# Environment files
+.env
+.env.*
+!.env.prod-example
+
+# Logs
+*.log
+

@@ -1,28 +1,36 @@
-# Ignore tenant storage directories (these contain large media files)
-storage/tenantafya-clinic
-storage/tenantapple
-storage/tenantnile-suites
-storage/tenantselam-bistro
-storage/tenanttesla
-storage/tenant*
+# Ignore vendor dependencies (built inside container)
+vendor/
+node_modules/
 
-# Ignore entire framework testing (permissions issues)
-storage/framework/testing
-
-# Keep essential storage dirs only
+# Ignore storage contents but keep structure
+storage/*
+!storage/.gitkeep
 !storage/app/.gitkeep
 !storage/framework/.gitkeep
 !storage/logs/.gitkeep
 
-# Logs and debug
+# Specially ignore massive app storage and tenants
+storage/app/*
+storage/tenant*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
 storage/logs/*
 storage/debugbar
-*.log
 
-# IDE
+# Logs and debug
+*.log
+.phpunit.result.cache
+
+# IDE and metadata
 .idea
 .vscode
+.git
+.gitignore
 *.md
+docker-compose*.yml
+Dockerfile*
+.dockerignore
 
 # Keep essential files
 !.gitkeep

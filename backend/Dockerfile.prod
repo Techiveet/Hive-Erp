@@ -42,10 +42,15 @@ WORKDIR /var/www/html
 # Copy codebase
 COPY . .
 
+# Ensure directories exist and have correct permissions for composer scripts
+RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache
+
 # Install dependencies optimized for production
+# We run as root first to allow scripts to run, or we could use --no-scripts
 RUN composer install --no-dev --optimize-autoloader
 
-# Set permissions
+# Final permission fix
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 8000
