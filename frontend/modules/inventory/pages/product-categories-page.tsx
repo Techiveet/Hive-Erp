@@ -3,7 +3,7 @@
 import * as React from "react";
 import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/store/use-translation";
 
@@ -33,6 +33,7 @@ import {
   updateInventoryProductCategory,
 } from "@/modules/inventory/api";
 import type { ProductCategory } from "@/modules/inventory/types";
+import { AssignApproversDialog } from "@/modules/workflow/components/assign-approvers-dialog";
 
 type TableQueryState = {
   page: number;
@@ -71,6 +72,8 @@ export default function ProductCategoriesPage() {
   const [selectedRowIds, setSelectedRowIds] = React.useState<RowSelectionState>({});
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState<CategoryForm>(DEFAULT_FORM);
+  const [approverDialogOpen, setApproverDialogOpen] = React.useState(false);
+  const [approverTarget, setApproverTarget] = React.useState<{ type: string; id: number; name?: string } | null>(null);
 
   const categoriesQuery = useQuery({
     queryKey: ["inventory", "product-categories", tableQuery],
@@ -185,6 +188,11 @@ export default function ProductCategoriesPage() {
     setForm(DEFAULT_FORM);
   }, []);
 
+  const openApproverDialog = React.useCallback((type: string, id: number, name?: string) => {
+    setApproverTarget({ type, id, name });
+    setApproverDialogOpen(true);
+  }, []);
+
   const clearSelection = React.useCallback(() => setSelectedRowIds({}), []);
 
   const exportUrl = React.useMemo(() => {
@@ -250,6 +258,15 @@ export default function ProductCategoriesPage() {
               <Button size="sm" variant="outline" className="rounded-full" onClick={() => openEdit(category)}>
                 <Pencil className="mr-1 h-3.5 w-3.5" />
                 {t("inventory.common.edit", "Edit")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => openApproverDialog("Modules\\Inventory\\Models\\ProductCategory", category.id, category.name)}
+              >
+                <UserCheck className="mr-1 h-3.5 w-3.5" />
+                {t("inventory.common.approve", "Request Approval")}
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -412,6 +429,19 @@ export default function ProductCategoriesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {approverTarget && (
+        <AssignApproversDialog
+          isOpen={approverDialogOpen}
+          onClose={() => {
+            setApproverDialogOpen(false);
+            setApproverTarget(null);
+          }}
+          approvableType={approverTarget.type}
+          approvableId={approverTarget.id}
+          approvableName={approverTarget.name}
+        />
+      )}
     </div>
   );
 }

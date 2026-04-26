@@ -19,6 +19,7 @@ import { LanguageSwitcher } from "../layout/language-switcher";
 import { GlobalSearch } from "./global-search";
 import { TopbarMailIcon } from "./topbar-mail";
 import { TopbarNotificationsIcon } from "./topbar-notifications";
+import { ChatNotificationIcon } from "./chat-notification-icon";
 import { getAccessToken, getBackendApiRoot, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -242,6 +243,7 @@ export function DashboardTopbar() {
               </div>
 
               <div className="flex items-center gap-0.5 sm:gap-1">
+                <ChatNotificationIcon />
                 <TopbarNotificationsIcon activeUser={activeUser} />
                 <TopbarMailIcon activeUser={activeUser} />
               </div>

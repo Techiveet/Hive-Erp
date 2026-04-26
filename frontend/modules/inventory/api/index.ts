@@ -3,6 +3,7 @@ import type {
   BarcodePayload,
   InventoryEntityRecord,
   InventoryItem,
+  PaginatedQaBatchResults,
   PaginatedResponse,
   ProductCategory,
   ProductDetailResponse,
@@ -12,17 +13,14 @@ import type {
   Supplier,
   SupplierDetail,
   Tag,
+  QaProtocol,
+  CoAResponse,
 } from "@/modules/inventory/types";
 
 type ListParams = Record<string, unknown>;
 type MultipartPayload = Record<string, unknown> | FormData;
 
 const isFormData = (payload: MultipartPayload): payload is FormData => payload instanceof FormData;
-
-const withMultipart = (payload: MultipartPayload) =>
-  isFormData(payload)
-    ? { headers: { "Content-Type": "multipart/form-data" } }
-    : undefined;
 
 export const fetchInventoryProductSummary = async () =>
   (await api.get<ProductSummaryResponse>("/inventory/products/summary")).data;
@@ -142,17 +140,16 @@ export const fetchInventoryProduct = async (id: number) =>
 
 export const createInventoryProduct = async (payload: MultipartPayload) =>
   (
-    await api.post<ProductRecord>("/inventory/products", payload, withMultipart(payload))
+    await api.post<ProductRecord>("/inventory/products", payload)
   ).data;
 
-export const updateInventoryProduct = async (id: number, payload: MultipartPayload) =>
-  (
-    await api.post<ProductRecord>(
-      `/inventory/products/${id}?_method=PATCH`,
-      payload,
-      withMultipart(payload)
-    )
-  ).data;
+export const updateInventoryProduct = async (id: number, payload: MultipartPayload) => {
+  if (isFormData(payload)) {
+    return (await api.post<ProductRecord>(`/inventory/products/${id}?_method=PATCH`, payload)).data;
+  }
+
+  return (await api.patch<ProductRecord>(`/inventory/products/${id}`, payload)).data;
+};
 
 export const deleteInventoryProduct = async (id: number) =>
   (await api.delete(`/inventory/products/${id}`)).data;
@@ -197,3 +194,25 @@ export const assignProductToShelf = async (productId: number, shelfBoxId: number
       { shelf_box_id: shelfBoxId }
     )
   ).data;
+
+export const fetchInventoryQaProtocols = async () =>
+  (await api.get<QaProtocol[]>("/inventory/qa-protocols")).data;
+
+export const recordInventoryBatchQaResults = async (
+  batchId: number,
+  payload: {
+    results: Record<string, string | number>;
+    notes?: string;
+    tested_at?: string;
+    sample_size?: number;
+  }
+) => (await api.post(`/inventory/product-batches/${batchId}/qa-results`, payload)).data;
+
+export const fetchInventoryBatchCoa = async (batchId: number) =>
+  (await api.get<CoAResponse>(`/inventory/product-batches/${batchId}/coa`)).data;
+
+export const fetchInventoryBatchQaResults = async (batchId: number) =>
+  (await api.get<PaginatedQaBatchResults>(`/inventory/product-batches/${batchId}/qa-results`)).data;
+
+export const fetchInventoryDocuments = async (params: ListParams = {}) =>
+  (await api.get<PaginatedResponse<any>>("/inventory/documents", { params })).data;

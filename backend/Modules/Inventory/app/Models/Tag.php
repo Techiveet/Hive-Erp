@@ -12,6 +12,8 @@ class Tag extends Model
     use HasFactory;
     use BelongsToInventoryTenant;
 
+    protected $connection = 'central';
+
     protected $table = 'tags';
 
     protected $fillable = [

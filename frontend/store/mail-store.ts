@@ -13,23 +13,64 @@ export interface MailParticipant {
     created_at: string;
     message: {
         id: number;
-        subject: string;
-        body: string;
+        subject: string | null;
+        body: string | null;
+        status?: string | null;
+        draft_recipients?: {
+            to?: {
+                id: number | string;
+                name: string;
+                email: string;
+                avatar_url?: string | null;
+                avatar_path?: string | null;
+                chat_public_key?: string | null;
+            }[];
+            cc?: {
+                id: number | string;
+                name: string;
+                email: string;
+                avatar_url?: string | null;
+                avatar_path?: string | null;
+                chat_public_key?: string | null;
+            }[];
+            bcc?: {
+                id: number | string;
+                name: string;
+                email: string;
+                avatar_url?: string | null;
+                avatar_path?: string | null;
+                chat_public_key?: string | null;
+            }[];
+        } | null;
         sender_id: number;
         sender: {
             id: number;
             name: string;
             email: string;
             avatar_url: string;
+            avatar_path?: string | null;
+            chat_public_key?: string | null;
         };
         participants: {
             user: {
                 id: number;
                 name: string;
                 email: string;
-            }
+                avatar_url?: string | null;
+                avatar_path?: string | null;
+                chat_public_key?: string | null;
+            } | null
         }[];
         created_at: string;
+        encryption?: {
+            enabled: boolean;
+            algorithm?: string | null;
+            wrapped_key?: string | null;
+            key_version?: number | null;
+            encrypted?: boolean;
+            subject_encrypted?: boolean;
+            body_encrypted?: boolean;
+        } | null;
     };
 }
 
@@ -77,6 +118,13 @@ interface MailState {
     adjustCounts: (updates: Partial<MailCounts>) => void;
     onlineUsers: any[];
     setOnlineUsers: (users: any[]) => void;
+    encryptionConfig: {
+        enabled: boolean;
+        algorithm?: string | null;
+        public_key?: string | null;
+        fingerprint?: string | null;
+    };
+    setEncryptionConfig: (config: MailState['encryptionConfig']) => void;
 }
 
 export const useMailStore = create<MailState>((set) => ({
@@ -103,9 +151,17 @@ export const useMailStore = create<MailState>((set) => ({
     checkedMailIds: [],
     searchQuery: '',
     isFullscreen: false,
+    encryptionConfig: {
+        enabled: false,
+        algorithm: null,
+        public_key: null,
+        fingerprint: null,
+    },
     setActiveFolder: (folder) => set({ activeFolder: folder, selectedMailId: null, checkedMailIds: [], searchQuery: '', isFullscreen: false }),
     setMails: (mails) => set({ mails, checkedMailIds: [] }),
-    appendMail: (mail) => set((state) => ({ mails: [mail, ...state.mails] })),
+    appendMail: (mail) => set((state) => ({
+        mails: [mail, ...state.mails.filter((entry) => entry.id !== mail.id)]
+    })),
     updateMail: (id, data) => set((state) => ({
         mails: state.mails.map((m) => m.mail_message_id === id ? { ...m, ...data } : m)
     })),
@@ -142,4 +198,5 @@ export const useMailStore = create<MailState>((set) => ({
     }),
     onlineUsers: [],
     setOnlineUsers: (users) => set({ onlineUsers: users }),
+    setEncryptionConfig: (config) => set({ encryptionConfig: config }),
 }));

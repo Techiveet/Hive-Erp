@@ -111,6 +111,7 @@ class FileEntry extends Model implements HasMedia
             'mime_type' => $media->mime_type,
             'size' => $media->size,
             'human_size' => $media->human_readable_size,
+            'relative_path' => $mediaStorage->mediaRelativePath($media),
             'url' => $mediaUrl,
             'thumbnail' => $thumbnailUrl,
             'hls_path' => $this->hls_path,

@@ -445,6 +445,7 @@ class AuthController extends Controller
             'central_control_override' => $user->hasCentralControlOverride(),
             'has_completed_welcome_tour' => (bool) $user->has_completed_welcome_tour,
             'two_factor_enabled' => $twoFactorEnabled ?? (!empty($user->two_factor_secret) && $user->two_factor_confirmed_at !== null),
+            'business_type' => $tenant?->business_type ?? null,
             'module_access' => $tenant
                 ? app(TenantSubscriptionService::class)->buildModuleAccess($tenant)
                 : [

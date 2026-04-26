@@ -8,6 +8,8 @@ use Modules\Identity\Database\Seeders\IdentityDatabaseSeeder;
 use Modules\Subscription\Database\Seeders\SubscriptionDatabaseSeeder;
 use Modules\Tenancy\Database\Seeders\TenancyDatabaseSeeder;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
+use Modules\Inventory\Database\Seeders\WaterQualityTestSeeder;
+use Modules\Inventory\Database\Seeders\InventoryTestingSeeder;
 use Spatie\Permission\PermissionRegistrar;
 
 class DatabaseSeeder extends Seeder
@@ -20,19 +22,34 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            // 1. Establish central roles and super admins
             IdentityDatabaseSeeder::class,
-
-            // 2. Spawn tenant databases (this triggers the tenant-specific seeders)
+            \Modules\Tenancy\Database\Seeders\BusinessTypeSeeder::class,
             TenancyDatabaseSeeder::class,
-
-            // 3. Seed central subscription records for tenant workspaces
             SubscriptionDatabaseSeeder::class,
-
-            // 4. Establish global core settings and languages
             CoreDatabaseSeeder::class,
         ]);
 
+        $this->seedCentralInventoryModule();
+
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
+    }
+
+    protected function seedCentralInventoryModule(): void
+    {
+        $catalog = app(\Modules\Tenancy\Support\TenantLandingTemplateCatalog::class);
+        $businessTypes = $catalog->businessTypeKeys();
+
+        if (in_array('water-bottling', $businessTypes)) {
+            $tenant = \Modules\Tenancy\Models\Tenant::find('aquauno');
+
+            if ($tenant) {
+                $tenant->run(function () {
+                    $this->call([
+                        WaterQualityTestSeeder::class,
+                        InventoryTestingSeeder::class,
+                    ]);
+                });
+            }
+        }
     }
 }

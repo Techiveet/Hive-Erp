@@ -293,6 +293,7 @@ class InventoryExportController extends Controller
         }
 
         if ($type === 'pdf') {
+            ini_set('memory_limit', '512M');
             $this->enforcePdfLimit($query);
             $rows = (clone $query)
                 ->limit($this->maxPdfRows())
@@ -301,6 +302,12 @@ class InventoryExportController extends Controller
                 ->all();
 
             $html = $this->buildPdfHtml($title, $headings, $rows, $branding);
+            
+            \Log::info("Generating Inventory PDF export", [
+                'rows' => count($rows),
+                'html_length' => strlen($html),
+                'user_id' => auth()->id()
+            ]);
 
             return Pdf::loadHTML($html)
                 ->setPaper('a4', 'landscape')

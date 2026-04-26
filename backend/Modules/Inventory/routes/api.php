@@ -98,6 +98,12 @@ Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout', 'tenant_m
         Route::post('product-batches/{batchId}/qa-results', [InventoryBatchQaResultController::class, 'store'])
             ->middleware('permission:manage_inventory,sanctum')
             ->name('product-batches.qa-results.store');
+        Route::get('product-batches/{batchId}/coa', [InventoryBatchQaResultController::class, 'coa'])
+            ->middleware('permission:view_inventory|manage_inventory,sanctum')
+            ->name('product-batches.coa');
+
+        Route::get('qa-protocols', [InventoryBatchQaResultController::class, 'protocols'])
+            ->middleware('permission:view_inventory|manage_inventory,sanctum');
 
         Route::get('categories', [InventoryCategoryController::class, 'index'])
             ->middleware('permission:view_inventory|manage_inventory,sanctum')
@@ -259,6 +265,12 @@ Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout', 'tenant_m
             Route::get('shelf-boxes/{id}', fn($id) => app(InventoryEntityRecordController::class)->show('shelf-boxes', $id));
             Route::match(['put', 'patch'], 'shelf-boxes/{id}', fn(\Illuminate\Http\Request $request, $id) => app(InventoryEntityRecordController::class)->update($request, 'shelf-boxes', $id));
             Route::delete('shelf-boxes/{id}', fn($id) => app(InventoryEntityRecordController::class)->destroy('shelf-boxes', $id));
+
+            Route::get('product-batches', [InventoryEntityRecordController::class, 'index'])->defaults('resource', 'product-batches');
+            Route::post('product-batches', [InventoryEntityRecordController::class, 'store'])->defaults('resource', 'product-batches');
+            Route::get('product-batches/{id}', fn($id) => app(InventoryEntityRecordController::class)->show('product-batches', $id));
+            Route::match(['put', 'patch'], 'product-batches/{id}', fn(\Illuminate\Http\Request $request, $id) => app(InventoryEntityRecordController::class)->update($request, 'product-batches', $id));
+            Route::delete('product-batches/{id}', fn($id) => app(InventoryEntityRecordController::class)->destroy('product-batches', $id));
         });
         Route::get('{resource}', [InventoryEntityRecordController::class, 'index'])
             ->where('resource', InventoryEntityCatalog::routeRegex())

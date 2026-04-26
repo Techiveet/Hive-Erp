@@ -349,19 +349,27 @@ export function VideoPlayer({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [progressStorageKey]);
 
+  const videoVersionsString = JSON.stringify(videoVersions);
+
   // 2. Load Fallback MP4 Qualities if not using HLS
   useEffect(() => {
     if (!isHlsSource && videoVersions.length > 0) {
-      setQualityLevels(videoVersions);
-      setActiveQuality(0); 
+      // Prevent redundant state updates
+      if (JSON.stringify(qualityLevels) !== videoVersionsString) {
+        setQualityLevels(videoVersions);
+        setActiveQuality(0); 
+      }
       return;
     }
 
     if (!isHlsSource) {
-      setQualityLevels([]);
-      setActiveQuality(-1);
+      // Only reset if not already reset
+      if (qualityLevels.length > 0) {
+        setQualityLevels([]);
+        setActiveQuality(-1);
+      }
     }
-  }, [isHlsSource, videoVersions]);
+  }, [isHlsSource, videoVersionsString]);
 
   // 3. Mount Video Source (HLS vs Native)
   useEffect(() => {

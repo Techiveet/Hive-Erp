@@ -22,6 +22,7 @@ class CentralGeneralSettingsSeeder extends BaseSettingsSeeder
             'maintenance_message' => 'HIVE.OS: System neural links are currently undergoing optimization.',
             'enable_registration' => false,
             'require_2fa' => false,
+            'enable_communication_encryption' => false,
         ]);
 
         $this->clearGeneralSettingsCache();

@@ -185,18 +185,26 @@ const normalizeApiRoot = (value: string): string => {
 };
 
 export const getBackendOrigin = (): string => {
-  if (shouldUseSameOriginTenantBackend()) {
-    return window.location.origin.replace(/\/+$/, "");
-  }
-
   const configuredApiRoot = process.env.NEXT_PUBLIC_API_URL?.trim();
 
-  if (configuredApiRoot) {
+  if (configuredApiRoot && configuredApiRoot.startsWith("http")) {
     try {
-      return new URL(configuredApiRoot).origin;
+      const url = new URL(configuredApiRoot);
+      const onTenantHost = typeof window !== "undefined" && isTenantHost(window.location.hostname);
+      if (onTenantHost) {
+        const protocol = window.location.protocol;
+        const host = window.location.hostname;
+        const port = url.port ? `:${url.port}` : "";
+        return `${protocol}//${host}${port}`;
+      }
+      return url.origin;
     } catch {
-      return configuredApiRoot.replace(/\/api\/v1\/?$/, "").replace(/\/+$/, "");
+      // Fallback
     }
+  }
+
+  if (shouldUseSameOriginTenantBackend()) {
+    return window.location.origin.replace(/\/+$/, "");
   }
 
   if (typeof window === "undefined") {
@@ -229,6 +237,36 @@ const getLocalPathname = (url: string): string => {
   } catch {
     return url;
   }
+};
+
+/**
+ * Converts a standard file serve URL into a signed media stream URL.
+ * This allows native media players and 3D viewers to access protected 
+ * tenant media without manually adding Authorization headers.
+ */
+export const getStreamUrl = (url: string | null | undefined): string => {
+  if (!url) return "";
+
+  // Only transform URLs that follow the /api/v1/files/{id}/serve pattern
+  const match = url.match(/\/api\/v1\/files\/(\d+)\/serve/);
+  if (!match) return url;
+
+  const fileId = match[1];
+  const apiRoot = getBackendApiRoot();
+  const token = typeof window !== "undefined" ? localStorage.getItem("hive_token") : null;
+  const tenantId = getStoredHiveContext();
+  const tenantSignature = getStoredHiveContextSignature();
+
+  const params = new URLSearchParams();
+  if (token) params.set("token", token);
+  if (tenantId) params.set("tenant", tenantId);
+  
+  // Only add signature for tenant-scoped requests (not central)
+  if (tenantId && tenantId !== "central" && tenantSignature) {
+    params.set("signature", tenantSignature);
+  }
+
+  return `${apiRoot}/media/stream/${fileId}?${params.toString()}`;
 };
 
 const getStorageAssetPath = (url: string | null | undefined): string | null => {
@@ -340,4 +378,14 @@ export const extractStorageRelativePath = (url: string | null | undefined): stri
   }
 
   return getLocalPathname(url);
+};
+
+export const handleAuthFailureResponse = async (res: Response): Promise<boolean> => {
+  if (res.status === 401) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/sign-in";
+    }
+    return true;
+  }
+  return false;
 };

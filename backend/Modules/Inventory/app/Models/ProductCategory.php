@@ -7,11 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Inventory\Models\Concerns\BelongsToInventoryTenant;
+use Modules\Workflow\Traits\HasDynamicApprovals;
 
 class ProductCategory extends Model
 {
     use HasFactory;
     use BelongsToInventoryTenant;
+    use HasDynamicApprovals;
+
+    protected $connection = 'central';
 
     protected $table = 'product_categories';
 

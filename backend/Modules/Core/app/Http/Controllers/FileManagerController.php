@@ -26,11 +26,8 @@ class FileManagerController extends Controller
 {
     public function __construct(
         private readonly VideoWatermarkService $videoWatermarkService,
-<<<<<<< HEAD
-        private readonly TemporaryDownloadSignature $temporaryDownloadSignature
-=======
+        private readonly TemporaryDownloadSignature $temporaryDownloadSignature,
         private readonly TenantMediaStorage $mediaStorage
->>>>>>> fdba7116f66fd5d462137665fb0c6cad6d63dd2d
     ) {}
 
     // =========================================================================

@@ -3,7 +3,7 @@
 import * as React from "react";
 import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, Power, Trash2, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/store/use-translation";
 
@@ -34,6 +34,7 @@ import {
   updateInventorySupplier,
 } from "@/modules/inventory/api";
 import type { Supplier } from "@/modules/inventory/types";
+import { AssignApproversDialog } from "@/modules/workflow/components/assign-approvers-dialog";
 
 type TableQueryState = {
   page: number;
@@ -77,6 +78,8 @@ export default function InventorySuppliersPage() {
   const [selectedRowIds, setSelectedRowIds] = React.useState<RowSelectionState>({});
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState<SupplierForm>(DEFAULT_FORM);
+  const [approverDialogOpen, setApproverDialogOpen] = React.useState(false);
+  const [approverTarget, setApproverTarget] = React.useState<{ type: string; id: number; name?: string } | null>(null);
 
   const suppliersQuery = useQuery({
     queryKey: ["inventory", "suppliers", tableQuery],
@@ -198,6 +201,11 @@ export default function InventorySuppliersPage() {
     setForm(DEFAULT_FORM);
   }, []);
 
+  const openApproverDialog = React.useCallback((type: string, id: number, name?: string) => {
+    setApproverTarget({ type, id, name });
+    setApproverDialogOpen(true);
+  }, []);
+
   const exportUrl = React.useMemo(() => {
     const params = new URLSearchParams();
     if (tableQuery.search) params.set("search", tableQuery.search);
@@ -260,6 +268,15 @@ export default function InventorySuppliersPage() {
               <Button size="sm" variant="outline" className="rounded-full" onClick={() => openEdit(supplier)}>
                 <Pencil className="mr-1 h-3.5 w-3.5" />
                 {t("inventory.common.edit", "Edit")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => openApproverDialog("Modules\\Inventory\\Models\\Supplier", supplier.id, supplier.name)}
+              >
+                <UserCheck className="mr-1 h-3.5 w-3.5" />
+                {t("inventory.common.approve", "Request Approval")}
               </Button>
               {supplier.is_active ? (
                 <AlertDialog>
@@ -484,6 +501,19 @@ export default function InventorySuppliersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {approverTarget && (
+        <AssignApproversDialog
+          isOpen={approverDialogOpen}
+          onClose={() => {
+            setApproverDialogOpen(false);
+            setApproverTarget(null);
+          }}
+          approvableType={approverTarget.type}
+          approvableId={approverTarget.id}
+          approvableName={approverTarget.name}
+        />
+      )}
     </div>
   );
 }

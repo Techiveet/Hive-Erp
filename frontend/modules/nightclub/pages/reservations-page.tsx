@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Loader2, Plus, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Plus, XCircle, UserCheck } from "lucide-react";
+import { AssignApproversDialog } from "@/modules/workflow/components/assign-approvers-dialog";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,8 @@ export default function NightClubReservationsPage() {
   const [statusFilter, setStatusFilter] = React.useState<(typeof statuses)[number]>("all");
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState<ReservationForm>(defaultForm);
+  const [approvalTarget, setApprovalTarget] = React.useState<NightClubReservation | null>(null);
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = React.useState(false);
 
   const reservationsQuery = useQuery({
     queryKey: ["nightclub", "reservations", statusFilter],
@@ -230,6 +233,19 @@ export default function NightClubReservationsPage() {
                       </Button>
                     </>
                   ) : null}
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-emerald-600 hover:bg-emerald-600/10"
+                    title="Request Approval"
+                    onClick={() => {
+                      setApprovalTarget(reservation);
+                      setIsApprovalDialogOpen(true);
+                    }}
+                  >
+                    <UserCheck className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>
@@ -342,6 +358,18 @@ export default function NightClubReservationsPage() {
           </div>
         </div>
       ) : null}
+      {approvalTarget && (
+        <AssignApproversDialog
+          isOpen={isApprovalDialogOpen}
+          onClose={() => {
+            setIsApprovalDialogOpen(false);
+            setApprovalTarget(null);
+          }}
+          approvableId={Number(approvalTarget.id)}
+          approvableType="Modules\NightClub\Models\Reservation"
+          approvableName={`${approvalTarget.customer_name} (${approvalTarget.reservation_code || `#${approvalTarget.id}`})`}
+        />
+      )}
     </div>
   );
 }

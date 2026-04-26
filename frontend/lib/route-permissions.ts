@@ -6,6 +6,7 @@ export const TENANTS_ROUTE_PERMISSIONS = ["view_tenants", "manage_tenants"] as c
 export const LANDING_TEMPLATES_ROUTE_PERMISSIONS = ["manage_tenants", "provision_tenants"] as const;
 export const SUBSCRIPTIONS_ROUTE_PERMISSIONS = ["view_module_subscriptions", "manage_module_subscriptions"] as const;
 export const STORAGE_ROUTE_PERMISSIONS = ["view_storage", "manage_storage"] as const;
+export const CHAT_ROUTE_PERMISSIONS = ["view_chat", "manage_chat"] as const;
 export const SETTINGS_ROUTE_PERMISSIONS = [
   "manage_brand_settings",
   "manage_general_settings",
@@ -81,6 +82,10 @@ export function canAccessDashboardRoute(rawPath: string, access: RoutePermission
 
   if (matchesPrefix(path, "/dashboard/storage")) {
     return access.hasAnyPermission([...STORAGE_ROUTE_PERMISSIONS]);
+  }
+
+  if (matchesPrefix(path, "/dashboard/chat")) {
+    return access.hasAnyPermission([...CHAT_ROUTE_PERMISSIONS]);
   }
 
   if (matchesPrefix(path, "/dashboard/settings")) {

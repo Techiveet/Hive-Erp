@@ -7,6 +7,11 @@ use Modules\Warehouse\Support\WarehouseTenantContext;
 
 trait BelongsToWarehouseTenant
 {
+    public function getConnectionName()
+    {
+        return 'central';
+    }
+
     protected static function bootBelongsToWarehouseTenant(): void
     {
         static::creating(function ($model): void {

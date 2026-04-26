@@ -99,6 +99,7 @@ class TenantModuleCatalog
                 'category' => 'Business Apps',
                 'tone' => 'lime',
                 'recommended_plans' => ['business', 'enterprise', 'overlord'],
+                'business_types' => ['retail', 'restaurant', 'hotel', 'clinic', 'logistics', 'water-bottling', 'farm'],
                 'monthly_price_etb' => 649,
                 'route_hints' => ['/dashboard/inventory'],
             ],
@@ -109,6 +110,7 @@ class TenantModuleCatalog
                 'category' => 'Hospitality',
                 'tone' => 'fuchsia',
                 'recommended_plans' => ['business', 'enterprise', 'overlord'],
+                'business_types' => ['restaurant', 'hotel'],
                 'monthly_price_etb' => 749,
                 'route_hints' => ['/dashboard/nightclub'],
             ],
@@ -119,6 +121,7 @@ class TenantModuleCatalog
                 'category' => 'Business Apps',
                 'tone' => 'teal',
                 'recommended_plans' => ['enterprise', 'overlord'],
+                'business_types' => ['logistics', 'water-bottling', 'farm'],
                 'monthly_price_etb' => 799,
             ],
 
@@ -377,12 +380,25 @@ class TenantModuleCatalog
         return $defaults;
     }
 
-    public static function defaultsForPlan(?string $plan): array
+    public static function defaultsForPlan(?string $plan, ?string $businessType = null): array
     {
         $defaults = self::planDefaults();
         $key = strtolower((string) $plan);
 
-        return $defaults[$key] ?? $defaults['business'];
+        $modules = $defaults[$key] ?? $defaults['business'];
+
+        if ($businessType) {
+            $catalogMap = self::catalogMap();
+            // Filter out modules that explicitly don't support the business type
+            $modules = collect($modules)->filter(function ($slug) use ($catalogMap, $businessType) {
+                if (!isset($catalogMap[$slug]) || !isset($catalogMap[$slug]['business_types'])) {
+                    return true;
+                }
+                return empty($catalogMap[$slug]['business_types']) || in_array($businessType, $catalogMap[$slug]['business_types'], true);
+            })->values()->all();
+        }
+
+        return $modules;
     }
 
     public static function planOverrides(): array
@@ -507,16 +523,16 @@ class TenantModuleCatalog
         ];
     }
 
-    public static function resolve(?array $payload, ?string $plan = null, array $pendingModules = []): array
+    public static function resolve(?array $payload, ?string $plan = null, array $pendingModules = [], ?string $businessType = null): array
     {
         if ($payload === null) {
             return self::decorate([
-                'enabled_modules' => self::defaultsForPlan($plan),
+                'enabled_modules' => self::defaultsForPlan($plan, $businessType),
                 'custom_modules' => [],
                 'catalog_version' => self::VERSION,
                 'updated_at' => null,
                 'updated_by' => null,
-            ], $plan, $pendingModules);
+            ], $plan, $pendingModules, $businessType);
         }
 
         $enabledModules = self::normalizeEnabledModules(
@@ -531,12 +547,12 @@ class TenantModuleCatalog
             'catalog_version' => (int) ($payload['catalog_version'] ?? self::VERSION),
             'updated_at' => $payload['updated_at'] ?? null,
             'updated_by' => $payload['updated_by'] ?? null,
-        ], $plan, $pendingModules);
+        ], $plan, $pendingModules, $businessType);
     }
 
-    public static function normalizeForStorage(?array $payload, ?string $plan = null, ?string $updatedBy = null): array
+    public static function normalizeForStorage(?array $payload, ?string $plan = null, ?string $updatedBy = null, ?string $businessType = null): array
     {
-        $resolved = self::resolve($payload, $plan);
+        $resolved = self::resolve($payload, $plan, [], $businessType);
 
         return [
             'enabled_modules' => $resolved['enabled_modules'],
@@ -622,10 +638,10 @@ class TenantModuleCatalog
             ->all();
     }
 
-    protected static function decorate(array $state, ?string $plan = null, array $pendingModules = []): array
+    protected static function decorate(array $state, ?string $plan = null, array $pendingModules = [], ?string $businessType = null): array
     {
         $catalogMap = self::catalogMap();
-        $includedModules = self::defaultsForPlan($plan);
+        $includedModules = self::defaultsForPlan($plan, $businessType);
         $pending = collect(self::normalizeEnabledModules($pendingModules));
         $selectedCatalogModules = collect($state['enabled_modules'])
             ->filter(fn (string $slug) => isset($catalogMap[$slug]))
@@ -650,6 +666,12 @@ class TenantModuleCatalog
             ->all();
 
         $catalogModules = collect(self::catalog())
+            ->filter(function (array $module) use ($businessType) {
+                if (!$businessType || !isset($module['business_types'])) {
+                    return true;
+                }
+                return empty($module['business_types']) || in_array($businessType, $module['business_types'], true);
+            })
             ->map(function (array $module) use ($state, $includedModules, $pending) {
                 $isActive = in_array($module['slug'], $state['enabled_modules'], true);
                 $isPending = !$isActive && $pending->contains($module['slug']);

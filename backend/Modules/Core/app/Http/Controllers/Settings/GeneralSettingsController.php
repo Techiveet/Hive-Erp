@@ -3,16 +3,18 @@
 namespace Modules\Core\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Modules\Core\Models\Setting;
+use Modules\Core\Support\CommunicationEncryptionSyncService;
+use Modules\Core\Support\CommunicationEncryptionService;
 
 class GeneralSettingsController extends Controller
 {
     /**
      * Fetch the current general settings
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $isTenantContext = $this->isTenantContext();
         $keys = [
@@ -30,7 +32,8 @@ class GeneralSettingsController extends Controller
             'maintenance_mode',
             'maintenance_message',  // 🚀 NEW: Added the live status ticker message
             'enable_registration',
-            'require_2fa'
+            'require_2fa',
+            'enable_communication_encryption',
         ];
 
         // Fetch existing settings from the database
@@ -53,6 +56,7 @@ class GeneralSettingsController extends Controller
             'maintenance_message' => 'HIVE.OS: System neural links are currently undergoing optimization.', // 🚀 NEW
             'enable_registration' => false,
             'require_2fa' => false,
+            'enable_communication_encryption' => false,
         ];
 
         // Merge DB data over defaults
@@ -64,6 +68,7 @@ class GeneralSettingsController extends Controller
         $response['maintenance_mode'] = filter_var($response['maintenance_mode'], FILTER_VALIDATE_BOOLEAN);
         $response['enable_registration'] = filter_var($response['enable_registration'], FILTER_VALIDATE_BOOLEAN);
         $response['require_2fa'] = filter_var($response['require_2fa'], FILTER_VALIDATE_BOOLEAN);
+        $response['enable_communication_encryption'] = app(CommunicationEncryptionService::class)->isEnabled();
 
         // Maintenance mode is a central-node control. Tenant dashboards should
         // never expose or honor a tenant-local maintenance toggle.
@@ -83,6 +88,8 @@ class GeneralSettingsController extends Controller
     public function store(Request $request): JsonResponse
     {
         $isTenantContext = $this->isTenantContext();
+        $canManageCommunicationEncryption = $this->canManageCommunicationEncryption($request);
+        $currentEncryptionState = app(CommunicationEncryptionService::class)->isEnabled();
 
         // 1. Strict Validation
         $rules = [
@@ -99,6 +106,7 @@ class GeneralSettingsController extends Controller
             'session_timeout_minutes' => 'required|integer|min:1|max:1440',
             'enable_registration' => 'required|boolean',
             'require_2fa' => 'required|boolean',
+            'enable_communication_encryption' => 'sometimes|boolean',
         ];
 
         if (!$isTenantContext) {
@@ -107,6 +115,32 @@ class GeneralSettingsController extends Controller
         }
 
         $validated = $request->validate($rules);
+
+        if (! $canManageCommunicationEncryption) {
+            if ($request->has('enable_communication_encryption')
+                && (bool) $request->boolean('enable_communication_encryption') !== $currentEncryptionState) {
+                return response()->json([
+                    'message' => 'Only the central Super Admin can change communication encryption.',
+                ], 403);
+            }
+
+            $validated['enable_communication_encryption'] = $currentEncryptionState;
+        }
+
+        $requestedEncryptionState = (bool) ($validated['enable_communication_encryption'] ?? $currentEncryptionState);
+
+        if ($requestedEncryptionState !== $currentEncryptionState) {
+            try {
+                app(CommunicationEncryptionSyncService::class)->sync($requestedEncryptionState);
+            } catch (\Throwable $exception) {
+                report($exception);
+
+                return response()->json([
+                    'message' => 'Failed to update communication encryption for the current workspace.',
+                ], 500);
+            }
+        }
+
         $settingsToPersist = $validated;
 
         if ($isTenantContext) {
@@ -140,5 +174,16 @@ class GeneralSettingsController extends Controller
     private function isTenantContext(): bool
     {
         return function_exists('tenant') && (bool) tenant('id');
+    }
+
+    private function canManageCommunicationEncryption(Request $request): bool
+    {
+        if ($this->isTenantContext()) {
+            return false;
+        }
+
+        $user = $request->user();
+
+        return $user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin();
     }
 }

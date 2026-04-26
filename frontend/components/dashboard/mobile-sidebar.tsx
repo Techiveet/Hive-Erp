@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { usePathname, useRouter } from "next/navigation";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useBusinessType } from "@/hooks/use-business-type";
 import { useTranslation } from "@/store/use-translation";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
@@ -68,6 +69,7 @@ export function MobileSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { hasAnyPermission } = usePermissions();
+  const { hasBusinessType } = useBusinessType();
   const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
   
@@ -110,9 +112,8 @@ export function MobileSidebar() {
 
   const hasAccess = (item: NavItem) => {
     if (!isTenantNode && item.moduleId === "subscription") return false;
-    // 🚀 THE FIX: Hide Tenant Management if the user is on a Tenant Node
     if (isTenantNode && item.href === '/dashboard/tenants') return false;
-
+    if (item.businessTypes && item.businessTypes.length > 0 && !hasBusinessType(item.businessTypes)) return false;
     if (!item.permissions || item.permissions.length === 0) return true;
     return hasAnyPermission(item.permissions);
   };

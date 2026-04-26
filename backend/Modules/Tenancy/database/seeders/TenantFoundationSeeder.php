@@ -20,6 +20,14 @@ class TenantFoundationSeeder extends Seeder
             TenantBrandSettingsSeeder::class,
         ]);
 
+        $businessType = tenant('business_type')
+            ?? (tenant()->landing_page_template['meta']['business_type'] ?? null);
+
+        if ($businessType === 'water-bottling') {
+            $this->call(\Modules\Inventory\Database\Seeders\WaterQualityTestSeeder::class);
+            $this->call(\Modules\Inventory\Database\Seeders\InventoryTestingSeeder::class);
+        }
+
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
     }
 }

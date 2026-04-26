@@ -38,6 +38,8 @@ import { BackupSettings } from '@/components/settings/backup-settings';
 import { EmailSettings } from '@/components/settings/email-settings';
 import { PaymentSettings } from '@/components/settings/payment-settings';
 import { PlanSettings } from '@/components/settings/plan-settings';
+import { useChatStore } from '@/store/chat-store';
+import { useMailStore } from '@/store/mail-store';
 
 const toErrorMessage = (value: unknown, fallback = "Something went wrong."): string => {
     if (value instanceof Error && typeof value.message === "string" && value.message.trim()) {
@@ -523,13 +525,14 @@ function BrandSettings() {
 function GeneralSettings() {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
+    const { roles } = usePermissions();
     const [isTenantNode, setIsTenantNode] = useState<boolean | null>(null);
 
     const [formData, setFormData] = useState({
         support_email: '', support_phone: '', system_email_name: '', system_email_address: '',
         default_timezone: 'UTC', default_currency: 'USD', date_format: 'YYYY-MM-DD', time_format: '24h',
         max_upload_size: 10, max_upload_unit: 'MB', session_timeout_minutes: 120, maintenance_mode: false,
-        maintenance_message: '', enable_registration: false, require_2fa: false,
+        maintenance_message: '', enable_registration: false, require_2fa: false, enable_communication_encryption: false,
     });
 
     const { data: settingsData, isLoading } = useQuery({
@@ -549,14 +552,43 @@ function GeneralSettings() {
         setIsTenantNode(isTenantSession());
     }, []);
 
+    const canManageCommunicationEncryption = isTenantNode === false
+        && roles.some((role) => role.toLowerCase() === 'super admin');
+
     const saveMut = useMutation({
         mutationFn: () => {
-            const { maintenance_mode, maintenance_message, ...tenantPayload } = formData;
-            const payload = isTenantNode === true ? tenantPayload : formData;
+            const {
+                maintenance_mode,
+                maintenance_message,
+                enable_communication_encryption,
+                ...basePayload
+            } = formData;
+
+            const payload = {
+                ...basePayload,
+                ...(isTenantNode === false ? {
+                    maintenance_mode,
+                    maintenance_message,
+                } : {}),
+                ...(canManageCommunicationEncryption ? {
+                    enable_communication_encryption,
+                } : {}),
+            };
 
             return apiFetch('/settings/general', { method: 'POST', body: JSON.stringify(payload) });
         },
         onSuccess: () => {
+            const nextEnabledState = Boolean(formData.enable_communication_encryption);
+            const currentChatConfig = useChatStore.getState().encryptionConfig;
+            const currentMailConfig = useMailStore.getState().encryptionConfig;
+            useChatStore.getState().setEncryptionConfig({
+                ...currentChatConfig,
+                enabled: nextEnabledState,
+            });
+            useMailStore.getState().setEncryptionConfig({
+                ...currentMailConfig,
+                enabled: nextEnabledState,
+            });
             toast.success(t('settings.general_updated', "System Configuration Updated Successfully!"));
             queryClient.invalidateQueries({ queryKey: ['globalSystemSettings'] });
         },
@@ -595,7 +627,7 @@ function GeneralSettings() {
                     <div className="h-10 w-10 bg-purple-500/10 rounded-xl flex items-center justify-center text-purple-500"><ShieldCheck className="h-5 w-5" /></div>
                     <div><h2 className="text-2xl font-space font-black tracking-tight text-foreground">{t('settings.global_access', 'Global Access Control')}</h2></div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div onClick={() => handleToggle('enable_registration')} className={cn("flex items-center gap-4 p-4 rounded-xl border cursor-pointer", formData.enable_registration ? "bg-purple-500/10 border-purple-500/30" : "bg-muted/30")}>
                         <div className="h-10 w-10 bg-background rounded-lg flex items-center justify-center shrink-0 border"><UserPlus className={cn("h-5 w-5", formData.enable_registration ? "text-purple-500" : "text-muted-foreground")} /></div>
                         <div className="flex-1"><Label className="text-sm font-bold cursor-pointer">{t('settings.allow_registration', 'Allow Public Registration')}</Label></div>
@@ -606,6 +638,29 @@ function GeneralSettings() {
                         <div className="flex-1"><Label className="text-sm font-bold cursor-pointer">{t('settings.enforce_2fa', 'Enforce Global 2FA')}</Label></div>
                         <Switch checked={formData.require_2fa} className="data-[state=checked]:bg-amber-500 pointer-events-none" />
                     </div>
+                    {canManageCommunicationEncryption ? (
+                        <div onClick={() => handleToggle('enable_communication_encryption')} className={cn("flex items-start gap-4 p-4 rounded-xl border cursor-pointer", formData.enable_communication_encryption ? "bg-emerald-500/10 border-emerald-500/30" : "bg-muted/30")}>
+                            <div className="h-10 w-10 bg-background rounded-lg flex items-center justify-center shrink-0 border"><Shield className={cn("h-5 w-5", formData.enable_communication_encryption ? "text-emerald-500" : "text-muted-foreground")} /></div>
+                            <div className="flex-1">
+                                <Label className="text-sm font-bold cursor-pointer">{t('settings.communication_encryption', 'Communication Encryption')}</Label>
+                                <p className="mt-1 text-xs text-muted-foreground">{t('settings.communication_encryption_desc', 'Enable secure chat and mailbox encryption in the browser, plus protected communication storage for this workspace.')}</p>
+                            </div>
+                            <Switch checked={formData.enable_communication_encryption} className="data-[state=checked]:bg-emerald-500 pointer-events-none" />
+                        </div>
+                    ) : (
+                        <div className={cn("flex items-start gap-4 p-4 rounded-xl border", formData.enable_communication_encryption ? "bg-emerald-500/10 border-emerald-500/30" : "bg-muted/30")}>
+                            <div className="h-10 w-10 bg-background rounded-lg flex items-center justify-center shrink-0 border"><Shield className={cn("h-5 w-5", formData.enable_communication_encryption ? "text-emerald-500" : "text-muted-foreground")} /></div>
+                            <div className="flex-1">
+                                <Label className="text-sm font-bold">{t('settings.communication_encryption', 'Communication Encryption')}</Label>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    {isTenantNode
+                                        ? t('settings.communication_encryption_tenant_locked', 'This setting is controlled from the central system by the Super Admin.')
+                                        : t('settings.communication_encryption_locked', 'Only the central Super Admin can enable or disable communication encryption.')}
+                                </p>
+                            </div>
+                            <Switch checked={formData.enable_communication_encryption} disabled className="data-[state=checked]:bg-emerald-500" />
+                        </div>
+                    )}
                 </div>
             </div>
 

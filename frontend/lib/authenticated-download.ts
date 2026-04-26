@@ -65,11 +65,25 @@ export const authenticatedDownload = (
 
     xhr.onload = () => {
       if (xhr.status < 200 || xhr.status >= 300) {
-        const fallbackMessage = xhr.status === 401
-          ? "Authentication expired. Please sign in again."
-          : "Download failed. Please try again.";
-
-        reject(new Error(fallbackMessage));
+        const blob = xhr.response;
+        if (blob instanceof Blob) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const json = JSON.parse(reader.result as string);
+              reject(new Error(json.message || json.error || "Download failed."));
+            } catch {
+              reject(new Error("Download failed. Please try again."));
+            }
+          };
+          reader.onerror = () => reject(new Error("Download failed."));
+          reader.readAsText(blob);
+        } else {
+          const fallbackMessage = xhr.status === 401
+            ? "Authentication expired. Please sign in again."
+            : "Download failed. Please try again.";
+          reject(new Error(fallbackMessage));
+        }
         return;
       }
 

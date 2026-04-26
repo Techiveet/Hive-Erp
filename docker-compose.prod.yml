@@ -154,6 +154,21 @@ services:
     networks:
       - hive-network
 
+  # 🎬 MEDIA CONVERTER (FFmpeg API)
+  ffmpeg:
+    build:
+      context: ./ffmpeg-api
+      dockerfile: Dockerfile
+    container_name: hive-ffmpeg
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hive-network
+
   # PDF & DOC CONVERTER (Gotenberg)
   gotenberg:
     image: gotenberg/gotenberg:8
@@ -197,6 +212,7 @@ services:
       MEILISEARCH_INTERNAL_URL: ${MEILISEARCH_INTERNAL_URL:-http://meilisearch:7700}
       REMBG_INTERNAL_URL: ${REMBG_INTERNAL_URL:-http://rembg:5000}
       GOTENBERG_INTERNAL_URL: ${GOTENBERG_INTERNAL_URL:-http://gotenberg:3000}
+      FFMPEG_INTERNAL_URL: ${FFMPEG_INTERNAL_URL:-http://ffmpeg:9090}
       REVERB_HOST: reverb
       PUSHER_HOST: reverb
     depends_on:
@@ -210,6 +226,8 @@ services:
         condition: service_completed_successfully
       meilisearch:
         condition: service_started
+      ffmpeg:
+        condition: service_healthy
     command: php artisan octane:start --server=roadrunner --host=0.0.0.0 --port=8000
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8000/up || exit 1"]

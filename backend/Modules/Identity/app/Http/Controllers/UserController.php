@@ -153,6 +153,8 @@ class UserController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'avatar_url' => $user->avatar_url,
+                'chat_public_key' => $user->chat_encryption_public_key,
+                'chat_key_fingerprint' => $user->chat_encryption_key_fingerprint,
             ];
         });
 

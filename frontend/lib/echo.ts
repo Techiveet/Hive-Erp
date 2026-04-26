@@ -1,43 +1,91 @@
-//lib/echo.ts
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
-import { getBackendOrigin, getTenantHeaders } from "@/lib/runtime-context";
+import { getBackendOrigin, getTenantHeaders, getTenantId } from "@/lib/runtime-context";
 
 declare global {
   interface Window {
-    Pusher: any;
-    Echo: Echo<any>;
+    Pusher: typeof Pusher;
+    Echo?: Echo<any>;
+    __hiveEchoSessionKey?: string;
   }
 }
 
-export const initEcho = (token: string) => {
-  if (typeof window !== 'undefined') {
-    window.Pusher = Pusher;
+const getTenantChannelPrefix = () => {
+  const tenantId = getTenantId();
 
-    // Singleton pattern to prevent duplicate connections
-    if (!window.Echo) {
-      const authEndpoint = `${getBackendOrigin()}/api/v1/broadcasting/auth`;
-      window.Echo = new Echo({
-        broadcaster: 'reverb',
-        key: process.env.NEXT_PUBLIC_REVERB_APP_KEY,
-        wsHost: process.env.NEXT_PUBLIC_REVERB_HOST || 'localhost',
-        
-        // 🚀 THE FIX: Cast the string environment variables safely to numbers
-        wsPort: Number(process.env.NEXT_PUBLIC_REVERB_PORT ?? 9000),
-        wssPort: Number(process.env.NEXT_PUBLIC_REVERB_PORT ?? 9000),
-        
-        forceTLS: process.env.NEXT_PUBLIC_REVERB_SCHEME === 'https',
-        enabledTransports: ['ws', 'wss'],
-        authEndpoint: authEndpoint, 
-        auth: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-            ...getTenantHeaders(),
-          },
-        },
-      });
-    }
+  return tenantId ? `tenant.${tenantId}.` : '';
+};
+
+export const getChatUserChannelName = (userId: number | string) => {
+  return `${getTenantChannelPrefix()}user.${userId}.chat`;
+};
+
+export const getUserNotificationChannelName = (userId: number | string) => {
+  return `${getTenantChannelPrefix()}App.Models.User.${userId}`;
+};
+
+export const getChatPresenceChannelName = () => {
+  return `${getTenantChannelPrefix()}chat.presence`;
+};
+
+export const getConversationPresenceChannelName = (conversationId: number | string) => {
+  return `${getTenantChannelPrefix()}chat.conversation.${conversationId}.presence`;
+};
+
+export const getWorkflowChannelName = (userId: number | string) => {
+  return `${getTenantChannelPrefix()}user.${userId}.workflow`;
+};
+
+export const getWorkflowGlobalChannelName = () => {
+  return `${getTenantChannelPrefix()}workflow`;
+};
+
+export const initEcho = (token: string) => {
+  if (typeof window === 'undefined') {
+    throw new Error('Echo can only be initialized in the browser.');
   }
+
+  window.Pusher = Pusher;
+
+  const reverbHost =
+    process.env.NEXT_PUBLIC_REVERB_HOST === 'localhost' || process.env.NEXT_PUBLIC_REVERB_HOST === 'reverb'
+      ? window.location.hostname
+      : process.env.NEXT_PUBLIC_REVERB_HOST || window.location.hostname;
+
+  const reverbPort =
+    process.env.NEXT_PUBLIC_REVERB_HOST === 'localhost' || process.env.NEXT_PUBLIC_REVERB_HOST === 'reverb'
+      ? 9000
+      : Number(process.env.NEXT_PUBLIC_REVERB_PORT ?? 9000);
+
+  const reverbScheme = window.location.protocol === 'https:' ? 'https' : (process.env.NEXT_PUBLIC_REVERB_SCHEME || 'http');
+  const sessionKey = `${getBackendOrigin()}::${getTenantId() ?? 'central'}::${token}`;
+
+  if (window.Echo && window.__hiveEchoSessionKey !== sessionKey) {
+    window.Echo.disconnect();
+    delete window.Echo;
+  }
+
+  if (!window.Echo) {
+    window.Echo = new Echo({
+      broadcaster: 'reverb',
+      key: process.env.NEXT_PUBLIC_REVERB_APP_KEY,
+      wsHost: reverbHost,
+      wsPort: reverbPort,
+      wssPort: reverbPort,
+      forceTLS: reverbScheme === 'https',
+      enabledTransports: ['ws', 'wss'],
+      authEndpoint: `${getBackendOrigin()}/api/v1/broadcasting/auth`,
+      auth: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          ...getTenantHeaders({ allowUnsigned: true }),
+        },
+      },
+    });
+
+    window.__hiveEchoSessionKey = sessionKey;
+  }
+
   return window.Echo;
 };

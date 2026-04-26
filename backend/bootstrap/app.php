@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active_status' => \App\Http\Middleware\EnsureActiveStatus::class,
             'dynamic_timeout' => \Modules\Core\Http\Middleware\EnforceDynamicSessionTimeout::class,
             'tenant_module' => \Modules\Subscription\Http\Middleware\EnsureTenantModuleEnabled::class,
+            'business_type' => \Modules\Tenancy\Http\Middleware\RequireBusinessType::class,
         ]);
 
         // 2. Bypass CSRF for API requests

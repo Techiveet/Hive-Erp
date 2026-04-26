@@ -57,6 +57,7 @@ final class AccessControlCatalog
             'view_users', 'create_users', 'edit_users', 'delete_users', 'manage_users',
             'view_roles', 'create_roles', 'edit_roles', 'delete_roles', 'manage_roles',
             'view_permissions',
+            'view_chat', 'manage_chat',
             'view_logs', 'export_logs', 'manage_log_settings', 'archive_logs', 'delete_archived_logs',
             'view_alerts', 'manage_alerts',
             'view_backups', 'manage_backups',
@@ -77,19 +78,24 @@ final class AccessControlCatalog
             'Security Auditor' => [
                 'view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs',
                 'view_tenants', 'view_users', 'view_roles', 'view_permissions',
-                'view_logs', 'export_logs', 'view_alerts', 'view_storage',
+                'view_chat', 'manage_chat', 'view_logs', 'export_logs', 'view_alerts', 'view_storage',
                 'view_module_subscriptions',
             ],
             'Support Specialist' => [
                 'view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs',
                 'view_tenants', 'view_users', 'edit_users',
-                'view_alerts', 'view_storage', 'view_module_subscriptions',
+                'view_chat', 'manage_chat', 'view_alerts', 'view_storage', 'view_module_subscriptions',
             ],
             'Billing Admin' => [
                 'view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs',
                 'view_tenants', 'suspend_tenants', 'view_alerts',
                 'manage_payment_settings',
                 'view_module_subscriptions', 'manage_module_subscriptions',
+            ],
+            'Communications Officer' => [
+                'view_system_dashboard', 'view_profile', 'edit_profile',
+                'view_users', 'view_storage',
+                'view_chat', 'manage_chat',
             ],
         ];
     }
@@ -106,6 +112,7 @@ final class AccessControlCatalog
                 'view_users', 'create_users', 'edit_users', 'delete_users', 'manage_users',
                 'view_roles', 'create_roles', 'edit_roles', 'delete_roles', 'manage_roles',
                 'view_permissions',
+                'view_chat', 'manage_chat',
                 'view_logs', 'export_logs', 'manage_log_settings', 'archive_logs', 'delete_archived_logs',
                 'view_alerts', 'manage_alerts',
                 'manage_system_settings',
@@ -146,16 +153,19 @@ final class AccessControlCatalog
         return [
             'HR Manager' => [
                 'view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs',
+                'view_chat', 'manage_chat',
                 'view_alerts', 'view_users', 'create_users', 'edit_users', 'view_roles',
                 'view_storage', 'view_module_subscriptions',
             ],
             'Finance Controller' => [
                 'view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs',
+                'view_chat', 'manage_chat',
                 'view_alerts', 'view_invoices', 'manage_invoices',
                 'view_logs', 'export_logs', 'view_module_subscriptions',
             ],
             'Logistics Coordinator' => [
                 'view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs', 'view_alerts',
+                'view_chat', 'manage_chat',
                 'view_inventory', 'manage_inventory', 'manage_fleet', 'view_module_subscriptions',
                 'manage_routes', 'manage_dispatches', 'approve_dispatches',
                 'manage_delivery_notes', 'dispatch_delivery_notes', 'confirm_delivery_notes',
@@ -163,7 +173,13 @@ final class AccessControlCatalog
             ],
             'Employee' => [
                 'view_system_dashboard', 'view_profile', 'edit_profile', 'view_api_docs',
+                'view_chat', 'manage_chat',
                 'view_alerts', 'view_users', 'view_module_subscriptions',
+            ],
+            'Communications Officer' => [
+                'view_system_dashboard', 'view_profile', 'edit_profile',
+                'view_users', 'view_storage',
+                'view_chat', 'manage_chat',
             ],
         ] + self::nightclubRoles();
     }

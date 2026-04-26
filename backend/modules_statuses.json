@@ -7,5 +7,7 @@
     "MailBox": true,
     "NightClub": true,
     "Inventory": true,
-    "Warehouse": true
+    "Warehouse": true,
+    "Chat": true,
+    "Workflow": true
 }

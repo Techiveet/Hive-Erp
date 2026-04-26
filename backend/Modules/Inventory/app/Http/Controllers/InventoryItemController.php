@@ -52,8 +52,8 @@ class InventoryItemController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'category_id' => ['nullable', 'exists:inventory_categories,id'],
-            'sku' => ['nullable', 'string', 'max:80', 'unique:inventory_items,sku'],
+            'category_id' => ['nullable', 'exists:central.inventory_categories,id'],
+            'sku' => ['nullable', 'string', 'max:80', 'unique:central.inventory_items,sku'],
             'name' => ['required', 'string', 'max:120'],
             'unit' => ['nullable', 'string', 'max:30'],
             'current_stock' => ['nullable', 'numeric', 'min:0'],
@@ -102,8 +102,8 @@ class InventoryItemController extends Controller
         $item = InventoryItem::query()->findOrFail($id);
 
         $validated = $request->validate([
-            'category_id' => ['nullable', 'exists:inventory_categories,id'],
-            'sku' => ['sometimes', 'string', 'max:80', Rule::unique('inventory_items', 'sku')->ignore($item->id)],
+            'category_id' => ['nullable', 'exists:central.inventory_categories,id'],
+            'sku' => ['sometimes', 'string', 'max:80', Rule::unique('central.inventory_items', 'sku')->ignore($item->id)],
             'name' => ['sometimes', 'string', 'max:120'],
             'unit' => ['sometimes', 'string', 'max:30'],
             'reorder_level' => ['sometimes', 'numeric', 'min:0'],

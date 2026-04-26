@@ -14,10 +14,12 @@ use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use Modules\Identity\Database\Factories\UserFactory;
 use Modules\Identity\Support\AccessControlCatalog;
+use Modules\Workflow\Traits\HasDynamicApprovals;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, Searchable, HasRoles, HasApiTokens, LogsActivity;
+    use HasFactory, Notifiable, Searchable, HasRoles, HasApiTokens, LogsActivity, HasDynamicApprovals;
+
 
     protected $fillable = [
         'name',
@@ -25,6 +27,9 @@ class User extends Authenticatable
         'password',
         'is_active',
         'avatar_path',
+        'chat_encryption_public_key',
+        'chat_encryption_key_algorithm',
+        'chat_encryption_key_fingerprint',
         'has_completed_welcome_tour',
         'two_factor_secret',
         'two_factor_recovery_codes',
@@ -136,6 +141,19 @@ class User extends Authenticatable
         return $this->hasRoleAcrossGuards(AccessControlCatalog::administrativeRoles());
     }
 
+    public function conversations(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(\Modules\Chat\Models\Conversation::class, 'conversation_participants')
+            ->withPivot([
+                'joined_at',
+                'last_read_at',
+                'encrypted_conversation_key',
+                'conversation_key_algorithm',
+                'conversation_key_version',
+            ])
+            ->withTimestamps();
+    }
+
     public function hasCentralControlOverride(): bool
     {
         return $this->hasRoleAcrossGuards(AccessControlCatalog::centralControlOverrideRoles())
@@ -221,6 +239,12 @@ class User extends Authenticatable
     protected function makeAllSearchableUsing($query)
     {
         return $query->with('roles');
+    }
+
+    public function approvalRoles(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(\Modules\Workflow\Models\ApprovalRole::class, 'approval_role_user')
+            ->withTimestamps();
     }
 
     public function getActivitylogOptions(): LogOptions

@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Workflow\Traits\HasDynamicApprovals;
 
 class InventoryDocument extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDynamicApprovals;
 
     protected $table = 'inventory_documents';
 
@@ -56,6 +57,31 @@ class InventoryDocument extends Model
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(\Modules\Identity\Models\User::class, 'approved_by_id');
+    }
+
+    /**
+     * Handle logic when the document is fully approved via dynamic workflow.
+     */
+    public function onWorkflowFullyApproved(): void
+    {
+        // If it's still pending, move it to 'approved'
+        if ($this->status === 'pending' || $this->status === 'draft') {
+            $this->update([
+                'status' => 'approved',
+                'approved_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * Handle logic when the document is rejected via dynamic workflow.
+     */
+    public function onWorkflowRejected($approval): void
+    {
+        $this->update([
+            'status' => 'rejected',
+            'notes' => ($this->notes ? $this->notes . "\n" : "") . "Rejected by user #{$approval->user_id}: " . $approval->notes
+        ]);
     }
 }
 

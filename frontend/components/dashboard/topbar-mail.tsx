@@ -1,17 +1,17 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mail, Check, Circle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAccessToken, getBackendApiRoot, getTenantHeaders, getTenantId, isTenantSession } from "@/lib/runtime-context";
-import { initEcho } from "@/lib/echo";
+import { getAccessToken, getBackendApiRoot, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { toast } from "sonner";
 import { useMailStore } from "@/store/mail-store";
 import { formatDistanceToNow } from "date-fns";
 import api from "@/lib/api";
+import { decryptMailParticipants, ensureMailEncryptionIdentity, fetchMailEncryptionConfig, getEncryptedMailBodyFallback } from "@/lib/mail-e2ee";
 
 export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
   const router = useRouter();
@@ -45,47 +45,19 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
   const { data: recentMailsData, isLoading: isLoadingRecent } = useQuery({
     queryKey: ['recentMails'],
     queryFn: async () => {
-        const token = getAccessToken() || localStorage.getItem('token');
-        if (!token) throw new Error("No token");
-        const res = await fetch(getTenantAwareEndpoint('/mail?folder=inbox'), {
-            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', ...getTenantHeaders() } as Record<string, string>
-        });
-        if (!res.ok) throw new Error("Failed to fetch mails");
-        return res.json();
+        const encryptionConfig = await fetchMailEncryptionConfig();
+        await ensureMailEncryptionIdentity(encryptionConfig);
+
+        const { data } = await api.get('/mail?folder=inbox');
+        const decryptedMails = await decryptMailParticipants(data.data || []);
+
+        return { data: decryptedMails };
     },
     enabled: !!activeUser?.id && isOpen, // Only fetch when dropdown is open
   });
 
   const unreadCount = unreadMailData?.count || 0;
   const recentMails = recentMailsData?.data?.slice(0, 5) || [];
-
-  useEffect(() => {
-    if (!activeUser?.id) return;
-    const token = getAccessToken() || localStorage.getItem('token');
-    if (!token) return;
-
-    try {
-        const echo = initEcho(token);
-        const prefix = getTenantId() ? `tenant.${getTenantId()}.` : '';
-        const channelName = `${prefix}user.${activeUser.id}.mail`;
-
-        echo.private(channelName)
-           .listen('.mail.received', (e: any) => {
-               // Optimistically increment unread counter instantly
-               queryClient.setQueryData(['unreadMailCount'], (oldData: any) => ({
-                   count: (oldData?.count || 0) + 1
-               }));
-               queryClient.invalidateQueries({ queryKey: ['recentMails'] });
-               toast.info(`New mail: ${e.participantData?.message?.subject || 'No Subject'}`);
-           });
-           
-        return () => {
-           echo.leave(channelName);
-        };
-    } catch (e) {
-       console.log('Echo mail initialization failed', e);
-    }
-  }, [activeUser?.id, queryClient]);
 
   const handleMailClick = (id: number, isRead: boolean) => {
     setActiveFolder('inbox');
@@ -168,7 +140,7 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
                   {mail.message.subject || '(No Subject)'}
                 </div>
                 <div className="text-xs text-muted-foreground truncate w-[85%] opacity-80">
-                  {mail.message.body}
+                  {mail.message.encryption?.encrypted ? getEncryptedMailBodyFallback() : mail.message.body}
                 </div>
                 
                 {/* Read/Unread toggler button */}

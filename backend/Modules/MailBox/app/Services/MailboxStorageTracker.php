@@ -17,7 +17,7 @@ class MailboxStorageTracker
         // Assuming UTF-8, LENGTH() in MySQL returns bytes string length.
         $result = MailParticipant::where('user_id', $userId)
             ->join('mail_messages', 'mail_participants.mail_message_id', '=', 'mail_messages.id')
-            ->select(DB::raw('SUM(LENGTH(mail_messages.body) + LENGTH(mail_messages.subject)) as total_bytes'))
+            ->select(DB::raw('SUM(COALESCE(LENGTH(mail_messages.body), LENGTH(mail_messages.body_encrypted), 0) + COALESCE(LENGTH(mail_messages.subject), LENGTH(mail_messages.subject_encrypted), 0)) as total_bytes'))
             ->first();
 
         // Plus roughly 500 bytes per message to account for metadata overhead (headers, sender details)
@@ -56,7 +56,7 @@ class MailboxStorageTracker
         }
 
         $result = MailParticipant::join('mail_messages', 'mail_participants.mail_message_id', '=', 'mail_messages.id')
-            ->select(DB::raw('SUM(LENGTH(mail_messages.body) + LENGTH(mail_messages.subject)) as total_bytes'))
+            ->select(DB::raw('SUM(COALESCE(LENGTH(mail_messages.body), LENGTH(mail_messages.body_encrypted), 0) + COALESCE(LENGTH(mail_messages.subject), LENGTH(mail_messages.subject_encrypted), 0)) as total_bytes'))
             ->first();
 
         $messageCount = MailParticipant::count();

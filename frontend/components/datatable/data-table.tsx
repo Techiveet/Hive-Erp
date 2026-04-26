@@ -134,13 +134,24 @@ function downloadBlob(blob: Blob, filename: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  window.URL.revokeObjectURL(url);
+  // Delay revocation to ensure browsers have time to initiate the download
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 }
 
-function getExportErrorMessage(error: unknown, fallback: string) {
+async function getExportErrorMessage(error: unknown, fallback: string) {
   if (typeof error === "object" && error !== null) {
     const maybeResponse = (error as any).response;
-    const responseData = maybeResponse?.data;
+    let responseData = maybeResponse?.data;
+
+    // If the response is a Blob (common in exports), try to read it as text/JSON
+    if (responseData instanceof Blob) {
+      try {
+        const text = await responseData.text();
+        responseData = JSON.parse(text);
+      } catch {
+        // Not JSON, keep as is
+      }
+    }
 
     if (typeof responseData?.message === "string" && responseData.message.trim()) {
       return responseData.message;
@@ -459,8 +470,22 @@ function DataTableInner<TData, TValue>({
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }, [router, pathname, searchParams, syncWithUrl]);
 
+  const prevQueryRef = React.useRef<string>("");
+
   React.useEffect(() => {
-    onQueryChange({ page: effectivePageIndex, pageSize: effectivePageSize, search: debouncedSearch, sortCol: sorting[0]?.id, sortDir: sorting[0]?.desc ? "desc" : "asc" });
+    const nextQuery = { 
+      page: effectivePageIndex, 
+      pageSize: effectivePageSize, 
+      search: debouncedSearch, 
+      sortCol: sorting[0]?.id, 
+      sortDir: sorting[0]?.desc ? "desc" : "asc" 
+    };
+    
+    const queryStr = JSON.stringify(nextQuery);
+    if (prevQueryRef.current !== queryStr) {
+      prevQueryRef.current = queryStr;
+      onQueryChange(nextQuery);
+    }
   }, [effectivePageIndex, effectivePageSize, debouncedSearch, sorting, onQueryChange]);
 
   React.useEffect(() => {
@@ -609,9 +634,9 @@ function DataTableInner<TData, TValue>({
         if (fromSelection && ["copy", "print"].includes(type)) setRowSelection({});
         return successMessage as string;
       },
-      error: (err) => {
+      error: async (err) => {
         if (printWin && !printWin.closed) printWin.close();
-        return getExportErrorMessage(err, `Failed to complete ${type.toUpperCase()} action.`);
+        return await getExportErrorMessage(err, `Failed to complete ${type.toUpperCase()} action.`);
       },
     });
 

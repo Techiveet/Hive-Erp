@@ -49,8 +49,8 @@ class WarehouseLocationController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'warehouse_id' => 'required|exists:warehouse_warehouses,id',
-            'parent_id' => 'nullable|exists:warehouse_locations,id',
+            'warehouse_id' => 'required|exists:central.warehouse_warehouses,id',
+            'parent_id' => 'nullable|exists:central.warehouse_locations,id',
             'type' => 'required|string', // zone, shelf, bin, box
             'code' => 'required|string|max:50',
             'name' => 'nullable|string|max:255',
@@ -87,7 +87,7 @@ class WarehouseLocationController extends Controller
         $location = WarehouseLocation::findOrFail($id);
 
         $validated = $request->validate([
-            'parent_id' => 'nullable|exists:warehouse_locations,id',
+            'parent_id' => 'nullable|exists:central.warehouse_locations,id',
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'max_weight' => 'nullable|numeric|min:0',

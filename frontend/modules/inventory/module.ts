@@ -1,4 +1,4 @@
-import { LayoutDashboard, PackageSearch, Shapes, Tags, Truck } from "lucide-react";
+import { ClipboardCheck, LayoutDashboard, PackageSearch, Shapes, Tags, Truck } from "lucide-react";
 import type { FrontendModuleDefinition } from "@/modules/types";
 
 export const inventoryModule: FrontendModuleDefinition = {
@@ -8,10 +8,12 @@ export const inventoryModule: FrontendModuleDefinition = {
   backendModule: "Modules\\Inventory",
   routePrefixes: [
     "/dashboard/inventory",
+    "/dashboard/inventory/qa",
     "/dashboard/inventory/catalog/categories",
     "/dashboard/inventory/catalog/tags",
     "/dashboard/inventory/catalog/products",
     "/dashboard/inventory/catalog/suppliers",
+    "/dashboard/inventory/documents",
   ],
   navItems: [
     {
@@ -57,6 +59,25 @@ export const inventoryModule: FrontendModuleDefinition = {
       fallbackLabel: "Suppliers",
       href: "/dashboard/inventory/catalog/suppliers",
       icon: Truck,
+      permissions: ["view_inventory", "manage_inventory"],
+      placement: "primary",
+    },
+    {
+      moduleId: "inventory",
+      translationKey: "nav.inventory_qa",
+      fallbackLabel: "Quality Assurance",
+      href: "/dashboard/inventory/qa",
+      icon: ClipboardCheck,
+      permissions: ["view_inventory", "manage_inventory"],
+      businessTypes: ["water-bottling"],
+      placement: "primary",
+    },
+    {
+      moduleId: "inventory",
+      translationKey: "nav.inventory_documents",
+      fallbackLabel: "Inventory Documents",
+      href: "/dashboard/inventory/documents",
+      icon: LayoutDashboard, // Will use a better icon if found, for now LayoutDashboard
       permissions: ["view_inventory", "manage_inventory"],
       placement: "primary",
     },

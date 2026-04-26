@@ -56,6 +56,20 @@ class TenantsSeeder extends Seeder
                 'business_type' => 'clinic',
                 'admin_email' => 'admin@afya-clinic.com',
             ],
+            [
+                'id' => 'aquauno',
+                'name' => 'MDE Bottling',
+                'plan' => 'enterprise',
+                'business_type' => 'water-bottling',
+                'admin_email' => 'admin@aquauno.com',
+            ],
+            [
+                'id' => 'harrawefarm',
+                'name' => 'Harrawe Farm',
+                'plan' => 'business',
+                'business_type' => 'farm',
+                'admin_email' => 'admin@harrawefarm.com',
+            ],
         ];
 
         foreach ($tenants as $data) {

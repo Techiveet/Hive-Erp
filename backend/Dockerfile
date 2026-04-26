@@ -24,10 +24,11 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_pgsql zip pcntl sockets opcache gd exif
 
 # 3. Performance & Resource Tuning
-# Increase limits to support 5MB chunked video uploads and prevent Composer memory limits
+# Increase limits to support 500MB chunked video uploads and prevent Composer memory limits
 RUN echo "memory_limit=2G" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
-    && echo "upload_max_filesize=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
-    && echo "post_max_size=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
+    && echo "upload_max_filesize=500M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
+    && echo "post_max_size=500M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
+    && echo "max_execution_time=3600" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
     && echo "opcache.enable_cli=1" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
     && echo "opcache.jit_buffer_size=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
     && echo "opcache.jit=tracing" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini

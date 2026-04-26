@@ -7,9 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+use Modules\Workflow\Traits\HasDynamicApprovals;
+
 class InventoryEntityRecord extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDynamicApprovals;
+
+    protected $connection = 'central';
 
     protected $table = 'inventory_entity_records';
 

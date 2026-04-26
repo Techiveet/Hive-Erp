@@ -8,11 +8,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Inventory\Models\Concerns\BelongsToInventoryTenant;
+use Modules\Workflow\Traits\HasDynamicApprovals;
 
 class Product extends Model
 {
     use HasFactory;
     use BelongsToInventoryTenant;
+    use HasDynamicApprovals;
+
+    protected $connection = 'central';
 
     protected $table = 'products';
 
@@ -20,6 +24,8 @@ class Product extends Model
         'tenant_id',
         'name',
         'sku',
+        'source_type',
+        'source_id',
         'stock_code',
         'description',
         'product_category_id',
@@ -33,6 +39,7 @@ class Product extends Model
         'unit_price',
         'tax_rate',
         'cost_of_good',
+        'currency',
         'sale_price',
         'barcode',
         'barcode_path',
@@ -53,6 +60,7 @@ class Product extends Model
     ];
 
     protected $casts = [
+        'source_id' => 'integer',
         'units_per_package' => 'integer',
         'reorder_point' => 'integer',
         'quantity' => 'decimal:3',
@@ -70,6 +78,11 @@ class Product extends Model
         'width' => 'decimal:3',
         'height' => 'decimal:3',
     ];
+
+    public function source()
+    {
+        return $this->morphTo();
+    }
 
     public function category(): BelongsTo
     {

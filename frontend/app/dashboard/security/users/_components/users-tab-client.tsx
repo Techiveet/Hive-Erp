@@ -6,7 +6,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import {
   Calendar, Eye, EyeOff, Loader2, Mail, Pencil, PlusCircle, 
-  RefreshCw, Shield, Trash2, UserCog, Upload, ImageIcon, Filter, X, AlertCircle, Zap, VenetianMask
+  RefreshCw, Shield, Trash2, UserCog, Upload, ImageIcon, Filter, X, AlertCircle, Zap, VenetianMask, UserCheck
 } from "lucide-react"; 
 
 import {
@@ -42,6 +42,7 @@ import { useTranslation } from "@/store/use-translation";
 import { getAccessToken, getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, persistHiveContext } from "@/lib/runtime-context";
 
 import { FileManagerClient } from "@/components/dashboard/file-manager-client";
+import { AssignApproversDialog } from "@/modules/workflow/components/assign-approvers-dialog";
 
 export type UserForClient = {
   id: string;
@@ -176,6 +177,8 @@ export function UsersTabClient(props: Props) {
 
   const [editingUser, setEditingUser] = React.useState<UserForClient | null>(null);
   const [viewUser, setViewUser] = React.useState<UserForClient | null>(null);
+  const [approvalTarget, setApprovalTarget] = React.useState<UserForClient | null>(null);
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = React.useState(false);
   const isEdit = !!editingUser;
 
   const [formName, setFormName] = React.useState("");
@@ -567,6 +570,21 @@ export function UsersTabClient(props: Props) {
                 <Eye className="h-4 w-4" />
               </Button>
             </span>
+
+            <span className="tour-users-action-approval flex">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-muted-foreground hover:text-emerald-600 hover:bg-emerald-600/10" 
+                title={t('users.request_approval', 'Request Approval')} 
+                onClick={() => {
+                  setApprovalTarget(u);
+                  setIsApprovalDialogOpen(true);
+                }}
+              >
+                <UserCheck className="h-4 w-4" />
+              </Button>
+            </span>
             
             {canEdit && (
               <span className="tour-users-action-edit flex">
@@ -867,6 +885,19 @@ export function UsersTabClient(props: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {approvalTarget && (
+        <AssignApproversDialog
+          isOpen={isApprovalDialogOpen}
+          onClose={() => {
+            setIsApprovalDialogOpen(false);
+            setApprovalTarget(null);
+          }}
+          approvableId={Number(approvalTarget.id)}
+          approvableType="Modules\Identity\Models\User"
+          approvableName={approvalTarget.name || approvalTarget.email}
+        />
+      )}
     </div>
   );
 }

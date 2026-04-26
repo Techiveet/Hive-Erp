@@ -15,11 +15,11 @@ class TenantLandingTemplateCatalog
         return collect($this->catalog())
             ->map(fn (array $definition, string $key) => [
                 'key' => $key,
-                'label' => $definition['label'],
-                'description' => $definition['description'],
-                'icon' => $definition['icon'],
+                'label' => $definition['label'] ?? '',
+                'description' => $definition['description'] ?? '',
+                'icon' => $definition['icon'] ?? '',
                 'default_template_key' => $definition['default_template_key'] ?? 'signature',
-                'default_template' => $definition['default_template'],
+                'default_template' => $definition['default_template'] ?? [],
                 'templates' => array_values($definition['templates'] ?? []),
             ])
             ->values()
@@ -75,9 +75,11 @@ class TenantLandingTemplateCatalog
     {
         $normalized = $this->normalizeStoredCatalog($definitions, $this->baseCatalog());
 
+        $payload = collect($normalized)->map(fn (array $data, string $key) => array_merge(['key' => $key], $data))->values()->all();
+
         Setting::on($this->centralConnection())->updateOrCreate(
             ['key' => self::SETTINGS_KEY],
-            ['value' => json_encode(array_values($normalized))]
+            ['value' => json_encode($payload)]
         );
 
         clear_system_settings_cache();
@@ -86,266 +88,21 @@ class TenantLandingTemplateCatalog
         return $this->businessTypesPayload();
     }
 
+    /**
+     * Minimal fallback catalog used ONLY when the DB setting has never been seeded.
+     * All rich, per-type templates are defined in BusinessTypeSeeder and stored via
+     * persistBusinessTypesPayload(). Add new built-in types there, not here.
+     */
     protected function baseCatalog(): array
     {
         $base = $this->baseTemplate();
 
         return [
             'general' => [
-                'label' => 'General Business',
-                'description' => 'Balanced landing page for agencies, service teams, and multipurpose brands.',
-                'icon' => 'layout-dashboard',
+                'label'            => 'General Business',
+                'description'      => 'Balanced landing page for agencies, service teams, and multipurpose brands.',
+                'icon'             => 'layout-dashboard',
                 'default_template' => $base,
-            ],
-            'retail' => [
-                'label' => 'Retail Store',
-                'description' => 'Merchandising-focused layout for launches, collections, and store traffic.',
-                'icon' => 'store',
-                'default_template' => array_replace_recursive($base, [
-                    'theme' => [
-                        'accent' => '#ea580c',
-                        'accent_soft' => '#ffedd5',
-                        'surface' => '#fff7ed',
-                        'canvas' => 'linear-gradient(135deg, #fff7ed 0%, #fffbeb 38%, #fef2f2 100%)',
-                    ],
-                    'hero' => [
-                        'eyebrow' => 'Retail Experience',
-                        'title' => 'Turn every collection drop into a storefront moment.',
-                        'description' => 'Highlight best sellers, seasonal campaigns, and in-store offers from one polished homepage.',
-                        'primary_label' => 'Shop Featured Drops',
-                        'secondary_label' => 'See New Arrivals',
-                        'announcement' => 'Fresh arrivals, curated bundles, and limited seasonal edits are now live.',
-                    ],
-                    'stats' => [
-                        ['value' => '38%', 'label' => 'repeat purchase lift'],
-                        ['value' => '4.8/5', 'label' => 'storefront rating'],
-                        ['value' => 'Same Day', 'label' => 'pickup and delivery'],
-                    ],
-                    'highlights' => [
-                        ['kicker' => 'Merchandising', 'title' => 'Feature collections with an editorial rhythm', 'description' => 'Give campaigns enough space to feel premium and focused.'],
-                        ['kicker' => 'Offers', 'title' => 'Promotions can feel elevated', 'description' => 'Bundle sales, loyalty rewards, and launch-day offers without visual noise.'],
-                        ['kicker' => 'Store traffic', 'title' => 'Bridge online discovery and walk-ins', 'description' => 'Use the homepage like a polished window display for social and in-store traffic.'],
-                    ],
-                    'spotlight' => [
-                        'heading' => 'Built for modern retail teams',
-                        'description' => 'From curated drops to loyalty campaigns, the layout supports the moments that move inventory.',
-                        'items' => [
-                            ['title' => 'Launch capsule collections', 'description' => 'Stage seasonal edits, hero products, and featured bundles in one place.'],
-                            ['title' => 'Promote in-store pickup', 'description' => 'Give busy customers a faster path from discovery to collection.'],
-                            ['title' => 'Highlight trust signals', 'description' => 'Show customer love, delivery speed, and quality guarantees early.'],
-                        ],
-                    ],
-                    'testimonials' => [
-                        ['quote' => 'Our homepage finally feels like the same brand people see in the store.', 'author' => 'Sara N.', 'role' => 'Retail Director'],
-                        ['quote' => 'The featured collection blocks helped us push launches without clutter.', 'author' => 'Yonatan M.', 'role' => 'Merchandising Lead'],
-                    ],
-                    'final_cta' => [
-                        'title' => 'Make your storefront feel curated before customers step inside.',
-                        'description' => 'Spotlight what is new, trusted, and worth attention right now.',
-                        'primary_label' => 'Open Store Portal',
-                        'secondary_label' => 'View Featured Lines',
-                    ],
-                ]),
-            ],
-            'restaurant' => [
-                'label' => 'Restaurant',
-                'description' => 'Warm hospitality template for menus, reservations, and signature dishes.',
-                'icon' => 'utensils-crossed',
-                'default_template' => array_replace_recursive($base, [
-                    'theme' => [
-                        'accent' => '#b45309',
-                        'accent_soft' => '#fef3c7',
-                        'surface' => '#fffbeb',
-                        'canvas' => 'linear-gradient(135deg, #fffbeb 0%, #fff7ed 42%, #fef2f2 100%)',
-                    ],
-                    'hero' => [
-                        'eyebrow' => 'Dining and Hospitality',
-                        'title' => 'Set the mood before the first plate lands on the table.',
-                        'description' => 'Turn your homepage into an elegant digital host for reservations, specials, and private dining.',
-                        'primary_label' => 'Reserve a Table',
-                        'secondary_label' => 'Explore the Menu',
-                        'announcement' => 'Chef tasting nights, family platters, and priority reservations are now available.',
-                    ],
-                    'stats' => [
-                        ['value' => '12 min', 'label' => 'average reservation flow'],
-                        ['value' => '4.9/5', 'label' => 'guest satisfaction'],
-                        ['value' => '7 Days', 'label' => 'lunch and dinner service'],
-                    ],
-                    'highlights' => [
-                        ['kicker' => 'Reservations', 'title' => 'Guide guests from craving to confirmed booking', 'description' => 'Make it obvious where to book and what kind of experience to expect.'],
-                        ['kicker' => 'Signature dishes', 'title' => 'Let the food carry the story', 'description' => 'Give hero dishes, tasting menus, and specials the kind of attention they deserve.'],
-                        ['kicker' => 'Private events', 'title' => 'Showcase celebrations and group dining', 'description' => 'Position the restaurant for birthdays, business dinners, and curated packages.'],
-                    ],
-                    'spotlight' => [
-                        'heading' => 'What this restaurant landing page can emphasize',
-                        'description' => 'Every section is tuned to drive appetite, confidence, and easy next steps.',
-                        'items' => [
-                            ['title' => 'Highlight chef specials', 'description' => 'Feature weekly dishes and tasting experiences with stronger storytelling.'],
-                            ['title' => 'Promote reservations and delivery', 'description' => 'Give guests a clear path whether they want a table or a quick order.'],
-                            ['title' => 'Frame atmosphere and service', 'description' => 'Use layout and proof points to show that the dining experience matters.'],
-                        ],
-                    ],
-                    'testimonials' => [
-                        ['quote' => 'Guests arrive already excited because the homepage tells the story so well.', 'author' => 'Chef Liya', 'role' => 'Founder'],
-                        ['quote' => 'Reservations became easier the moment we made the landing page feel intentional.', 'author' => 'Henok T.', 'role' => 'Restaurant Manager'],
-                    ],
-                    'final_cta' => [
-                        'title' => 'Invite guests in with the same care you put into the menu.',
-                        'description' => 'Make bookings, specials, and standout experiences easy to discover in one refined flow.',
-                        'primary_label' => 'Reserve Now',
-                        'secondary_label' => 'See Signature Plates',
-                    ],
-                ]),
-            ],
-            'hotel' => [
-                'label' => 'Hotel',
-                'description' => 'Premium hospitality layout for rooms, amenities, and concierge-ready booking flows.',
-                'icon' => 'hotel',
-                'default_template' => array_replace_recursive($base, [
-                    'theme' => [
-                        'accent' => '#0f766e',
-                        'accent_soft' => '#ccfbf1',
-                        'surface' => '#f0fdfa',
-                        'canvas' => 'linear-gradient(135deg, #f0fdfa 0%, #ecfeff 38%, #eef2ff 100%)',
-                    ],
-                    'hero' => [
-                        'eyebrow' => 'Boutique Hospitality',
-                        'title' => 'Give every guest a digital first impression that feels calm and premium.',
-                        'description' => 'Present rooms, amenities, and concierge support from a homepage designed to build trust before arrival.',
-                        'primary_label' => 'Book a Stay',
-                        'secondary_label' => 'Explore Signature Rooms',
-                        'announcement' => 'Airport pickups, curated weekend packages, and suite upgrades are now bookable.',
-                    ],
-                    'stats' => [
-                        ['value' => '96%', 'label' => 'guest return intent'],
-                        ['value' => '24/7', 'label' => 'front desk support'],
-                        ['value' => '4.9/5', 'label' => 'stay satisfaction'],
-                    ],
-                    'highlights' => [
-                        ['kicker' => 'Suites and rooms', 'title' => 'Show the property with quiet confidence', 'description' => 'Make room categories, upgrades, and packages feel memorable.'],
-                        ['kicker' => 'Amenities', 'title' => 'Frame experiences, not just facilities', 'description' => 'Turn spa access, transport, and breakfast into decision-making advantages.'],
-                        ['kicker' => 'Concierge', 'title' => 'Reduce guest uncertainty before arrival', 'description' => 'Answer common questions through layout, proof points, and clearer actions.'],
-                    ],
-                    'spotlight' => [
-                        'heading' => 'Ideal for guest-first hospitality brands',
-                        'description' => 'The sections are tuned to make bookings feel reassuring, elegant, and fast.',
-                        'items' => [
-                            ['title' => 'Feature room categories and upgrades', 'description' => 'Guide guests toward your most profitable stays with better hierarchy.'],
-                            ['title' => 'Promote concierge-friendly services', 'description' => 'Make transport, amenities, and private dining easy to discover.'],
-                            ['title' => 'Reinforce trust before check-in', 'description' => 'Use testimonials, stats, and CTAs to reduce hesitation for new guests.'],
-                        ],
-                    ],
-                    'testimonials' => [
-                        ['quote' => 'The new landing experience feels like our lobby translated beautifully onto the web.', 'author' => 'Marta G.', 'role' => 'Hospitality Director'],
-                        ['quote' => 'Guests now understand our room differences and amenities before they ever call.', 'author' => 'Daniel K.', 'role' => 'Front Office Lead'],
-                    ],
-                    'final_cta' => [
-                        'title' => 'Turn calm presentation into confident bookings.',
-                        'description' => 'Surface premium offers and make next steps feel effortless.',
-                        'primary_label' => 'Open Guest Portal',
-                        'secondary_label' => 'Contact Concierge',
-                    ],
-                ]),
-            ],
-            'clinic' => [
-                'label' => 'Clinic',
-                'description' => 'Trust-centered healthcare landing page for appointments and patient reassurance.',
-                'icon' => 'stethoscope',
-                'default_template' => array_replace_recursive($base, [
-                    'theme' => [
-                        'accent' => '#2563eb',
-                        'accent_soft' => '#dbeafe',
-                        'surface' => '#eff6ff',
-                        'canvas' => 'linear-gradient(135deg, #eff6ff 0%, #f0f9ff 38%, #ecfeff 100%)',
-                    ],
-                    'hero' => [
-                        'eyebrow' => 'Patient Care',
-                        'title' => 'Design a front door that feels clear, calm, and medically trustworthy.',
-                        'description' => 'Show specialties, appointment paths, and care standards from a landing page built to reduce uncertainty.',
-                        'primary_label' => 'Book Appointment',
-                        'secondary_label' => 'View Specialties',
-                        'announcement' => 'Same-day consultations, specialist referrals, and digital intake are now supported.',
-                    ],
-                    'stats' => [
-                        ['value' => '98%', 'label' => 'patient follow-through'],
-                        ['value' => '7 Days', 'label' => 'appointment availability'],
-                        ['value' => '15 min', 'label' => 'average intake time'],
-                    ],
-                    'highlights' => [
-                        ['kicker' => 'Clarity', 'title' => 'Help patients know what to do next', 'description' => 'Present appointments, services, and contact routes in a structure that feels calm.'],
-                        ['kicker' => 'Trust', 'title' => 'Use proof points without feeling cold', 'description' => 'Operational stats and testimonials can reassure patients without overwhelming them.'],
-                        ['kicker' => 'Specialties', 'title' => 'Make care categories easier to understand', 'description' => 'Group core services and specialist pathways in a way that supports faster decisions.'],
-                    ],
-                    'spotlight' => [
-                        'heading' => 'Designed for modern healthcare communication',
-                        'description' => 'The landing page supports reassurance first, then moves patients smoothly toward appointments.',
-                        'items' => [
-                            ['title' => 'Guide patients to the right service', 'description' => 'Explain key departments and consultations with less friction.'],
-                            ['title' => 'Promote digital booking', 'description' => 'Give patients a fast way to request care without losing trust signals.'],
-                            ['title' => 'Answer common concerns early', 'description' => 'Reinforce timings, specialist access, and what a first visit looks like.'],
-                        ],
-                    ],
-                    'testimonials' => [
-                        ['quote' => 'Patients say the homepage makes the clinic feel organized and reassuring.', 'author' => 'Dr. Bethlehem', 'role' => 'Medical Director'],
-                        ['quote' => 'Appointment requests became easier because people understand where to go.', 'author' => 'Mulu S.', 'role' => 'Operations Lead'],
-                    ],
-                    'final_cta' => [
-                        'title' => 'Build confidence before the patient arrives.',
-                        'description' => 'Communicate care quality, accessibility, and the right next step with clarity.',
-                        'primary_label' => 'Request Care',
-                        'secondary_label' => 'Explore Services',
-                    ],
-                ]),
-            ],
-            'logistics' => [
-                'label' => 'Logistics',
-                'description' => 'Operational template for freight, fleet, fulfillment, and time-sensitive delivery businesses.',
-                'icon' => 'truck',
-                'default_template' => array_replace_recursive($base, [
-                    'theme' => [
-                        'accent' => '#0f172a',
-                        'accent_soft' => '#e2e8f0',
-                        'surface' => '#f8fafc',
-                        'canvas' => 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 42%, #ecfeff 100%)',
-                    ],
-                    'hero' => [
-                        'eyebrow' => 'Fleet and Fulfillment',
-                        'title' => 'Signal speed, control, and reliability from the first scroll.',
-                        'description' => 'Turn your landing page into a sharper operations hub for shipping requests, service coverage, and delivery trust.',
-                        'primary_label' => 'Track or Request Service',
-                        'secondary_label' => 'View Coverage',
-                        'announcement' => 'Priority lanes, route optimization, and warehouse handoffs are now featured for enterprise clients.',
-                    ],
-                    'stats' => [
-                        ['value' => '99.2%', 'label' => 'on-time dispatch'],
-                        ['value' => '24/7', 'label' => 'shipment visibility'],
-                        ['value' => '12 hubs', 'label' => 'regional coverage'],
-                    ],
-                    'highlights' => [
-                        ['kicker' => 'Reliability', 'title' => 'Translate operational precision into customer confidence', 'description' => 'Make timing, coverage, and accountability visible in a way that wins trust quickly.'],
-                        ['kicker' => 'Coverage', 'title' => 'Explain routes, capacity, and services clearly', 'description' => 'Give clients a confident snapshot of what you move and how quickly you respond.'],
-                        ['kicker' => 'Enterprise readiness', 'title' => 'Position the business for larger accounts', 'description' => 'Use proof points and CTA structure that feel credible to procurement teams.'],
-                    ],
-                    'spotlight' => [
-                        'heading' => 'Best for freight, delivery, and fulfillment teams',
-                        'description' => 'The structure balances credibility, speed, and operational clarity without feeling overly technical.',
-                        'items' => [
-                            ['title' => 'Promote service lanes and coverage', 'description' => 'Show clients how quickly you can move goods between key routes.'],
-                            ['title' => 'Highlight tracking and visibility', 'description' => 'Make real-time control part of the offer, not an afterthought.'],
-                            ['title' => 'Support enterprise sales conversations', 'description' => 'Use the landing page as a sharper introduction for larger contracts.'],
-                        ],
-                    ],
-                    'testimonials' => [
-                        ['quote' => 'The page finally communicates how disciplined our operations team really is.', 'author' => 'Kalkidan T.', 'role' => 'Logistics Director'],
-                        ['quote' => 'Clients reach out already understanding our coverage and reliability story.', 'author' => 'Samuel R.', 'role' => 'Fleet Operations Lead'],
-                    ],
-                    'final_cta' => [
-                        'title' => 'Make operational trust visible from the first click.',
-                        'description' => 'Use the homepage to frame your speed, coverage, and control as a clear edge.',
-                        'primary_label' => 'Open Operations Portal',
-                        'secondary_label' => 'Review Coverage',
-                    ],
-                ]),
             ],
         ];
     }
@@ -400,9 +157,20 @@ class TenantLandingTemplateCatalog
 
         $decoded = json_decode((string) $raw, true);
 
-        return is_array($decoded)
-            ? $this->normalizeStoredCatalog($decoded, $baseCatalog)
-            : [];
+        if (!is_array($decoded) || empty($decoded)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($decoded as $item) {
+            $key = $item['key'] ?? '';
+            if (empty($key)) {
+                continue;
+            }
+            $normalized[$key] = $item;
+        }
+
+        return $normalized;
     }
 
     protected function normalizeStoredCatalog(array $definitions, array $baseCatalog): array
@@ -414,7 +182,12 @@ class TenantLandingTemplateCatalog
                 continue;
             }
 
-            $businessKey = $this->normalizeBusinessTypeFromCatalog($definition['key'] ?? null, $baseCatalog);
+            $businessKey = strtolower(trim((string) ($definition['key'] ?? '')));
+            $businessKey = preg_replace('/[^a-z0-9-]+/', '-', $businessKey) ?: 'general';
+            $businessKey = trim($businessKey, '-');
+            if ($businessKey === '') {
+                $businessKey = 'general';
+            }
             $baseDefinition = $baseCatalog[$businessKey] ?? $baseCatalog['general'];
             $templates = $this->normalizeTemplateDefinitions(
                 is_array($definition['templates'] ?? null) ? $definition['templates'] : [],

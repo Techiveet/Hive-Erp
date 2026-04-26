@@ -10,6 +10,8 @@ class InventoryEntityLog extends Model
 {
     use HasFactory;
 
+    protected $connection = 'central';
+
     protected $table = 'inventory_entity_logs';
 
     protected $fillable = [

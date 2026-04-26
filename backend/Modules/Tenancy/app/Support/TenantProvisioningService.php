@@ -61,6 +61,8 @@ class TenantProvisioningService
                     'database/migrations/tenant',
                     'Modules/Identity/database/migrations/tenant',
                     'Modules/Core/database/migrations/tenant',
+                    'Modules/Chat/database/migrations/tenant',
+                    'Modules/MailBox/database/migrations/tenant',
                     'Modules/Inventory/database/migrations',
                     'Modules/NightClub/database/migrations',
                 ],

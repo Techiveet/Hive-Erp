@@ -33,10 +33,11 @@ class TenantSubscriptionService
             $subscription->module_subscriptions = TenantModuleCatalog::normalizeForStorage(
                 $seedPayload,
                 $plan,
-                $updatedBy ?? $tenant->admin_email
+                $updatedBy ?? $tenant->admin_email,
+                $tenant->business_type
             );
         } elseif ($existingPayload !== null) {
-            $subscription->module_subscriptions = $this->preserveStoredPayload($existingPayload, $plan, $updatedBy);
+            $subscription->module_subscriptions = $this->preserveStoredPayload($existingPayload, $plan, $updatedBy, $tenant->business_type);
         }
 
         if ($resetBillingWindow || !$subscription->started_at || !$subscription->expires_at) {
@@ -65,7 +66,7 @@ class TenantSubscriptionService
     public function updateModules(Tenant $tenant, ?array $payload, ?string $updatedBy = null): TenantSubscription
     {
         $subscription = $this->ensureForTenant($tenant, null, $updatedBy);
-        $subscription->module_subscriptions = TenantModuleCatalog::normalizeForStorage($payload, $subscription->plan, $updatedBy);
+        $subscription->module_subscriptions = TenantModuleCatalog::normalizeForStorage($payload, $subscription->plan, $updatedBy, $tenant->business_type);
         $subscription->updated_by = $updatedBy;
         $subscription->save();
 
@@ -77,7 +78,9 @@ class TenantSubscriptionService
         $subscription = $this->ensureForTenant($tenant, null, $updatedBy);
         $resolved = TenantModuleCatalog::resolve(
             is_array($subscription->module_subscriptions) ? $subscription->module_subscriptions : null,
-            $subscription->plan
+            $subscription->plan,
+            [],
+            $tenant->business_type
         );
 
         $subscription->module_subscriptions = TenantModuleCatalog::normalizeForStorage([
@@ -87,7 +90,7 @@ class TenantSubscriptionService
                 ->values()
                 ->all(),
             'custom_modules' => $resolved['custom_modules'],
-        ], $subscription->plan, $updatedBy);
+        ], $subscription->plan, $updatedBy, $tenant->business_type);
         $subscription->updated_by = $updatedBy;
         $subscription->save();
 
@@ -163,7 +166,8 @@ class TenantSubscriptionService
                 'module_subscriptions' => TenantModuleCatalog::resolve(
                     null,
                     $plan,
-                    $pendingModules
+                    $pendingModules,
+                    $tenant->business_type
                 ),
             ];
         }
@@ -197,9 +201,9 @@ class TenantSubscriptionService
         ];
     }
 
-    protected function preserveStoredPayload(?array $payload, ?string $plan = null, ?string $updatedBy = null): array
+    protected function preserveStoredPayload(?array $payload, ?string $plan = null, ?string $updatedBy = null, ?string $businessType = null): array
     {
-        $resolved = TenantModuleCatalog::resolve($payload, $plan);
+        $resolved = TenantModuleCatalog::resolve($payload, $plan, [], $businessType);
 
         return [
             'enabled_modules' => $resolved['enabled_modules'],
@@ -234,7 +238,8 @@ class TenantSubscriptionService
             'module_subscriptions' => TenantModuleCatalog::resolve(
                 is_array($subscription->module_subscriptions) ? $subscription->module_subscriptions : null,
                 $subscription->plan,
-                $pendingModules
+                $pendingModules,
+                $tenant->business_type
             ),
         ];
     }

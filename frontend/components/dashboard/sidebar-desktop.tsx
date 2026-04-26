@@ -3,14 +3,16 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Layers, ChevronDown, ChevronRight, FileType, Mail, Boxes, Warehouse } from "lucide-react";
+import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Layers, ChevronDown, ChevronRight, FileType, Mail, Boxes, Warehouse, MessageCircle, LayoutTemplate, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { useChatAccess } from "@/hooks/use-chat-access";
 import { DASHBOARD_NAV, DASHBOARD_SECONDARY, type NavItem } from "./nav";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTranslation } from "@/store/use-translation";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
+import { useBusinessType } from "@/hooks/use-business-type";
 import { cn } from "@/lib/utils";
 import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
@@ -74,11 +76,11 @@ const SecureSidebarLogo = ({ path, fallbackTitle, collapsed }: { path?: string, 
 };
 
 export function DashboardSidebarDesktop({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void; }) {
-  const widthClass = collapsed ? "w-[92px]" : "w-[280px]";
+  const widthClass = collapsed ? "w-[72px]" : "w-[220px]";
 
   return (
-    <aside className={cn(`mr-4 hidden shrink-0 lg:block transition-all duration-300`, widthClass)}>
-      <div className="glass-panel border border-border/50 bg-card/40 backdrop-blur-xl sticky top-6 h-[calc(100vh-3rem)] rounded-[2rem] p-3 overflow-hidden flex flex-col shadow-sm">
+    <aside className={cn(`mr-3 hidden shrink-0 lg:block transition-all duration-300`, widthClass)}>
+      <div className="glass-panel border border-border/50 bg-card/40 backdrop-blur-xl sticky top-4 h-[calc(100vh-2rem)] rounded-[1.25rem] p-2 overflow-hidden flex flex-col shadow-sm">
         <SidebarInner collapsed={collapsed} onToggle={onToggle} />
       </div>
     </aside>
@@ -90,18 +92,21 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   const router = useRouter();
   const { resolvedTheme } = useTheme();
   const { hasAnyPermission } = usePermissions();
+  const { hasChatWorkspace } = useChatAccess();
+  const { hasBusinessType } = useBusinessType();
   const { t } = useTranslation();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [isMounted, setIsMounted] = useState(false);
   const [isTenantNode, setIsTenantNode] = useState(false);
   
-  const [isModulesOpen, setIsModulesOpen] = useState(true);
-  const [isInventoryOpen, setIsInventoryOpen] = useState(true);
-  const [isWarehouseOpen, setIsWarehouseOpen] = useState(true);
+  const [isModulesOpen, setIsModulesOpen] = useState(false);
+  const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+  const [isWarehouseOpen, setIsWarehouseOpen] = useState(false);
   // 🚀 Apps dropdown state
-  const [isAppsOpen, setIsAppsOpen] = useState(true);
+  const [isAppsOpen, setIsAppsOpen] = useState(false);
   const canAccessConverter = hasAnyPermission(["manage_storage"]);
+  const canAccessLandingTemplates = hasAnyPermission(["manage_tenants", "provision_tenants"]);
 
   useEffect(() => {
       setIsMounted(true);
@@ -135,6 +140,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   const hasAccess = (item: NavItem) => {
     if (!isTenantNode && item.moduleId === "subscription") return false;
     if (isTenantNode && item.href === '/dashboard/tenants') return false;
+    if (item.businessTypes && item.businessTypes.length > 0 && !hasBusinessType(item.businessTypes)) return false;
     if (!item.permissions || item.permissions.length === 0) return true;
     return hasAnyPermission(item.permissions);
   };
@@ -154,17 +160,25 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   }, [searchQuery, t, hasAnyPermission, isTenantNode, isMounted]);
 
   const moduleNavItems = filteredNav.filter((item) => item.moduleId === "inventory" || item.moduleId === "nightclub" || item.moduleId === "warehouse");
-  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "nightclub" && item.moduleId !== "warehouse");
+  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "nightclub" && item.moduleId !== "warehouse" && item.href !== "/dashboard/landing-templates");
   const inventoryModuleItems = moduleNavItems.filter((item) => item.moduleId === "inventory");
   const nightclubModuleItems = moduleNavItems.filter((item) => item.moduleId === "nightclub");
   const warehouseModuleItems = moduleNavItems.filter((item) => item.moduleId === "warehouse");
 
   useEffect(() => {
     if (pathname.startsWith("/dashboard/inventory")) {
+      setIsModulesOpen(true);
       setIsInventoryOpen(true);
     }
     if (pathname.startsWith("/dashboard/warehouse")) {
+      setIsModulesOpen(true);
       setIsWarehouseOpen(true);
+    }
+    if (pathname.startsWith("/dashboard/nightclub")) {
+      setIsModulesOpen(true);
+    }
+    if (pathname.startsWith("/dashboard/tools/converter") || pathname.startsWith("/dashboard/mail") || pathname.startsWith("/dashboard/chat") || pathname.startsWith("/dashboard/landing-templates")) {
+      setIsAppsOpen(true);
     }
   }, [pathname]);
 
@@ -202,14 +216,14 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
       {brand}
 
       {!collapsed && (
-        <div id="tour-sidebar-search" className="px-2 mt-4 relative group shrink-0">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+        <div id="tour-sidebar-search" className="px-1 mt-3 relative group shrink-0">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <input 
             type="text"
             placeholder={t('topbar.search_menu', 'Search menu...')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-foreground/5 border border-border/40 rounded-xl py-2 pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
+            className="w-full bg-foreground/5 border border-border/40 rounded-lg py-1.5 pl-8 pr-7 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
           />
           {searchQuery && (
             <button onClick={() => setSearchQuery("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
@@ -219,7 +233,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
         </div>
       )}
       
-      <nav id="tour-sidebar-nav" className="mt-4 flex-1 space-y-2 overflow-y-auto min-h-0 py-2 no-scrollbar">
+      <nav id="tour-sidebar-nav" className="mt-3 flex-1 space-y-1 overflow-y-auto min-h-0 py-1 no-scrollbar">
         {searchQuery ? (
           filteredNav.map((item) => {
             const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
@@ -228,8 +242,8 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
 
             return (
               <Link key={item.href} id={item.tourId} href={item.href} title={collapsed ? label : undefined}
-                className={cn("group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all duration-200", 
-                  collapsed ? "justify-center px-0 py-3" : "", 
+                className={cn("group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] transition-all duration-200", 
+                  collapsed ? "justify-center px-0 py-2" : "", 
                   active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "text-muted-foreground font-semibold hover:bg-muted/80 hover:text-foreground border border-transparent")} 
               >
                 <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary-foreground" : "")} />
@@ -246,8 +260,8 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
 
               return (
                 <Link key={item.href} id={item.tourId} href={item.href} title={collapsed ? label : undefined}
-                  className={cn("group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all duration-200", 
-                    collapsed ? "justify-center px-0 py-3" : "", 
+                  className={cn("group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] transition-all duration-200", 
+                    collapsed ? "justify-center px-0 py-2" : "", 
                     active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "text-muted-foreground font-semibold hover:bg-muted/80 hover:text-foreground border border-transparent")} 
                 >
                   <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary-foreground" : "")} />
@@ -261,7 +275,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                 <button
                   id="tour-nav-modules"
                   onClick={() => setIsModulesOpen(!isModulesOpen)}
-                  className="group flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/80 hover:text-foreground outline-none"
+                  className="group flex items-center justify-between rounded-xl px-2.5 py-2 text-[13px] font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/80 hover:text-foreground outline-none"
                 >
                   <div className="flex items-center gap-3">
                     <Boxes className="h-4 w-4 shrink-0" />
@@ -276,7 +290,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                       <div className="flex flex-col gap-1">
                         <button
                           onClick={() => setIsInventoryOpen(!isInventoryOpen)}
-                          className="group flex items-center justify-between rounded-2xl px-3 py-2 text-sm font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground outline-none"
+                          className="group flex items-center justify-between rounded-xl px-2.5 py-1.5 text-[13px] font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground outline-none"
                         >
                           <div className="flex items-center gap-3">
                             <Boxes className="h-4 w-4 shrink-0" />
@@ -297,7 +311,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                                   id={item.tourId}
                                   href={item.href}
                                   className={cn(
-                                    "group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-all duration-200",
+                                    "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
                                     active
                                       ? "bg-primary/10 text-primary font-bold"
                                       : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
@@ -324,7 +338,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                           id={item.tourId}
                           href={item.href}
                           className={cn(
-                            "group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-all duration-200",
+                            "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
                             active
                               ? "bg-primary/10 text-primary font-bold"
                               : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
@@ -340,7 +354,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                       <div className="flex flex-col gap-1">
                         <button
                           onClick={() => setIsWarehouseOpen(!isWarehouseOpen)}
-                          className="group flex items-center justify-between rounded-2xl px-3 py-2 text-sm font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground outline-none"
+                          className="group flex items-center justify-between rounded-xl px-2.5 py-1.5 text-[13px] font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground outline-none"
                         >
                           <div className="flex items-center gap-3">
                             <Warehouse className="h-4 w-4 shrink-0" />
@@ -361,7 +375,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                                   id={item.tourId}
                                   href={item.href}
                                   className={cn(
-                                "group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-all duration-200",
+                                "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
                                 active
                                   ? "bg-primary/10 text-primary font-bold"
                                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
@@ -387,7 +401,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                   id="tour-nav-modules"
                   onClick={() => setIsModulesOpen(!isModulesOpen)}
                   title={t('nav.modules', 'Modules')}
-                  className="group flex items-center justify-center rounded-2xl px-0 py-3 text-sm transition-all duration-200 text-muted-foreground hover:bg-muted/80 hover:text-foreground border border-transparent"
+                  className="group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200 text-muted-foreground hover:bg-muted/80 hover:text-foreground border border-transparent"
                 >
                   <Boxes className="h-4 w-4 shrink-0" />
                 </button>
@@ -400,7 +414,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                   return (
                     <Link key={item.href} id={item.tourId} href={item.href} title={label}
                       className={cn(
-                        "group flex items-center justify-center rounded-2xl px-0 py-3 text-sm transition-all duration-200",
+                        "group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200",
                         active
                           ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold"
                           : "text-muted-foreground font-semibold hover:bg-muted/80 hover:text-foreground border border-transparent"
@@ -416,14 +430,14 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
         )}
 
         {/* 🚀 THE NEW APPS DROPDOWN */}
-        {isMounted && canAccessConverter && !searchQuery && (
+        {isMounted && (canAccessConverter || hasChatWorkspace || canAccessLandingTemplates) && !searchQuery && (
           <div className="mt-2 flex flex-col gap-1">
             <button 
               id="tour-nav-apps"
               onClick={() => setIsAppsOpen(!isAppsOpen)}
               className={cn(
-                "group flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/80 hover:text-foreground outline-none",
-                collapsed ? "justify-center px-0 py-3" : ""
+                "group flex items-center justify-between rounded-xl px-2.5 py-2 text-[13px] font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/80 hover:text-foreground outline-none",
+                collapsed ? "justify-center px-0 py-2.5" : ""
               )}
               title={collapsed ? t('nav.apps_tools', 'Apps & Tools') : undefined}
             >
@@ -440,11 +454,24 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
             {!collapsed && isAppsOpen && (
               <div className="flex flex-col gap-1 pl-4 mt-1 animate-in slide-in-from-top-2 duration-200">
                 <Link 
+                  href="/dashboard/tools/converters"
+                  id="tour-nav-converters-hub"
+                  className={cn(
+                    "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                    pathname.startsWith('/dashboard/tools/converters') 
+                      ? "bg-primary/10 text-primary font-bold" 
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                  )}
+                >
+                  <RefreshCcw className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Converters</span>
+                </Link>
+                <Link 
                   href="/dashboard/tools/converter"
                   id="tour-nav-converter"
                   className={cn(
-                    "group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-all duration-200",
-                    pathname.includes('/dashboard/tools/converter') 
+                    "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                    pathname === '/dashboard/tools/converter'
                       ? "bg-primary/10 text-primary font-bold" 
                       : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
                   )}
@@ -453,11 +480,11 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                   <span className="truncate">{t('nav.tools_converter', 'HTML to PDF')}</span>
                 </Link>
                 
-                <Link 
+<Link 
                   href="/dashboard/mail"
                   id="tour-nav-mail"
                   className={cn(
-                    "group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-all duration-200",
+                    "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
                     pathname.includes('/dashboard/mail') 
                       ? "bg-primary/10 text-primary font-bold" 
                       : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
@@ -466,6 +493,37 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                   <Mail className="h-4 w-4 shrink-0" />
                   <span className="truncate">{t('nav.mail', 'Internal Mail')}</span>
                 </Link>
+                
+                {hasChatWorkspace && (
+                  <Link 
+                    href="/dashboard/chat"
+                    id="tour-nav-chat"
+                    className={cn(
+                      "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                      pathname.includes('/dashboard/chat') 
+                        ? "bg-primary/10 text-primary font-bold" 
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                    )}
+                  >
+                    <MessageCircle className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{t('nav.chat', 'Real-time Chat')}</span>
+                  </Link>
+                )}
+                {canAccessLandingTemplates && !isTenantNode && (
+                  <Link 
+                    href="/dashboard/landing-templates"
+                    id="tour-nav-landing-templates"
+                    className={cn(
+                      "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                      pathname.includes('/dashboard/landing-templates') 
+                        ? "bg-primary/10 text-primary font-bold" 
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                    )}
+                  >
+                    <LayoutTemplate className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{t('nav.landing_templates', 'Landing Templates')}</span>
+                  </Link>
+                )}
               </div>
             )}
 
@@ -473,29 +531,69 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
             {collapsed && (
               <>
                <Link 
+                  href="/dashboard/tools/converters"
+                  title="Converters Hub"
+                  className={cn(
+                    "group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200 mt-1",
+                    pathname.startsWith('/dashboard/tools/converters') 
+                      ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
+                      : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
+                  )}
+               >
+                 <RefreshCcw className="h-4 w-4 shrink-0" />
+               </Link>
+               <Link 
                   href="/dashboard/tools/converter"
                   title="HTML to PDF"
                   className={cn(
-                    "group flex items-center justify-center rounded-2xl px-0 py-3 text-sm transition-all duration-200 mt-1",
-                    pathname.includes('/dashboard/tools/converter') 
+                    "group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200 mt-1",
+                    pathname === '/dashboard/tools/converter'
                       ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
                       : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
                   )}
                >
                  <FileType className="h-4 w-4 shrink-0" />
                </Link>
-               <Link 
-                  href="/dashboard/mail"
-                  title="Internal Mail"
-                  className={cn(
-                    "group flex items-center justify-center rounded-2xl px-0 py-3 text-sm transition-all duration-200 mt-1",
-                    pathname.includes('/dashboard/mail') 
-                      ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
-                      : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
-                  )}
-               >
-                 <Mail className="h-4 w-4 shrink-0" />
-               </Link>
+<Link 
+                   href="/dashboard/mail"
+                   title="Internal Mail"
+                   className={cn(
+                     "group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200 mt-1",
+                     pathname.includes('/dashboard/mail') 
+                       ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
+                       : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
+                   )}
+                >
+                  <Mail className="h-4 w-4 shrink-0" />
+                </Link>
+                {hasChatWorkspace && (
+                  <Link 
+                     href="/dashboard/chat"
+                     title="Real-time Chat"
+                     className={cn(
+                       "group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200 mt-1",
+                       pathname.includes('/dashboard/chat') 
+                         ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
+                         : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
+                     )}
+                  >
+                    <MessageCircle className="h-4 w-4 shrink-0" />
+                  </Link>
+                )}
+                {canAccessLandingTemplates && !isTenantNode && (
+                  <Link 
+                    href="/dashboard/landing-templates"
+                    title="Landing Templates"
+                    className={cn(
+                      "group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200 mt-1",
+                      pathname.includes('/dashboard/landing-templates') 
+                        ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
+                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
+                    )}
+                  >
+                    <LayoutTemplate className="h-4 w-4 shrink-0" />
+                  </Link>
+                )}
               </>
             )}
           </div>
@@ -515,8 +613,8 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
 
             return (
               <Link key={item.href} id={item.tourId} href={item.href} title={collapsed ? label : undefined}
-                className={cn("flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all duration-200", 
-                  collapsed ? "justify-center px-0 py-3" : "",
+                className={cn("flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] transition-all duration-200", 
+                  collapsed ? "justify-center px-0 py-2" : "",
                   active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")} 
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -525,12 +623,12 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
             );
           })}
           
-          <button onClick={handleLogout} className={cn("w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-destructive transition-colors hover:bg-destructive/15", collapsed ? "justify-center px-0 py-3" : "")} title={collapsed ? t('nav.disconnect', 'Disconnect Node') : undefined}>
+          <button onClick={handleLogout} className={cn("w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] font-bold text-destructive transition-colors hover:bg-destructive/15", collapsed ? "justify-center px-0 py-2" : "")} title={collapsed ? t('nav.disconnect', 'Disconnect Node') : undefined}>
             <LogOut className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="truncate">{t('nav.disconnect', 'Disconnect Node')}</span>}
           </button>
           
-          <div className={cn("flex items-center rounded-2xl border border-border/40 bg-background/50 px-3 py-2 mt-2", collapsed ? "justify-center flex-col gap-2" : "justify-between")}>
+          <div className={cn("flex items-center rounded-xl border border-border/40 bg-background/50 px-2.5 py-1.5 mt-2", collapsed ? "justify-center flex-col gap-2" : "justify-between")}>
             {!collapsed && <div className="text-xs text-muted-foreground font-bold uppercase tracking-wider">{t('nav.theme', 'Theme')}</div>}
             <ThemeToggle />
           </div>

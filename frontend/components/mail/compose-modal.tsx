@@ -5,10 +5,9 @@ import { useMailStore } from '@/store/mail-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, Lock, X } from 'lucide-react';
 import { UserMultiSelect, User } from './user-multi-select';
 import { Label } from '@/components/ui/label';
 import { RichTextEditor, RichTextEditorRef } from '@/components/ui/rich-text-editor';
@@ -16,14 +15,16 @@ import { FileManagerClient } from '@/components/dashboard/file-manager-client';
 import { getBackendStorageUrl } from '@/lib/runtime-context';
 import { useRef } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
+import { encryptMailDraft } from '@/lib/mail-e2ee';
 
 export default function ComposeModal() {
-  const { isComposeOpen, setComposeOpen, composeData } = useMailStore();
+  const { isComposeOpen, setComposeOpen, composeData, encryptionConfig } = useMailStore();
   const [to, setTo] = useState<User[]>([]);
   const [cc, setCc] = useState<User[]>([]);
   const [bcc, setBcc] = useState<User[]>([]);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [draftId, setDraftId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCcHeader, setShowCcHeader] = useState(false);
   const [showBccHeader, setShowBccHeader] = useState(false);
@@ -31,8 +32,20 @@ export default function ComposeModal() {
   const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
   const editorRef = useRef<RichTextEditorRef>(null);
 
+  const resetComposer = () => {
+    setDraftId(null);
+    setTo([]);
+    setCc([]);
+    setBcc([]);
+    setSubject('');
+    setBody('');
+    setShowCcHeader(false);
+    setShowBccHeader(false);
+  };
+
   React.useEffect(() => {
     if (isComposeOpen && composeData) {
+      setDraftId(composeData.draftId || null);
       setTo(composeData.to || []);
       setCc(composeData.cc || []);
       setBcc(composeData.bcc || []);
@@ -40,8 +53,18 @@ export default function ComposeModal() {
       setBody(composeData.body || '');
       setShowCcHeader(!!(composeData.cc?.length));
       setShowBccHeader(!!(composeData.bcc?.length));
+      return;
+    }
+
+    if (isComposeOpen) {
+      resetComposer();
     }
   }, [isComposeOpen, composeData]);
+
+  const secureRecipients = [...to, ...cc, ...bcc];
+  const missingSecureRecipients = encryptionConfig.enabled
+    ? secureRecipients.filter((user) => !user.chat_public_key)
+    : [];
 
   const handleSend = async () => {
     if (!to.length || !body) {
@@ -51,27 +74,58 @@ export default function ComposeModal() {
 
     setLoading(true);
     try {
+      const encryptedDraft = await encryptMailDraft({
+        subject,
+        body,
+        recipients: secureRecipients,
+      });
+
       await api.post('/mail', {
         to: to.map(u => u.id),
         cc: cc.map(u => u.id),
         bcc: bcc.map(u => u.id),
-        subject,
-        body
+        subject: encryptedDraft.subject,
+        body: encryptedDraft.body,
+        draft_id: draftId,
+        participant_keys: encryptedDraft.participant_keys,
       });
       
-      toast.success('Email sent successfully');
-      useMailStore.getState().adjustCounts({ sent: 1 });
+      toast.success(encryptedDraft.encrypted ? 'Encrypted email sent successfully' : 'Email sent successfully');
       setComposeOpen(false);
-      setTo([]);
-      setCc([]);
-      setBcc([]);
-      setSubject('');
-      setBody('');
-      setShowCcHeader(false);
-      setShowBccHeader(false);
+      resetComposer();
     } catch (e: any) {
       const errorMsg = e.response?.data?.error || 'Failed to send email';
       toast.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!subject.trim() && !body.trim() && to.length === 0 && cc.length === 0 && bcc.length === 0) {
+      toast.error('Add a recipient, subject, or message before saving a draft');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await api.post('/mail', {
+        to: to.map((user) => user.id),
+        cc: cc.map((user) => user.id),
+        bcc: bcc.map((user) => user.id),
+        subject,
+        body,
+        save_as_draft: true,
+        draft_id: draftId,
+      });
+
+      const savedDraftId = data?.data?.mail_message_id || data?.data?.message?.id || draftId;
+      setDraftId(savedDraftId ?? null);
+      toast.success(draftId ? 'Draft updated' : 'Draft saved');
+      setComposeOpen(false);
+      resetComposer();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || error?.response?.data?.message || 'Failed to save draft');
     } finally {
       setLoading(false);
     }
@@ -101,9 +155,30 @@ export default function ComposeModal() {
       <Dialog open={isComposeOpen} onOpenChange={setComposeOpen}>
         <DialogContent className="sm:max-w-[600px] flex flex-col gap-4">
         <DialogHeader>
-          <DialogTitle>New Message</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {draftId ? 'Edit Draft' : 'New Message'}
+            {encryptionConfig.enabled && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                <Lock className="h-3 w-3" />
+                Encrypted
+              </span>
+            )}
+          </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
+          {encryptionConfig.enabled && (
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">Secure mail is enabled.</span>{' '}
+              The subject and message body will be encrypted in the browser before sending.
+            </div>
+          )}
+
+          {encryptionConfig.enabled && missingSecureRecipients.length > 0 && (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              {missingSecureRecipients.map((user) => user.name).join(', ')} must open secure chat or secure mail once before you can send an encrypted email to them.
+            </div>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <Label className="text-xs text-muted-foreground uppercase tracking-wider">To</Label>
@@ -172,6 +247,10 @@ export default function ComposeModal() {
         <DialogFooter>
           <Button variant="secondary" onClick={() => setComposeOpen(false)} disabled={loading}>
             Cancel
+          </Button>
+          <Button variant="outline" onClick={handleSaveDraft} disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save Draft
           </Button>
           <Button onClick={handleSend} disabled={loading}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

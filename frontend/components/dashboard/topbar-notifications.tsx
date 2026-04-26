@@ -1,11 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Check, Circle, Loader2 } from "lucide-react";
+import { Bell, Check, Circle, Loader2, MessageSquare, Mail, AlertCircle, ClipboardCheck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { getAccessToken, getAuthHeaders, getBackendApiRoot } from "@/lib/runtime-context";
+import { initEcho } from "@/lib/echo";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -16,8 +19,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { initEcho } from "@/lib/echo";
-import { getAccessToken, getAuthHeaders, getBackendApiRoot } from "@/lib/runtime-context";
 
 type TopbarNotification = {
   id: string;
@@ -94,6 +95,8 @@ export function TopbarNotificationsIcon({ activeUser }: { activeUser: any }) {
   const unreadCount = notificationCenter?.data?.unread_count ?? 0;
   const notifications = notificationCenter?.data?.notifications ?? [];
 
+  const pathname = usePathname();
+
   useEffect(() => {
     if (!activeUser?.id) return;
 
@@ -128,7 +131,28 @@ export function TopbarNotificationsIcon({ activeUser }: { activeUser: any }) {
           }
         );
 
-        toast.info(incoming.title || "New notification");
+        // Intelligent Toast Suppression
+        // Don't show global notification toast if we are on the relevant page
+        const isChatPage = pathname.startsWith('/dashboard/chat');
+        const isMailPage = pathname.startsWith('/dashboard/mail');
+        const isWorkflowPage = pathname.startsWith('/dashboard/workflow/approvals');
+
+        if (
+            (incoming.category === 'chat' && isChatPage) || 
+            (incoming.category === 'mail' && isMailPage) ||
+            (incoming.category === 'workflow' && isWorkflowPage)
+        ) {
+            // Silently update the count and list (handled above) but no toast
+        } else {
+            toast.info(incoming.title || "New notification", {
+                description: incoming.body,
+                action: incoming.url ? {
+                    label: "View",
+                    onClick: () => router.push(incoming.url!)
+                } : undefined
+            });
+        }
+
         queryClient.invalidateQueries({ queryKey: ["dashboard-notifications"] });
       });
 
@@ -138,7 +162,7 @@ export function TopbarNotificationsIcon({ activeUser }: { activeUser: any }) {
     } catch (error) {
       console.log("Echo notification initialization failed", error);
     }
-  }, [activeUser?.id, queryClient]);
+  }, [activeUser?.id, queryClient, pathname, router]);
 
   const markAsRead = async (notificationId: string) => {
     try {
@@ -220,26 +244,47 @@ export function TopbarNotificationsIcon({ activeUser }: { activeUser: any }) {
               <DropdownMenuItem
                 key={notification.id}
                 onClick={() => handleNotificationClick(notification)}
-                className={`relative flex cursor-pointer flex-col items-start gap-1 rounded-none border-b border-border/40 px-4 py-3 focus:bg-muted/50 ${
-                  !notification.read_at ? "bg-muted/20" : ""
-                }`}
+                className={cn(
+                  "relative flex cursor-pointer flex-col items-start gap-1 rounded-none border-b border-border/40 px-4 py-3 focus:bg-muted/50",
+                  !notification.read_at && "bg-muted/20"
+                )}
               >
-                <div className="flex w-full items-start justify-between gap-3">
-                  <span className={`text-sm ${!notification.read_at ? "font-bold text-foreground" : "font-medium text-muted-foreground"}`}>
-                    {notification.title}
-                  </span>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">
-                    {notification.created_at
-                      ? formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })
-                      : "just now"}
-                  </span>
-                </div>
+                <div className="flex w-full items-start gap-3">
+                    <div className={cn(
+                      "mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                      notification.category === 'chat' ? "bg-blue-50 border-blue-100 text-blue-600" :
+                      notification.category === 'mail' ? "bg-amber-50 border-amber-100 text-amber-600" :
+                      notification.category === 'workflow' ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
+                      "bg-slate-50 border-slate-100 text-slate-600"
+                    )}>
+                      {notification.category === 'chat' ? <MessageSquare className="h-4 w-4" /> :
+                       notification.category === 'mail' ? <Mail className="h-4 w-4" /> :
+                       notification.category === 'workflow' ? <ClipboardCheck className="h-4 w-4" /> :
+                       <AlertCircle className="h-4 w-4" />}
+                    </div>
+                  
+                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <div className="flex w-full items-start justify-between gap-3">
+                      <span className={cn(
+                        "text-[13px] leading-tight",
+                        !notification.read_at ? "font-bold text-foreground" : "font-medium text-muted-foreground"
+                      )}>
+                        {notification.title}
+                      </span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        {notification.created_at
+                          ? formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })
+                          : "just now"}
+                      </span>
+                    </div>
 
-                {notification.body ? (
-                  <div className="w-[90%] text-xs leading-relaxed text-muted-foreground">
-                    {notification.body}
+                    {notification.body ? (
+                      <div className="text-[11px] leading-relaxed text-muted-foreground line-clamp-2">
+                        {notification.body}
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                </div>
 
                 <button
                   type="button"

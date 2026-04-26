@@ -13,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { authenticatedDownload } from "@/lib/authenticated-download";
-import { getAuthHeaders, getBackendApiRoot } from "@/lib/runtime-context";
+import { getAuthHeaders, getBackendApiRoot, getAccessToken, getTenantId } from "@/lib/runtime-context";
 
 export type Track = {
   id: string | number;
@@ -285,6 +285,16 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   }, [currentTrack, playlist, queue, history, currentTime]);
 
   const fetchPlaylists = useCallback(async () => {
+    const token = getAccessToken();
+    const tenantId = getTenantId();
+
+    if (!token) {
+      if (playlists.length > 0) {
+        setPlaylists([]);
+      }
+      return;
+    }
+
     try {
       const response = await fetch(`${getBackendApiRoot()}/playlists`, {
         headers: getAuthHeaders(),
@@ -299,7 +309,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     } catch (error) {
       console.error("Failed to load playlists", error);
     }
-  }, []);
+  }, [playlists.length]);
 
   useEffect(() => {
     void fetchPlaylists();

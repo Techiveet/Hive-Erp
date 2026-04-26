@@ -17,11 +17,15 @@ class MailParticipant extends Model
         'folder',
         'is_read',
         'is_starred',
+        'encrypted_message_key',
+        'message_key_algorithm',
+        'message_key_version',
     ];
 
     protected $casts = [
         'is_read' => 'boolean',
         'is_starred' => 'boolean',
+        'message_key_version' => 'integer',
     ];
 
     public function message()

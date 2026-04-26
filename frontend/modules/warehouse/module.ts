@@ -10,6 +10,7 @@ export const warehouseModule: FrontendModuleDefinition = {
     "/dashboard/warehouse/warehouses",
     "/dashboard/warehouse/locations/shelves",
     "/dashboard/warehouse/locations/boxes",
+    "/dashboard/warehouse/movements",
   ],
   navItems: [
     {
@@ -27,6 +28,15 @@ export const warehouseModule: FrontendModuleDefinition = {
       fallbackLabel: "Shelves",
       href: "/dashboard/warehouse/locations/shelves",
       icon: Rows3,
+      permissions: ["view_inventory", "manage_inventory"],
+      placement: "primary",
+    },
+    {
+      moduleId: "warehouse",
+      translationKey: "nav.warehouse_movements",
+      fallbackLabel: "Stock Movements",
+      href: "/dashboard/warehouse/movements",
+      icon: Grid3X3,
       permissions: ["view_inventory", "manage_inventory"],
       placement: "primary",
     },

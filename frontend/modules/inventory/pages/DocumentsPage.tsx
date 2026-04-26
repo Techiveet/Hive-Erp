@@ -1,0 +1,178 @@
+"use client";
+
+import * as React from "react";
+import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ClipboardList, LayoutDashboard, Loader2, UserCheck } from "lucide-react";
+import { useTranslation } from "@/store/use-translation";
+
+import { DataTable } from "@/components/datatable/data-table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { fetchInventoryDocuments } from "@/modules/inventory/api";
+import { AssignApproversDialog } from "@/modules/workflow/components/assign-approvers-dialog";
+
+type TableQueryState = {
+  page: number;
+  pageSize: number;
+  search: string;
+  sortCol: string;
+  sortDir: "asc" | "desc";
+};
+
+const DEFAULT_QUERY: TableQueryState = {
+  page: 1,
+  pageSize: 10,
+  search: "",
+  sortCol: "created_at",
+  sortDir: "desc",
+};
+
+export default function InventoryDocumentsPage() {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [tableQuery, setTableQuery] = React.useState<TableQueryState>(DEFAULT_QUERY);
+  const [selectedRowIds, setSelectedRowIds] = React.useState<RowSelectionState>({});
+  const [approvalTarget, setApprovalTarget] = React.useState<any | null>(null);
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = React.useState(false);
+
+  const documentsQuery = useQuery({
+    queryKey: ["inventory", "documents", tableQuery],
+    queryFn: () =>
+      fetchInventoryDocuments({
+        search: tableQuery.search || undefined,
+        page: tableQuery.page,
+        per_page: tableQuery.pageSize,
+        sort_col: tableQuery.sortCol,
+        sort_dir: tableQuery.sortDir,
+      }),
+  });
+
+  const applyTableQuery = React.useCallback((nextPartial: Partial<TableQueryState>) => {
+    setTableQuery((prev) => ({ ...prev, ...nextPartial }));
+  }, []);
+
+  const handleTableQueryChange = React.useCallback(
+    (query: { page?: number; pageSize?: number; search?: string; sortCol?: string; sortDir?: string }) => {
+      applyTableQuery({
+        page: Number(query.page || 1),
+        pageSize: Number(query.pageSize || 10),
+        search: String(query.search ?? ""),
+        sortCol: String(query.sortCol || "created_at"),
+        sortDir: query.sortDir === "asc" ? "asc" : "desc",
+      });
+    },
+    [applyTableQuery]
+  );
+
+  const columns = React.useMemo<ColumnDef<any>[]>(
+    () => [
+      {
+        accessorKey: "document_number",
+        header: t("inventory.docs.col_number", "Document #"),
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-primary" />
+            <span className="font-bold">{row.original.document_number}</span>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "title",
+        header: t("inventory.docs.col_title", "Title"),
+        cell: ({ row }) => <span className="font-medium">{row.original.title || "-"}</span>,
+      },
+      {
+        accessorKey: "type",
+        header: t("inventory.docs.col_type", "Type"),
+        cell: ({ row }) => (
+          <Badge variant="outline" className="uppercase text-[10px] tracking-widest font-black">
+            {row.original.type}
+          </Badge>
+        ),
+      },
+      {
+        accessorKey: "status",
+        header: t("inventory.common.status", "Status"),
+        cell: ({ row }) => {
+          const status = row.original.status;
+          return (
+            <Badge 
+              variant={status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary"}
+              className="rounded-full px-3 py-0.5"
+            >
+              {status}
+            </Badge>
+          );
+        },
+      },
+      {
+        accessorKey: "created_at",
+        header: t("inventory.common.created_at", "Date"),
+        cell: ({ row }) => new Date(row.original.created_at).toLocaleDateString(),
+      },
+      {
+        id: "actions",
+        header: t("inventory.common.actions", "Actions"),
+        cell: ({ row }) => {
+          const doc = row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
+                title="Request Approval"
+                onClick={() => {
+                  setApprovalTarget(doc);
+                  setIsApprovalDialogOpen(true);
+                }}
+              >
+                <UserCheck className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        },
+      },
+    ],
+    [t]
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight">{t("inventory.docs.title", "Inventory Documents")}</h1>
+          <p className="text-sm text-muted-foreground">
+            {t("inventory.docs.subtitle", "Track and approve stock adjustments, transfers, and records.")}
+          </p>
+        </div>
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={documentsQuery.data?.data ?? []}
+        totalEntries={documentsQuery.data?.total ?? 0}
+        loading={documentsQuery.isLoading}
+        pageIndex={tableQuery.page}
+        pageSize={tableQuery.pageSize}
+        onQueryChange={handleTableQueryChange}
+        searchPlaceholder={t("inventory.docs.search_placeholder", "Search by document number or title...")}
+        resourceName="documents"
+      />
+
+      {approvalTarget && (
+        <AssignApproversDialog
+          isOpen={isApprovalDialogOpen}
+          onClose={() => {
+            setIsApprovalDialogOpen(false);
+            setApprovalTarget(null);
+          }}
+          approvableId={Number(approvalTarget.id)}
+          approvableType="Modules\Inventory\Models\InventoryDocument"
+          approvableName={`${approvalTarget.document_number} - ${approvalTarget.title || approvalTarget.type}`}
+        />
+      )}
+    </div>
+  );
+}

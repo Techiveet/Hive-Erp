@@ -212,7 +212,10 @@ return [
             database_path('migrations/tenant'), // Keep the default just in case
             base_path('Modules/Core/database/migrations/tenant'),
             base_path('Modules/Identity/database/migrations/tenant'),
-            // Add Tenancy module here too if it has tenant-specific tables
+            base_path('Modules/Chat/database/migrations/tenant'),
+            base_path('Modules/MailBox/database/migrations/tenant'),
+            base_path('Modules/Workflow/database/migrations'),
+            base_path('Modules/Inventory/database/migrations'),
         ],
         '--realpath' => true,
     ],

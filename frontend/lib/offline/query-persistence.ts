@@ -38,6 +38,20 @@ export const restorePersistedQueryCache = (queryClient: QueryClient): void => {
       return;
     }
 
+    // Strip any previously-persisted product detail queries (they are now excluded
+    // from persistence, but old snapshots might still contain them).
+    if (parsed.state?.queries) {
+      parsed.state.queries = parsed.state.queries.filter((q) => {
+        const key = q.queryKey;
+        return !(
+          Array.isArray(key) &&
+          key[0] === "inventory" &&
+          key[1] === "products" &&
+          key[2] === "detail"
+        );
+      });
+    }
+
     hydrate(queryClient, parsed.state);
   } catch {
     window.localStorage.removeItem(storageKey);
@@ -50,7 +64,22 @@ const persistQueryCache = (queryClient: QueryClient): void => {
   }
 
   const state = dehydrate(queryClient, {
-    shouldDehydrateQuery: (query) => query.state.status === "success",
+    shouldDehydrateQuery: (query) => {
+      if (query.state.status !== "success") return false;
+      // Do not persist mutable per-record detail queries — they must always
+      // be fetched fresh so edits (e.g. currency, prices) are never masked by
+      // a stale localStorage snapshot.
+      const key = query.queryKey;
+      if (
+        Array.isArray(key) &&
+        key[0] === "inventory" &&
+        key[1] === "products" &&
+        key[2] === "detail"
+      ) {
+        return false;
+      }
+      return true;
+    },
     shouldDehydrateMutation: () => false,
   });
 

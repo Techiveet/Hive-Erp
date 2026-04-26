@@ -5,6 +5,7 @@ import { tenancyModule } from "@/modules/tenancy/module";
 import { nightclubModule } from "@/modules/nightclub/module";
 import { inventoryModule } from "@/modules/inventory/module";
 import { warehouseModule } from "@/modules/warehouse/module";
+import { workflowModule } from "@/modules/workflow/module";
 import type { FrontendModuleDefinition, ModuleNavItem } from "@/modules/types";
 
 export type { FrontendModuleDefinition, ModuleNavItem } from "@/modules/types";
@@ -17,6 +18,7 @@ export const FEATURE_MODULES: FrontendModuleDefinition[] = [
   nightclubModule,
   inventoryModule,
   warehouseModule,
+  workflowModule,
 ];
 
 export const DASHBOARD_NAV: ModuleNavItem[] = FEATURE_MODULES.flatMap((module) =>

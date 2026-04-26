@@ -3,7 +3,7 @@
 import React from 'react';
 import { useMailStore } from '@/store/mail-store';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trash, Reply, Forward, Star, Archive, MailOpen, Printer, Maximize, Minimize, Info } from 'lucide-react';
+import { ArrowLeft, Trash, Reply, Forward, Star, Archive, MailOpen, Mail, Printer, Maximize, Minimize, Lock, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
@@ -12,9 +12,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 
 export default function MailDetail() {
-  const { mails, selectedMailId, selectMail, deleteMail, updateMail, setComposeOpen, activeFolder, checkedMailIds, bulkDeleteMails, bulkUpdateMails, clearChecked, adjustCounts, isFullscreen, setFullscreen } = useMailStore();
+  const { mails, selectedMailId, selectMail, deleteMail, updateMail, setComposeOpen, activeFolder, checkedMailIds, adjustCounts, isFullscreen, setFullscreen, encryptionConfig } = useMailStore();
   
   const mail = mails.find((m) => m.mail_message_id === selectedMailId);
+  const isMailEncrypted = Boolean(mail?.message?.encryption?.encrypted);
+  const isSecureMailEnabled = Boolean(encryptionConfig.enabled);
 
   if (!mail) {
     return (
@@ -71,6 +73,21 @@ export default function MailDetail() {
     }
   };
 
+  const handleSpamToggle = async () => {
+    const nextFolder = activeFolder === 'spam' ? 'inbox' : 'spam';
+
+    try {
+      await api.post('/mail/bulk', { ids: [selectedMailId], action: nextFolder });
+      updateMail(selectedMailId!, { folder: nextFolder });
+      deleteMail(selectedMailId!);
+      adjustCounts({ [activeFolder]: -1, [nextFolder]: 1 });
+      selectMail(null);
+      toast.success(nextFolder === 'spam' ? 'Message moved to spam' : 'Message moved to inbox');
+    } catch (err) {
+      toast.error(nextFolder === 'spam' ? 'Failed to move message to spam' : 'Failed to move message to inbox');
+    }
+  };
+
   const handleToggleStar = async () => {
     const newVal = !mail.is_starred;
     updateMail(selectedMailId!, { is_starred: newVal });
@@ -89,8 +106,16 @@ export default function MailDetail() {
   };
 
   const handleReply = () => {
+    const otherParticipants = (mail.message?.participants || [])
+      .map((participant) => participant.user)
+      .filter((participant): participant is NonNullable<typeof participant> => Boolean(participant))
+      .filter((participant) => String(participant.id) !== String(mail.user_id));
+    const replyRecipients = mail.folder === 'sent'
+      ? otherParticipants
+      : (mail.message?.sender ? [mail.message.sender] : []);
+
     setComposeOpen(true, {
-      to: mail.message?.sender ? [mail.message.sender] : [],
+      to: replyRecipients,
       subject: (mail.message?.subject || '').startsWith('Re:') ? mail.message?.subject : `Re: ${mail.message?.subject || ''}`,
       body: `\n\n\n--- Original Message ---\nFrom: ${mail.message?.sender?.name || 'Unknown'}\nDate: ${mail.message?.created_at ? format(new Date(mail.message.created_at), 'PPPp') : 'Unknown'}\n\n${mail.message?.body || ''}`
     });
@@ -156,6 +181,15 @@ export default function MailDetail() {
 
                 <Tooltip>
                   <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={handleSpamToggle} className="h-[38px] w-[38px] hover:bg-white dark:hover:bg-muted/80 shadow-sm transition-all hover:scale-105">
+                      {activeFolder === 'spam' ? <Mail className="w-[18px] h-[18px] text-muted-foreground" /> : <Zap className="w-[18px] h-[18px] text-muted-foreground" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{activeFolder === 'spam' ? 'Move to Inbox' : 'Report Spam'}</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" onClick={() => setFullscreen(!isFullscreen)} className="h-[38px] w-[38px] hover:bg-white dark:hover:bg-muted/80 shadow-sm transition-all hover:scale-105 hidden md:flex">
                       {isFullscreen ? <Minimize className="w-[18px] h-[18px] text-muted-foreground" /> : <Maximize className="w-[18px] h-[18px] text-muted-foreground" />}
                     </Button>
@@ -184,7 +218,23 @@ export default function MailDetail() {
           </div>
 
           <div className="flex items-start justify-between mb-8 pb-6 border-b border-muted">
-            <h1 className="text-3xl font-extrabold tracking-tight text-foreground pr-8 animate-in slide-in-from-bottom-2 fade-in">{mail.message?.subject || '(No Subject)'}</h1>
+            <div className="pr-8">
+              <h1 className="text-3xl font-extrabold tracking-tight text-foreground animate-in slide-in-from-bottom-2 fade-in">
+                {mail.message?.subject || '(No Subject)'}
+              </h1>
+              {isMailEncrypted && (
+                <div className="mt-3 inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  <Lock className="h-3.5 w-3.5" />
+                  E2E Encrypted
+                </div>
+              )}
+              {!isMailEncrypted && isSecureMailEnabled && (
+                <div className="mt-3 inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  <Lock className="h-3.5 w-3.5" />
+                  Secure Mail On
+                </div>
+              )}
+            </div>
             <div className="text-[13px] font-medium text-muted-foreground whitespace-nowrap mt-2">
                {mail.message?.created_at ? format(new Date(mail.message.created_at), 'PPP, p') : ''}
             </div>

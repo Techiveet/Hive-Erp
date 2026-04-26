@@ -8,7 +8,7 @@ import {
   Folder, Star, Share2, Trash2, Clock, Settings, Search, 
   Image as ImageIcon, Video, FileText, Music, Plus, UploadCloud, 
   File as FileIcon, Loader2, Download, Copy, CalendarDays, HardDrive, 
-  ImagePlus, Type, Subtitles, ExternalLink, X, Info, Archive, ChevronDown, ChevronUp,
+  ImagePlus, Type, Subtitles, ExternalLink, X, Info, Archive, ChevronDown, ChevronUp, Box,
   LayoutGrid, List, SortAsc, MoreVertical, Edit, FolderInput, RefreshCcw, AlertTriangle, Link as LinkIcon,
   Eraser, Wand2, Crop, Square, Monitor, FileImage, Sun, Contrast, Droplets, Palette, Save, RotateCw, FlipHorizontal, FlipVertical, ZoomOut, ZoomIn, Maximize, Minimize, Edit2, RotateCcw, DownloadCloud, Unlink, LockKeyhole, Layers
 } from "lucide-react";
@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, getStoredHiveContextSignature, getTenantId } from "@/lib/runtime-context";
+import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, getStoredHiveContextSignature, getTenantId, getStreamUrl, getStoredHiveContext } from "@/lib/runtime-context";
 import { authenticatedDownload } from "@/lib/authenticated-download";
 import { useTranslation } from "@/store/use-translation";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -43,6 +43,7 @@ import { VideoPlayer } from "@/components/ui/video-player";
 import { AudioPlayer } from "@/components/ui/audio-player";
 import { PdfViewer } from "@/components/ui/pdf-viewer";
 import { DocumentViewer } from "@/components/ui/document-viewer";
+import { Model3DViewer } from "@/components/ui/model-3d-viewer";
 import { useGlobalAudio } from "@/context/global-audio-context";
 
 // ============================================================================
@@ -165,26 +166,6 @@ const toCollectionItems = <T,>(value: any): T[] => {
  * Tenant media URLs need query credentials for native audio/video playback.
  * Central or plain storage URLs can be used as-is.
  */
-const getStreamUrl = (url: string | null | undefined, apiRoot: string): string => {
-  if (!url) return '';
-
-  const match = url.match(/\/api\/v1\/files\/(\d+)\/serve/);
-  if (!match) return url;
-
-  const fileId = match[1];
-  const token = typeof window !== 'undefined' ? localStorage.getItem('hive_token') : null;
-  const tenantId = typeof window !== 'undefined' ? localStorage.getItem('hive_context') : null;
-  const tenantSignature = getStoredHiveContextSignature();
-
-  const params = new URLSearchParams();
-  if (token) params.set('token', token);
-  if (tenantId) params.set('tenant', tenantId);
-  if (tenantId && tenantId !== 'central' && tenantSignature) {
-    params.set('signature', tenantSignature);
-  }
-
-  return `${apiRoot}/media/stream/${fileId}?${params.toString()}`;
-};
 
 
 /**
@@ -957,10 +938,10 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { playTrack, syncFavoriteStatus, currentTrack } = useGlobalAudio();
-  const { hasPermission } = usePermissions();
+  const { hasAnyPermission, hasPermission } = usePermissions();
   const { hasModule } = useTenantModuleAccess();
   
-  const canRead = access?.canRead ?? hasPermission("read_storage");
+  const canRead = access?.canRead ?? hasAnyPermission(["view_storage", "manage_storage"]);
   const canManage = access?.canManage ?? hasPermission("manage_storage");
   const hasVideoPlayer = hasModule("video_audio_player");
   const hasImageEditor = hasModule("image_editor");
@@ -1017,7 +998,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
 
   const playlists = playlistsData || [];
   const [activeFilter, setActiveFilter] = React.useState<"all" | "favorites" | "trash" | "recent">("all");
-  const [activeTypeFilter, setActiveTypeFilter] = React.useState<"image" | "video" | "document" | "audio" | "archive" | "other" | null>(null);
+  const [activeTypeFilter, setActiveTypeFilter] = React.useState<"image" | "video" | "document" | "audio" | "model" | "archive" | "other" | null>(null);
   const [activePlaylistId, setActivePlaylistId] = React.useState<number | null>(null);
   const [currentFolderId, setCurrentFolderId] = React.useState<number | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -1632,13 +1613,14 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     if (activeTypeFilter === 'video') return mime.startsWith('video/');
     if (activeTypeFilter === 'audio') return mime.startsWith('audio/');
     if (activeTypeFilter === 'document') return /(document|pdf|text|msword|excel|spreadsheet|powerpoint|presentation|csv)/i.test(mime);
+    if (activeTypeFilter === 'model') return mime.startsWith('model/') || (mime === 'application/octet-stream' && (file.media_details?.name?.toLowerCase().endsWith('.glb') || file.media_details?.name?.toLowerCase().endsWith('.gltf')));
     if (activeTypeFilter === 'archive') return /(zip|rar|tar|gzip|7z|compressed)/i.test(mime);
-    return !mime.startsWith('image/') && !mime.startsWith('video/') && !mime.startsWith('audio/') && !/(document|pdf|text|msword|excel|spreadsheet|powerpoint|presentation|csv|zip|rar|tar|gzip|7z|compressed)/i.test(mime);
+    return !mime.startsWith('image/') && !mime.startsWith('video/') && !mime.startsWith('audio/') && !/(document|pdf|text|msword|excel|spreadsheet|powerpoint|presentation|csv|zip|rar|tar|gzip|7z|compressed)/i.test(mime) && !mime.startsWith('model/');
   });
 
   const visibleFiles = showAllFiles ? displayedFiles : displayedFiles.slice(0, 5);
 
-  const categoryStats = { image: { size: 0, count: 0 }, video: { size: 0, count: 0 }, document: { size: 0, count: 0 }, audio: { size: 0, count: 0 }, archive: { size: 0, count: 0 }, other: { size: 0, count: 0 } };
+  const categoryStats = { image: { size: 0, count: 0 }, video: { size: 0, count: 0 }, document: { size: 0, count: 0 }, audio: { size: 0, count: 0 }, model: { size: 0, count: 0 }, archive: { size: 0, count: 0 }, other: { size: 0, count: 0 } };
   allFiles.forEach((file: any) => {
       const mime = file.media_details?.mime_type || '';
       const size = file.media_details?.size || 0;
@@ -1646,6 +1628,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       else if (mime.startsWith('video/')) { categoryStats.video.size += size; categoryStats.video.count++; }
       else if (mime.startsWith('audio/')) { categoryStats.audio.size += size; categoryStats.audio.count++; }
       else if (/(document|pdf|text|msword|excel|spreadsheet|powerpoint|presentation|csv)/i.test(mime)) { categoryStats.document.size += size; categoryStats.document.count++; }
+      else if (mime.startsWith('model/') || (mime === 'application/octet-stream' && (file.media_details?.name?.toLowerCase().endsWith('.glb') || file.media_details?.name?.toLowerCase().endsWith('.gltf')))) { categoryStats.model.size += size; categoryStats.model.count++; }
       else if (/(zip|rar|tar|gzip|7z|compressed)/i.test(mime)) { categoryStats.archive.size += size; categoryStats.archive.count++; }
       else { categoryStats.other.size += size; categoryStats.other.count++; }
   });
@@ -1783,9 +1766,13 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       );
     }
 
-    if (mime === 'application/pdf') return <div className="h-full w-full min-h-[60vh] rounded-2xl overflow-hidden border border-border/50"><PdfViewer src={safeUrl} title={mediaTitle} /></div>;
-    if (/(document|msword|excel|spreadsheet|powerpoint|presentation|csv)/i.test(mime)) return <div className="h-full w-full min-h-[50vh] rounded-2xl overflow-hidden border border-border/50"><DocumentViewer url={safeUrl} type="office" /></div>;
-    return <div className="flex flex-col items-center justify-center bg-muted/20 rounded-2xl h-full min-h-[40vh] border border-dashed border-border/50 w-full"><FileIcon className="h-16 w-16 text-muted-foreground/40 mb-4" /><p className="text-base font-bold text-foreground mb-1">Preview Unavailable</p><Button onClick={() => window.open(safeUrl, '_blank')} className="mt-6 rounded-xl shadow-md px-8"><Download className="h-4 w-4 mr-2" /> Download to View</Button></div>;
+    if (mime === 'application/pdf') return <div className="h-full w-full min-h-[60vh] rounded-2xl overflow-hidden border border-border/50"><PdfViewer src={getStreamUrl(safeUrl)} title={mediaTitle} /></div>;
+    
+    if (mime.startsWith('model/') || (mime === 'application/octet-stream' && (media.name?.toLowerCase().endsWith('.glb') || media.name?.toLowerCase().endsWith('.gltf')))) {
+      return <div className="h-full w-full min-h-[75vh] rounded-2xl overflow-hidden border border-border/50"><Model3DViewer src={getStreamUrl(safeUrl)} alt={mediaTitle} /></div>;
+    }
+    if (/(document|msword|excel|spreadsheet|powerpoint|presentation|csv)/i.test(mime)) return <div className="h-full w-full min-h-[50vh] rounded-2xl overflow-hidden border border-border/50"><DocumentViewer url={getStreamUrl(safeUrl)} type="office" /></div>;
+    return <div className="flex flex-col items-center justify-center bg-muted/20 rounded-2xl h-full min-h-[40vh] border border-dashed border-border/50 w-full"><FileIcon className="h-16 w-16 text-muted-foreground/40 mb-4" /><p className="text-base font-bold text-foreground mb-1">Preview Unavailable</p><Button onClick={() => window.open(getStreamUrl(safeUrl), '_blank')} className="mt-6 rounded-xl shadow-md px-8"><Download className="h-4 w-4 mr-2" /> Download to View</Button></div>;
   };
 
   return (
@@ -1953,6 +1940,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
               <MetricCard isActive={activeTypeFilter === 'video'} onClick={() => setActiveTypeFilter(activeTypeFilter === 'video' ? null : 'video')} icon={<Video className="h-4 w-4 text-blue-400" />} title="Videos" size={categoryStats.video.size} count={categoryStats.video.count} color="bg-blue-500/10 border-blue-500/20" />
               <MetricCard isActive={activeTypeFilter === 'document'} onClick={() => setActiveTypeFilter(activeTypeFilter === 'document' ? null : 'document')} icon={<FileText className="h-4 w-4 text-amber-400" />} title="Docs" size={categoryStats.document.size} count={categoryStats.document.count} color="bg-amber-500/10 border-amber-500/20" />
               <MetricCard isActive={activeTypeFilter === 'audio'} onClick={() => setActiveTypeFilter(activeTypeFilter === 'audio' ? null : 'audio')} icon={<Music className="h-4 w-4 text-pink-400" />} title="Audio" size={categoryStats.audio.size} count={categoryStats.audio.count} color="bg-pink-500/10 border-pink-500/20" />
+              <MetricCard isActive={activeTypeFilter === 'model'} onClick={() => setActiveTypeFilter(activeTypeFilter === 'model' ? null : 'model')} icon={<Box className="h-4 w-4 text-cyan-400" />} title="3D Models" size={categoryStats.model.size} count={categoryStats.model.count} color="bg-cyan-500/10 border-cyan-500/20" />
               <MetricCard isActive={activeTypeFilter === 'archive'} onClick={() => setActiveTypeFilter(activeTypeFilter === 'archive' ? null : 'archive')} icon={<Archive className="h-4 w-4 text-orange-400" />} title="Archives" size={categoryStats.archive.size} count={categoryStats.archive.count} color="bg-orange-500/10 border-orange-500/20" />
               <MetricCard isActive={activeTypeFilter === 'other'} onClick={() => setActiveTypeFilter(activeTypeFilter === 'other' ? null : 'other')} icon={<FileIcon className="h-4 w-4 text-gray-400" />} title="Others" size={categoryStats.other.size} count={categoryStats.other.count} color="bg-gray-500/10 border-gray-500/20" />
             </div>
@@ -2076,7 +2064,11 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
                               {media?.thumbnail ? (
                                 <AuthImage src={safeUrl} alt={media.title || media.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                               ) : (
-                                <FileIcon className="h-6 w-6 text-muted-foreground/40 transition-transform duration-300 group-hover:scale-110 group-hover:text-emerald-500/50" />
+                                (media?.mime_type?.startsWith('model/') || (media?.name?.toLowerCase().endsWith('.glb') || media?.name?.toLowerCase().endsWith('.gltf'))) ? (
+                                  <Box className="h-6 w-6 text-cyan-500 transition-transform duration-300 group-hover:scale-110" />
+                                ) : (
+                                  <FileIcon className="h-6 w-6 text-muted-foreground/40 transition-transform duration-300 group-hover:scale-110 group-hover:text-emerald-500/50" />
+                                )
                               )}
                               {file.is_favorite && viewMode === 'grid' && (
                                 <div className="absolute top-2 right-2 bg-background/80 backdrop-blur border border-border/50 p-1 rounded-lg"><Star className="h-3 w-3 text-yellow-500 fill-yellow-500" /></div>
@@ -2244,7 +2236,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
            setSubtitleFile(null);
         }
       }}>
-        <DialogContent className="sm:max-w-5xl md:max-w-[1200px] w-[95vw] md:w-full p-0 overflow-hidden bg-background/95 backdrop-blur-2xl border-border/50 rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.4)] flex flex-col max-h-[90vh]">
+        <DialogContent className="sm:max-w-5xl md:max-w-[1400px] lg:max-w-[1600px] w-[98vw] md:w-full p-0 overflow-hidden bg-background/95 backdrop-blur-2xl border-border/50 rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.4)] flex flex-col max-h-[95vh]">
           <DialogTitle className="sr-only">File Preview</DialogTitle>
 
           {selectedFile && (

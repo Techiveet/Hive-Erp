@@ -11,6 +11,8 @@ export interface User {
   name: string;
   email: string;
   avatar_url?: string;
+  chat_public_key?: string | null;
+  chat_key_fingerprint?: string | null;
 }
 
 interface UserMultiSelectProps {

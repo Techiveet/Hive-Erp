@@ -1,9 +1,46 @@
-compiled.php
-config.php
-down
-events.scanned.php
-maintenance.php
-routes.php
-routes.scanned.php
-schedule-*
-services.json
+# Laravel app inside /backend
+/backend/.env
+/backend/.env.*
+!/backend/.env.example
+
+/backend/vendor/
+/backend/node_modules/
+/backend/public/storage
+/backend/storage/*.key
+/backend/storage/framework/cache/*
+!/backend/storage/framework/cache/.gitignore
+/backend/storage/framework/sessions/*
+!/backend/storage/framework/sessions/.gitignore
+/backend/storage/framework/testing/*
+!/backend/storage/framework/testing/.gitignore
+/backend/storage/framework/views/*
+!/backend/storage/framework/views/.gitignore
+/backend/storage/logs/*
+!/backend/storage/logs/.gitignore
+/backend/bootstrap/cache/*
+!/backend/bootstrap/cache/.gitignore
+
+# Laravel / PHP generated cache files
+/backend/bootstrap/cache/*.php
+/backend/bootstrap/cache/*.json
+
+# Frontend build/deps
+/backend/public/build/
+/backend/.vite/
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Windows reserved accidental file
+NUL
+/backend/NUL
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

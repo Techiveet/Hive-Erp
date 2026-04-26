@@ -8,6 +8,7 @@ use Illuminate\Validation\ValidationException;
 use Modules\Inventory\Models\InventoryDocument;
 use Modules\Inventory\Models\InventoryDocumentAsset;
 use Modules\Inventory\Models\InventoryDocumentItem;
+use Modules\Workflow\Models\WorkflowApproval;
 
 class InventoryDocumentWorkflowService
 {
@@ -33,6 +34,17 @@ class InventoryDocumentWorkflowService
                 'created_by_id' => auth()->id(),
                 'workflow_meta' => is_array($payload['workflow_meta'] ?? null) ? $payload['workflow_meta'] : null,
             ]);
+
+            if (is_array($payload['approvers'] ?? null)) {
+                foreach ($payload['approvers'] as $approver) {
+                    if (!empty($approver['user_id'])) {
+                        $document->requestApproval(
+                            (int) $approver['user_id'],
+                            $approver['department'] ?? null
+                        );
+                    }
+                }
+            }
 
             $this->syncItems($document, $items);
 
@@ -88,10 +100,12 @@ class InventoryDocumentWorkflowService
 
         return DB::transaction(function () use ($document, $action, $payload, $transition): InventoryDocument {
             $locked = InventoryDocument::query()
-                ->with('items')
+                ->with(['items.inventoryItem'])
                 ->whereKey($document->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            $this->validateQualityCompliance($locked, $action);
 
             $allowedFrom = is_array($transition['from'] ?? null) ? $transition['from'] : [];
             if (!in_array($locked->status, $allowedFrom, true)) {
@@ -126,13 +140,40 @@ class InventoryDocumentWorkflowService
 
             $targetStatus = (string) ($transition['to'] ?? $locked->status);
             $update = [
-                'status' => $targetStatus,
                 'workflow_meta' => $currentMeta,
             ];
 
             if ($action === 'approve') {
-                $update['approved_by_id'] = auth()->id();
-                $update['approved_at'] = now();
+                if ($locked->approvals()->exists()) {
+                    $myApproval = $locked->approvals()
+                        ->where('user_id', auth()->id())
+                        ->where('status', 'pending')
+                        ->first();
+
+                    if ($myApproval) {
+                        /** @var \Modules\Workflow\Models\WorkflowApproval $myApproval */
+                        $myApproval->update([
+                            'status' => 'approved',
+                            'actioned_at' => now(),
+                            'notes' => $payload['notes'] ?? null,
+                        ]);
+                    }
+
+                    if ($locked->isFullyApproved()) {
+                        $update['status'] = $targetStatus;
+                        $update['approved_by_id'] = auth()->id();
+                        $update['approved_at'] = now();
+                    } else {
+                        // Stay in current status if not fully approved
+                        $update['status'] = $locked->status;
+                    }
+                } else {
+                    $update['status'] = $targetStatus;
+                    $update['approved_by_id'] = auth()->id();
+                    $update['approved_at'] = now();
+                }
+            } else {
+                $update['status'] = $targetStatus;
             }
 
             if (in_array($targetStatus, ['processed', 'received', 'dispatched', 'completed'], true)) {
@@ -251,5 +292,48 @@ class InventoryDocumentWorkflowService
         $randomPart = Str::upper(Str::random(6));
 
         return "{$prefix}-{$datePart}-{$randomPart}";
+    }
+
+    protected function validateQualityCompliance(InventoryDocument $document, string $action): void
+    {
+        // Only run for water bottling business type
+        // Use a generic way to check business type if available
+        $businessType = property_exists(auth()->user(), 'tenant') ? auth()->user()->tenant->business_type : null;
+        
+        // If we can't determine business type from auth, try current_tenant() helper if it exists
+        if (!$businessType && function_exists('current_tenant')) {
+            $businessType = current_tenant()?->business_type;
+        }
+
+        if ($businessType !== 'water-bottling') {
+            return;
+        }
+
+        // Only enforce on critical transitions that release stock to customers
+        if (!in_array($action, ['approve', 'dispatch', 'complete'], true)) {
+            return;
+        }
+
+        // Only for documents that involve outgoing finished goods
+        if (!in_array($document->type, ['delivery_note', 'dispatch', 'finished_goods_transfer'], true)) {
+            return;
+        }
+
+        $service = app(\Modules\Inventory\Services\QualityComplianceService::class);
+        
+        foreach ($document->items as $item) {
+            // Check if batch is specified in metadata
+            $batchId = $item->metadata['batch_id'] ?? null;
+            if ($batchId) {
+                if (!$service->isBatchReleasable((int) $batchId)) {
+                    throw ValidationException::withMessages([
+                        'quality' => "Batch #{$batchId} for '{$item->inventoryItem->name}' has not passed Quality Assurance and cannot be released/dispatched. Please perform mandatory tests and ensure results are within acceptable ranges.",
+                    ]);
+                }
+            } else {
+                // If the item belongs to a category that REQUIRES QA but no batch is assigned
+                // We might want to warn or block, but for now we look for batch-specific QA.
+            }
+        }
     }
 }

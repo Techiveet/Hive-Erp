@@ -7,10 +7,11 @@ import { formatDistanceToNow } from 'date-fns';
 import api from '@/lib/api';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { Search, Trash2, Star, MailOpen, Mail, Archive, MoreVertical, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Trash2, Star, MailOpen, Mail, Archive, MoreVertical, ChevronLeft, ChevronRight, Lock, Zap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { decryptMailParticipants } from '@/lib/mail-e2ee';
 
 export default function MailList() {
   const { 
@@ -20,6 +21,7 @@ export default function MailList() {
     activeFolder, 
     setMails, 
     updateMail,
+    setComposeOpen,
     checkedMailIds,
     toggleCheckMail,
     toggleCheckAll,
@@ -28,7 +30,8 @@ export default function MailList() {
     bulkDeleteMails,
     searchQuery,
     setSearchQuery,
-    adjustCounts
+    adjustCounts,
+    encryptionConfig,
   } = useMailStore();
 
   const [page, setPage] = useState(1);
@@ -45,7 +48,8 @@ export default function MailList() {
       setLoading(true);
       try {
         const { data } = await api.get(`/mail?folder=${activeFolder}&page=${page}`);
-        setMails(data.data);
+        const decryptedMails = await decryptMailParticipants(data.data || []);
+        setMails(decryptedMails);
         setTotalPages(data.last_page || 1);
       } catch (err) {
         console.error("Failed to fetch mails:", err);
@@ -54,13 +58,32 @@ export default function MailList() {
       }
     };
     fetchMails();
-  }, [activeFolder, page, setMails]);
+  }, [
+    activeFolder,
+    page,
+    setMails,
+    encryptionConfig.enabled,
+    encryptionConfig.public_key,
+    encryptionConfig.fingerprint,
+  ]);
 
-  const handleSelect = async (id: number, isRead: boolean) => {
-    selectMail(id);
-    if (!isRead) {
-      updateMail(id, { is_read: true });
-      await api.put(`/mail/${id}`, { is_read: true }).catch(() => {});
+  const handleSelect = async (mail: typeof mails[number]) => {
+    if (mail.folder === 'drafts' || mail.message?.status === 'draft') {
+      setComposeOpen(true, {
+        draftId: mail.mail_message_id,
+        to: mail.message?.draft_recipients?.to || [],
+        cc: mail.message?.draft_recipients?.cc || [],
+        bcc: mail.message?.draft_recipients?.bcc || [],
+        subject: mail.message?.subject || '',
+        body: mail.message?.body || '',
+      });
+      return;
+    }
+
+    selectMail(mail.mail_message_id);
+    if (!mail.is_read) {
+      updateMail(mail.mail_message_id, { is_read: true });
+      await api.put(`/mail/${mail.mail_message_id}`, { is_read: true }).catch(() => {});
     }
   };
 
@@ -91,6 +114,21 @@ export default function MailList() {
          if (activeFolder !== 'archive') bulkDeleteMails(ids);
          if (activeFolder !== 'archive') countUpdate[activeFolder] = -amount;
          countUpdate.archive = amount;
+      } else if (action === 'spam') {
+         bulkUpdateMails(ids, { folder: 'spam' });
+         if (activeFolder !== 'spam') bulkDeleteMails(ids);
+         if (activeFolder !== 'spam') countUpdate[activeFolder] = -amount;
+         countUpdate.spam = amount;
+      } else if (action === 'inbox') {
+         bulkUpdateMails(ids, { folder: 'inbox' });
+         if (activeFolder !== 'inbox') bulkDeleteMails(ids);
+         if (activeFolder !== 'inbox') countUpdate[activeFolder] = -amount;
+         countUpdate.inbox = amount;
+      } else if (action === 'important') {
+         bulkUpdateMails(ids, { folder: 'important' });
+         if (activeFolder !== 'important') bulkDeleteMails(ids);
+         if (activeFolder !== 'important') countUpdate[activeFolder] = -amount;
+         countUpdate.important = amount;
       } else if (action === 'read') {
          bulkUpdateMails(ids, { is_read: true });
          if (activeFolder === 'inbox') countUpdate.inbox_unread = -amount;
@@ -141,9 +179,17 @@ export default function MailList() {
              onCheckedChange={() => toggleCheckAll(filteredMails.map(m => m.mail_message_id))}
              className="border-muted-foreground/30 data-[state=checked]:bg-[#8b5cf6] data-[state=checked]:text-white rounded-[4px]"
            />
-           <h2 className="text-xl font-bold text-foreground capitalize tracking-tight ml-2">
-             {activeFolder === 'all' ? 'All Mails' : activeFolder}
-           </h2>
+           <div className="ml-2 flex items-center gap-2">
+             <h2 className="text-xl font-bold text-foreground capitalize tracking-tight">
+               {activeFolder === 'all' ? 'All Mails' : activeFolder}
+             </h2>
+             {encryptionConfig.enabled && (
+               <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                 <Lock className="h-3 w-3" />
+                 Secure Mail
+               </span>
+             )}
+           </div>
         </div>
         <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
           <MoreVertical className="w-5 h-5" />
@@ -162,6 +208,9 @@ export default function MailList() {
              </Button>
              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white dark:hover:bg-muted" onClick={() => handleBulkAction('archive')} title="Archive">
                <Archive className="w-[18px] h-[18px] text-muted-foreground" />
+             </Button>
+             <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white dark:hover:bg-muted" onClick={() => handleBulkAction(activeFolder === 'spam' ? 'inbox' : 'spam')} title={activeFolder === 'spam' ? "Move to Inbox" : "Report Spam"}>
+               {activeFolder === 'spam' ? <Mail className="w-[18px] h-[18px] text-muted-foreground" /> : <Zap className="w-[18px] h-[18px] text-muted-foreground hover:text-amber-500" />}
              </Button>
              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white dark:hover:bg-muted" onClick={() => handleBulkAction('star')} title="Star">
                <Star className="w-[18px] h-[18px] text-muted-foreground hover:text-yellow-500" />
@@ -198,7 +247,7 @@ export default function MailList() {
                 ? "bg-white dark:bg-muted shadow-sm border-primary/20 ring-1 ring-primary/10" 
                 : "bg-transparent hover:bg-white/80 dark:hover:bg-muted/60",
             )}
-            onClick={() => handleSelect(mail.mail_message_id, mail.is_read)}
+            onClick={() => handleSelect(mail)}
           >
             {/* Absolute Checkbox Overlay */}
             <div className={cn(
@@ -244,10 +293,16 @@ export default function MailList() {
                 </div>
               </div>
               <div className={cn(
-                "text-[14px] truncate w-full mb-1",
+                "flex items-center gap-1.5 text-[14px] truncate w-full mb-1",
                 !mail.is_read ? "font-bold text-foreground" : "font-medium text-foreground/80"
               )}>
-                {mail.message?.subject || '(No Subject)'}
+                {mail.message?.encryption?.encrypted && (
+                  <Lock className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                )}
+                {!mail.message?.encryption?.encrypted && encryptionConfig.enabled && (
+                  <Lock className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                )}
+                <span className="truncate">{mail.message?.subject || '(No Subject)'}</span>
               </div>
               <div className="text-[13px] text-muted-foreground line-clamp-1 w-full leading-relaxed pr-6">
                 {(mail.message?.body || '').replace(/<[^>]+>/g, '')}

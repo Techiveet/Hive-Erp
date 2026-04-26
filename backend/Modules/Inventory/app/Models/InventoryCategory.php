@@ -10,6 +10,8 @@ class InventoryCategory extends Model
 {
     use HasFactory;
 
+    protected $connection = 'central';
+
     protected $table = 'inventory_categories';
 
     protected $fillable = [

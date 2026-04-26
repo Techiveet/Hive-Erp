@@ -76,7 +76,7 @@ class InventoryStockLedgerController extends Controller
     public function createStockAdjustment(Request $request)
     {
         $validated = $request->validate([
-            'item_id' => ['required', 'exists:inventory_items,id'],
+            'item_id' => ['required', 'exists:central.inventory_items,id'],
             'direction' => ['required', 'in:in,out'],
             'quantity' => ['required', 'numeric', 'min:0.001'],
             'unit_cost' => ['nullable', 'numeric', 'min:0'],

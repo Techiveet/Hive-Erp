@@ -58,7 +58,7 @@ class InventoryEntityRecordController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:120'],
-            'parent_id' => ['nullable', 'exists:inventory_entity_records,id'],
+            'parent_id' => ['nullable', 'exists:central.inventory_entity_records,id'],
             'is_active' => ['sometimes', 'boolean'],
             'payload' => ['nullable', 'array'],
         ]);
@@ -157,7 +157,7 @@ class InventoryEntityRecordController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'code' => ['sometimes', 'nullable', 'string', 'max:120'],
-            'parent_id' => ['sometimes', 'nullable', 'exists:inventory_entity_records,id'],
+            'parent_id' => ['sometimes', 'nullable', 'exists:central.inventory_entity_records,id'],
             'is_active' => ['sometimes', 'boolean'],
             'payload' => ['sometimes', 'nullable', 'array'],
         ]);

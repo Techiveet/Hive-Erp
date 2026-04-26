@@ -64,8 +64,10 @@ export default function BusinessTypesPage() {
     queryFn: async () => {
       const url = `${getBackendApiRoot()}/settings/landing-templates`;
       const headers = getAuthHeaders();
+      console.log("[BusinessTypes] Fetching from:", url);
       const res = await fetch(url, { headers });
       const json = await res.json();
+      console.log("[BusinessTypes] Fetched data:", JSON.stringify(json, null, 2));
       return (json?.data?.business_types ?? DEFAULT_TYPES) as BusinessType[];
     },
   });
@@ -74,19 +76,22 @@ export default function BusinessTypesPage() {
     mutationFn: async (types: BusinessType[]) => {
       const url = `${getBackendApiRoot()}/settings/landing-templates`;
       const headers = getAuthHeaders({ "Content-Type": "application/json" });
+      const payload = { business_types: types };
       console.log("[BusinessTypes] Saving to:", url);
-      console.log("[BusinessTypes] Payload:", JSON.stringify({ business_types: types }));
+      console.log("[BusinessTypes] Payload:", JSON.stringify(payload, null, 2));
       const res = await fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify({ business_types: types }),
+        body: JSON.stringify(payload),
       });
+      const responseData = await res.json().catch(() => ({}));
+      console.log("[BusinessTypes] Response status:", res.status);
+      console.log("[BusinessTypes] Response body:", JSON.stringify(responseData, null, 2));
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.log("[BusinessTypes] Error response:", err);
-        throw new Error(err.message || `Failed to save (${res.status})`);
+        console.log("[BusinessTypes] Error response:", responseData);
+        throw new Error(responseData.message || `Failed to save (${res.status})`);
       }
-      return res.json();
+      return responseData;
     },
     onSuccess: (data) => {
       console.log("[BusinessTypes] Saved successfully:", data);

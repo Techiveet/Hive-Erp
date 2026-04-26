@@ -12,6 +12,8 @@ class Warehouse extends Model
 {
     use HasFactory, SoftDeletes, BelongsToWarehouseTenant;
 
+    protected $connection = 'central';
+
     protected $table = 'warehouse_warehouses';
 
     protected $fillable = [

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Reservation extends Model
 {
     use HasFactory;
+    use \Modules\Workflow\Traits\HasDynamicApprovals;
 
     protected $table = 'nightclub_reservations';
 

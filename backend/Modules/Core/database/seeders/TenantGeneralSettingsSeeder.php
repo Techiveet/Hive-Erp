@@ -20,6 +20,7 @@ class TenantGeneralSettingsSeeder extends BaseSettingsSeeder
             'session_timeout_minutes' => 120,
             'enable_registration' => false,
             'require_2fa' => false,
+            'enable_communication_encryption' => false,
         ]);
 
         $this->clearGeneralSettingsCache();

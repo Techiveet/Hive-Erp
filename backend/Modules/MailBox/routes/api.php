@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use Modules\MailBox\Http\Controllers\MailBoxController;
 
 Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout', 'tenant_module:mailbox'])->prefix('v1')->group(function () {
+    Route::get('mail/config', [MailBoxController::class, 'config'])->name('mailbox.config');
+    Route::post('mail/encryption/public-key', [MailBoxController::class, 'updatePublicKey'])->name('mailbox.encryption.public-key');
     Route::get('mail/unread-count', [MailBoxController::class, 'unreadCount'])->name('mailbox.unread');
     Route::get('mail/counts', [MailBoxController::class, 'counts'])->name('mailbox.counts');
     Route::post('mail/bulk', [MailBoxController::class, 'bulkAction'])->name('mailbox.bulk');

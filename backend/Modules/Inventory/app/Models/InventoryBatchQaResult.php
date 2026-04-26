@@ -10,6 +10,8 @@ class InventoryBatchQaResult extends Model
 {
     use HasFactory;
 
+    protected $connection = 'central';
+
     protected $table = 'inventory_batch_qa_results';
 
     protected $fillable = [

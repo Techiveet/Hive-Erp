@@ -63,6 +63,7 @@ return new class extends Migration
             $table->unsignedInteger('units_per_package')->nullable();
             $table->integer('reorder_point')->default(0);
             $table->decimal('quantity', 14, 3)->default(0);
+            $table->string('currency', 10)->default('USD');
             $table->decimal('unit_price', 14, 2)->default(0);
             $table->decimal('tax_rate', 6, 2)->default(15);
             $table->decimal('cost_of_good', 14, 2)->default(0);

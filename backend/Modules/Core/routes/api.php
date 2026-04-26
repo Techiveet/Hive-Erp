@@ -86,6 +86,8 @@ foreach ($centralDomains as $domain) {
             // 🔄 FILE CONVERTER ENGINE (Central)
             Route::prefix('convert')->middleware(['permission:manage_storage,sanctum', 'tenant_module:document_converter'])->group(function () {
                 Route::post('/html-to-pdf', [FileConverterController::class, 'htmlToPdf']);
+                Route::post('/document', [FileConverterController::class, 'documentConvert']);
+                Route::post('/media', [FileConverterController::class, 'mediaConvert']);
             });
 
             Route::prefix('settings')->group(function () {
@@ -226,6 +228,8 @@ Route::middleware([
         // 🔄 FILE CONVERTER ENGINE (Tenant)
         Route::prefix('convert')->middleware(['permission:manage_storage,sanctum', 'tenant_module:document_converter'])->group(function () {
             Route::post('/html-to-pdf', [FileConverterController::class, 'htmlToPdf']);
+            Route::post('/document', [FileConverterController::class, 'documentConvert']);
+            Route::post('/media', [FileConverterController::class, 'mediaConvert']);
         });
 
         Route::prefix('settings')->group(function () {

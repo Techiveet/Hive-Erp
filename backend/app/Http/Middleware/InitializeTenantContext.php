@@ -19,6 +19,13 @@ class InitializeTenantContext
 
     public function handle(Request $request, Closure $next): Response
     {
+        if ($request->is('api/v1/broadcasting/auth')) {
+            \Illuminate\Support\Facades\Log::debug('Broadcasting Auth Tenant Init', [
+                'host' => $request->getHost(),
+                'x-tenant' => $request->header('X-Tenant'),
+                'path' => $request->path(),
+            ]);
+        }
         if ($request->is('api/internal/caddy/allow-domain')) {
             if ($this->tenancy->initialized) {
                 $this->tenancy->end();
@@ -110,6 +117,7 @@ class InitializeTenantContext
             'api/v1/tenant/password-policy',
             'api/v1/reset-password',
             'api/v1/tenant/reset-password',
+            'api/v1/broadcasting/auth',
         ], true);
     }
 

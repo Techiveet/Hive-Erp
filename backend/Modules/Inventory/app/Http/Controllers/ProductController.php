@@ -8,12 +8,17 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Models\FileEntry;
+use Modules\Core\Support\OwnedMediaPathResolver;
 use Modules\Inventory\Enums\UomEnum;
 use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\ProductCategory;
 use Modules\Inventory\Models\Supplier;
 use Modules\Inventory\Models\Tag;
+use Modules\Inventory\Support\InventoryCountryCatalog;
 use Modules\Inventory\Support\InventoryTenantContext;
+use Modules\Inventory\Models\InventoryEntityRecord;
+use Modules\Inventory\Services\QualityComplianceService;
 use Symfony\Component\Intl\Countries;
 
 class ProductController extends Controller
@@ -40,10 +45,11 @@ class ProductController extends Controller
                 'suppliers' => Supplier::query()->count(),
             ],
             'recent_products' => Product::query()
-                ->with(['category:id,name', 'supplier:id,name', 'tags:id,name'])
+                ->with(['category:id,name', 'tags:id,name'])
                 ->latest()
                 ->limit(10)
-                ->get(),
+                ->get()
+                ->map(fn (Product $product) => $this->decorateProduct($product)),
         ]);
     }
 
@@ -62,10 +68,18 @@ class ProductController extends Controller
         return response()->json([
             'categories' => ProductCategory::query()->orderBy('name')->get(['id', 'name', 'parent_id']),
             'tags' => Tag::query()->orderBy('name')->get(['id', 'name', 'slug']),
-            'suppliers' => Supplier::query()->orderBy('name')->get(['id', 'name', 'code', 'is_active']),
             'parent_products' => $parentProductsQuery->get(['id', 'name', 'sku']),
             'uom_options' => UomEnum::values(),
             'status_options' => ['draft', 'published', 'archived'],
+            'currency_options' => [
+                ['code' => 'USD', 'symbol' => '$', 'label' => 'USD - US Dollar'],
+                ['code' => 'ETB', 'symbol' => 'Br', 'label' => 'ETB - Ethiopian Birr'],
+                ['code' => 'EUR', 'symbol' => 'EUR', 'label' => 'EUR - Euro'],
+                ['code' => 'GBP', 'symbol' => 'GBP', 'label' => 'GBP - Pound Sterling'],
+                ['code' => 'AED', 'symbol' => 'AED', 'label' => 'AED - UAE Dirham'],
+                ['code' => 'SAR', 'symbol' => 'SAR', 'label' => 'SAR - Saudi Riyal'],
+                ['code' => 'CNY', 'symbol' => 'CNY', 'label' => 'CNY - Chinese Yuan'],
+            ],
             'countries' => $this->countries(),
         ]);
     }
@@ -89,7 +103,6 @@ class ProductController extends Controller
         $query = Product::query()
             ->with([
                 'category:id,name',
-                'supplier:id,name,code',
                 'parent:id,name,sku',
                 'tags:id,name,slug',
             ])
@@ -111,10 +124,6 @@ class ProductController extends Controller
 
         if ($request->filled('product_category_id')) {
             $query->where('product_category_id', (int) $request->input('product_category_id'));
-        }
-
-        if ($request->filled('supplier_id')) {
-            $query->where('supplier_id', (int) $request->input('supplier_id'));
         }
 
         if ($request->boolean('variants_only', false)) {
@@ -139,10 +148,27 @@ class ProductController extends Controller
         }
         $sortDir = strtolower((string) $request->input('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        return response()->json(
-            $query->orderBy($sortCol, $sortDir)
-                ->paginate((int) $request->integer('per_page', 10))
+        $products = $query
+            ->orderBy($sortCol, $sortDir)
+            ->paginate((int) $request->integer('per_page', 10));
+
+        $productIds = $products->getCollection()->pluck('id')->toArray();
+        $latestBatches = InventoryEntityRecord::query()
+            ->where('entity_type', 'product_batches')
+            ->whereIn('payload->product_id', $productIds)
+            ->get()
+            ->groupBy(fn ($item) => $item->payload['product_id'])
+            ->map(fn ($group) => $group->sortByDesc('created_at')->first());
+
+        $products->setCollection(
+            $products->getCollection()->map(function (Product $product) use ($latestBatches) {
+                $batch = $latestBatches->get($product->id);
+                $product->setAttribute('qa_status', $batch?->payload['qa_status'] ?? 'no_batches');
+                return $this->decorateProduct($product);
+            })
         );
+
+        return response()->json($products);
     }
 
     public function show($id)
@@ -150,21 +176,17 @@ class ProductController extends Controller
         $product = Product::query()
             ->with([
                 'category:id,name,parent_id',
-                'supplier:id,name,code,email,phone',
                 'parent:id,name,sku',
                 'variants:id,name,sku,parent_product_id,status,quantity,reorder_point,track_inventory',
                 'tags:id,name,slug',
             ])
             ->findOrFail($id);
 
-        $countryName = null;
-        if (!empty($product->country_of_origin) && class_exists(Countries::class)) {
-            $countryName = Countries::getName(strtoupper((string) $product->country_of_origin), 'en');
-        }
+        $this->decorateProduct($product);
 
         return response()->json([
             'product' => $product,
-            'country_name' => $countryName,
+            'country_name' => $this->resolveCountryName($product->country_of_origin),
         ]);
     }
 
@@ -198,7 +220,7 @@ class ProductController extends Controller
             'tag_ids.*' => [
                 'required',
                 'integer',
-                Rule::exists('tags', 'id')->where(
+                Rule::exists(\Modules\Inventory\Models\Tag::class, 'id')->where(
                     fn ($query) => $query->where('tenant_id', $tenantId)
                 ),
             ],
@@ -222,6 +244,7 @@ class ProductController extends Controller
             ->whereIn('id', $validated['ids'])
             ->get();
 
+        /** @var Product $product */
         foreach ($products as $product) {
             $this->deleteAssets($product);
             $product->delete();
@@ -310,26 +333,37 @@ class ProductController extends Controller
             ]);
         }
 
-        if (($validated['is_variant'] ?? false) && empty($validated['parent_product_id'])) {
-            throw ValidationException::withMessages([
-                'parent_product_id' => 'Parent product is required when variant mode is enabled.',
-            ]);
+        if ($request->has('is_variant')) {
+            if ($validated['is_variant']) {
+                $validated['attributes'] = $this->filterKeyValueRows($validated['variant_attributes'] ?? []);
+                if (empty($validated['parent_product_id']) && empty($product?->parent_product_id)) {
+                    throw ValidationException::withMessages([
+                        'parent_product_id' => 'Parent product is required when variant mode is enabled.',
+                    ]);
+                }
+            } else {
+                $validated['parent_product_id'] = null;
+                $validated['attributes'] = null;
+            }
         }
 
-        if (!($validated['is_variant'] ?? false)) {
-            $validated['parent_product_id'] = null;
-            $validated['attributes'] = null;
-        } else {
-            $validated['attributes'] = $this->filterKeyValueRows($validated['variant_attributes'] ?? []);
+        if ($request->has('nutritional_info')) {
+            $validated['nutritional_info'] = $this->filterKeyValueRows($validated['nutritional_info'] ?? []);
         }
 
-        $validated['nutritional_info'] = $this->filterKeyValueRows($validated['nutritional_info'] ?? []);
-        $validated['unit'] = $validated['unit'] ?? $validated['uom'] ?? null;
-        $validated['country_of_origin'] = isset($validated['country_of_origin'])
-            ? strtoupper((string) $validated['country_of_origin'])
-            : null;
+        if ($request->has('unit') || $request->has('uom')) {
+            $validated['unit'] = $validated['unit'] ?? $validated['uom'] ?? null;
+        }
 
-        unset($validated['variant_attributes'], $validated['is_variant']);
+        $validated['supplier_id'] = null;
+
+        if ($request->has('country_of_origin')) {
+            $validated['country_of_origin'] = isset($validated['country_of_origin'])
+                ? strtoupper((string) $validated['country_of_origin'])
+                : null;
+        }
+
+        $validated = \Illuminate\Support\Arr::except($validated, ['variant_attributes', 'is_variant', 'uom']);
 
         if (empty($validated['sku'])) {
             $validated['sku'] = $product?->sku ?: $this->generateUniqueSku(
@@ -344,13 +378,15 @@ class ProductController extends Controller
             $validated['quantity'] = (float) $validated['set_quantity'];
         }
 
-        unset($validated['initial_stock'], $validated['set_quantity']);
+        $validated = \Illuminate\Support\Arr::except($validated, ['initial_stock', 'set_quantity']);
 
         if ($request->hasFile('new_image')) {
             if ($product && !empty($product->image)) {
                 Storage::disk('public')->delete($product->image);
             }
             $validated['image'] = $request->file('new_image')->store('inventory/products', 'public');
+        } elseif ($request->filled('image_path')) {
+            $validated['image'] = $request->input('image_path');
         }
 
         if ($request->hasFile('new_3d_model')) {
@@ -358,27 +394,39 @@ class ProductController extends Controller
                 Storage::disk('public')->delete($product->model_3d_path);
             }
             $validated['model_3d_path'] = $request->file('new_3d_model')->store('inventory/product-models', 'public');
+        } elseif ($request->filled('model_3d_path')) {
+            $validated['model_3d_path'] = $request->input('model_3d_path');
         }
 
-        $tagIds = array_values(array_unique(array_map('intval', $validated['tags'] ?? [])));
-        unset($validated['tags']);
+        $validated = \Illuminate\Support\Arr::except($validated, [
+            'tags',
+            'image_path',
+            'new_image',
+            'new_3d_model'
+        ]);
 
         if ($product) {
-            $product->update($validated);
-            $record = $product;
+            $product->fill($validated);
+            $product->save();
+            $record = $product->fresh();
         } else {
-            $record = Product::query()->create($validated);
+            $record = new Product($validated);
+            $record->save();
+            $record = $record->fresh();
         }
 
-        if (!empty($validated['barcode'])) {
+        if ($request->has('barcode') && !empty($validated['barcode'])) {
             $barcodePath = $this->storeBarcodeSvg($record, (string) $validated['barcode']);
             $record->updateQuietly(['barcode_path' => $barcodePath]);
-        } elseif ($product && empty($validated['barcode']) && !empty($product->barcode_path)) {
+        } elseif ($request->has('barcode') && empty($validated['barcode']) && $product && !empty($product->barcode_path)) {
             Storage::disk('public')->delete((string) $product->barcode_path);
             $record->updateQuietly(['barcode_path' => null]);
         }
 
-        $record->tags()->sync($tagIds);
+        if ($request->has('tags')) {
+            $tagIds = array_values(array_unique(array_map('intval', $request->input('tags', []))));
+            $record->tags()->sync($tagIds);
+        }
 
         return $record;
     }
@@ -394,7 +442,7 @@ class ProductController extends Controller
                 'string',
                 'alpha_dash',
                 'max:255',
-                Rule::unique('products', 'sku')
+                Rule::unique(\Modules\Inventory\Models\Product::class, 'sku')
                     ->where(fn ($query) => $query->where('tenant_id', $tenantId))
                     ->ignore($productId),
             ],
@@ -403,14 +451,17 @@ class ProductController extends Controller
             'unit_price' => ['required', 'numeric', 'min:0'],
             'tax_rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'new_image' => ['nullable', 'image', 'max:2048'],
+            'image_path' => ['nullable', 'string'],
             'new_3d_model' => ['nullable', 'file', 'mimes:glb,gltf', 'max:20240'],
+            'model_3d_path' => ['nullable', 'string'],
             'cost_of_good' => ['required', 'numeric', 'min:0'],
+            'currency' => ['required', 'string', 'max:10'],
             'sale_price' => ['nullable', 'numeric', 'min:0'],
             'barcode' => [
                 'nullable',
                 'string',
                 'max:255',
-                Rule::unique('products', 'barcode')
+                Rule::unique(\Modules\Inventory\Models\Product::class, 'barcode')
                     ->where(fn ($query) => $query->where('tenant_id', $tenantId))
                     ->ignore($productId),
             ],
@@ -419,13 +470,13 @@ class ProductController extends Controller
             'status' => ['required', Rule::in(['draft', 'published', 'archived'])],
             'product_category_id' => [
                 'nullable',
-                Rule::exists('product_categories', 'id')->where(
+                Rule::exists(\Modules\Inventory\Models\ProductCategory::class, 'id')->where(
                     fn ($query) => $query->where('tenant_id', $tenantId)
                 ),
             ],
             'parent_product_id' => [
                 'nullable',
-                Rule::exists('products', 'id')->where(
+                Rule::exists(\Modules\Inventory\Models\Product::class, 'id')->where(
                     fn ($query) => $query->where('tenant_id', $tenantId)
                 ),
             ],
@@ -433,12 +484,6 @@ class ProductController extends Controller
             'variant_attributes' => ['nullable', 'array'],
             'variant_attributes.*.key' => ['nullable', 'string'],
             'variant_attributes.*.value' => ['nullable', 'string'],
-            'supplier_id' => [
-                'nullable',
-                Rule::exists('suppliers', 'id')->where(
-                    fn ($query) => $query->where('tenant_id', $tenantId)
-                ),
-            ],
             'unit' => ['nullable', Rule::in(UomEnum::values())],
             'uom' => ['nullable', Rule::in(UomEnum::values())],
             'units_per_package' => ['nullable', 'integer', 'min:1'],
@@ -452,7 +497,7 @@ class ProductController extends Controller
             'tags' => ['nullable', 'array'],
             'tags.*' => [
                 'integer',
-                Rule::exists('tags', 'id')->where(
+                Rule::exists(\Modules\Inventory\Models\Tag::class, 'id')->where(
                     fn ($query) => $query->where('tenant_id', $tenantId)
                 ),
             ],
@@ -487,7 +532,7 @@ class ProductController extends Controller
         if (!$isUpdate) {
             $normalized['track_inventory'] = $normalized['track_inventory'] ?? true;
             $normalized['allow_backorders'] = $normalized['allow_backorders'] ?? false;
-            $normalized['initial_stock'] = $normalized['initial_stock'] ?? 0;
+            $normalized['initial_stock'] = $request->input('initial_stock', 0);
         }
 
         if ($request->has('country_of_origin')) {
@@ -524,15 +569,60 @@ class ProductController extends Controller
 
     protected function loadProduct(int $id): Product
     {
-        return Product::query()
+        $product = Product::query()
             ->with([
                 'category:id,name',
-                'supplier:id,name,code,email,phone',
                 'parent:id,name,sku',
                 'variants:id,name,sku,parent_product_id,status,quantity,reorder_point,track_inventory',
                 'tags:id,name,slug',
             ])
             ->findOrFail($id);
+
+        return $this->decorateProduct($product);
+    }
+
+    protected function decorateProduct(Product $product): Product
+    {
+        $product->makeHidden(['supplier_id']);
+        $product->setAttribute('image_preview_url', $this->resolveProductAssetPreviewUrl($product->image));
+        $product->setAttribute('model_3d_preview_url', $this->resolveProductAssetPreviewUrl($product->model_3d_path));
+
+        if (!$product->offsetExists('qa_status')) {
+            $product->setAttribute('qa_status', app(QualityComplianceService::class)->getProductLatestQaStatus($product->id));
+        }
+
+        $product->setAttribute('workflow_status', $product->workflow_status);
+
+        return $product;
+    }
+
+
+    protected function resolveProductAssetPreviewUrl(?string $path): ?string
+    {
+        $value = trim((string) $path);
+        if ($value === '') {
+            return null;
+        }
+
+        if (
+            Str::startsWith($value, ['http://', 'https://']) ||
+            (str_contains($value, '/api/v1/files/') && str_contains($value, '/serve'))
+        ) {
+            return $value;
+        }
+
+        $ownerId = (int) auth()->id();
+        if ($ownerId <= 0) {
+            return null;
+        }
+
+        $media = app(OwnedMediaPathResolver::class)->resolveOwnedMediaFromPath($value, $ownerId);
+
+        if (!$media || $media->model_type !== FileEntry::class) {
+            return null;
+        }
+
+        return url("/api/v1/files/{$media->model_id}/serve");
     }
 
     protected function generateUniqueSku(string $base): string
@@ -675,7 +765,7 @@ SVG;
     protected function countries(): array
     {
         if (!class_exists(Countries::class)) {
-            return [];
+            return InventoryCountryCatalog::all();
         }
 
         $names = Countries::getNames('en');
@@ -690,5 +780,22 @@ SVG;
         }
 
         return $countries;
+    }
+
+    protected function resolveCountryName(?string $countryCode): ?string
+    {
+        $normalized = strtoupper(trim((string) $countryCode));
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (class_exists(Countries::class)) {
+            $countryName = Countries::getName($normalized, 'en');
+            if (filled($countryName)) {
+                return $countryName;
+            }
+        }
+
+        return InventoryCountryCatalog::name($normalized);
     }
 }
