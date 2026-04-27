@@ -58,12 +58,10 @@ Route::get('/test-broadcast', function () {
         'time'        => now()->format('H:i:s'),
     ];
 
-    // Fire the event directly to the 'central' tenant channel
     event(new \Modules\Core\Events\DashboardActivityLogged($payload, 'central'));
 
     return response()->json([
         'status' => 'Broadcast dispatched to Reverb!',
-        'payload' => $payload
+        'payload' => $payload,
     ]);
 });
-

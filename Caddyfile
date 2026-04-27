@@ -4,37 +4,31 @@
     }
 }
 
-# Frontend app. Normal automatic HTTPS. No on-demand ask.
 {$FRONTEND_DOMAIN} {
     encode zstd gzip
     reverse_proxy frontend:3000
 }
 
-# Laravel API/backend. Normal automatic HTTPS. No on-demand ask.
 {$BACKEND_DOMAIN} {
     encode zstd gzip
     reverse_proxy backend:8000
 }
 
-# Laravel Reverb websocket server. Normal automatic HTTPS. No on-demand ask.
 {$REVERB_DOMAIN} {
     encode zstd gzip
     reverse_proxy reverb:9000
 }
 
-# Horizon/dashboard domain. Horizon is served by Laravel, not by the queue worker process.
 {$HORIZON_DOMAIN} {
     encode zstd gzip
     reverse_proxy backend:8000
 }
 
-# Meilisearch dashboard/API. Keep this only if you intentionally expose it publicly.
 {$MEILISEARCH_DOMAIN} {
     encode zstd gzip
     reverse_proxy meilisearch:7700
 }
 
-# Optional internal service domains. Keep only if you intentionally expose them.
 {$REMBG_DOMAIN} {
     encode zstd gzip
     reverse_proxy rembg:5000
@@ -45,7 +39,6 @@
     reverse_proxy gotenberg:3000
 }
 
-# Tenant/custom domains only. This is the only block that uses on-demand TLS.
 https:// {
     tls {
         on_demand
