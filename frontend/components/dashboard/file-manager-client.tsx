@@ -1685,8 +1685,8 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       const handleNext = () => { if (currentIndex < videoFiles.length - 1) setSelectedFile(videoFiles[currentIndex + 1]); };
       const handlePrev = () => { if (currentIndex > 0) setSelectedFile(videoFiles[currentIndex - 1]); };
       const formattedSubtitles = (media.subtitles || []).map((sub: any) => ({ ...sub, src: sub.uuid ? `${getBackendApiRoot()}/files/subtitle/${sub.uuid}` : sub.src, srcLang: sub.srcLang || 'en', label: sub.label || 'Subtitle', default: sub.default || false }));
-      const formattedVersions = (media.video_versions || []).map((v: any) => ({ label: v.label, url: getStreamUrl(getStorageUrl(v.url), getBackendApiRoot()) }));
-      const nativeSrc = getStreamUrl(safeUrl, getBackendApiRoot());
+      const formattedVersions = (media.video_versions || []).map((v: any) => ({ label: v.label, url: getStreamUrl(getStorageUrl(v.url)) }));
+      const nativeSrc = getStreamUrl(safeUrl);
       const adaptiveStreamingReady = Boolean(media.hls_path);
 
       if (!hasVideoPlayer) {
@@ -1745,14 +1745,14 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
       const handlePrev = () => { if (currentIndex > 0) setSelectedFile(audioFiles[currentIndex - 1]); };
       const currentPlaylist = audioFiles.map((f: any) => ({
         id: f.id,
-        src: getStreamUrl(getStorageUrl(f.media_details?.url), getBackendApiRoot()),
+     src: getStreamUrl(getStorageUrl(f.media_details?.url)),
         title: f.media_details?.title || f.media_details?.name || "Unknown Track",
         artist: f.media_details?.artist || "HIVE.OS Audio",
         coverArt: getStorageUrl(f.media_details?.thumbnail),
         isFavorite: f.is_favorite,
         downloadUrl: `${getBackendApiRoot()}/files/${f.id}/download`,
       }));
-      const streamSrc = getStreamUrl(safeUrl, getBackendApiRoot());
+   const streamSrc = getStreamUrl(safeUrl);
 
       return (
         <div className="flex flex-col items-center justify-center rounded-2xl h-full min-h-[350px] border border-border/50 shadow-inner w-full overflow-hidden relative bg-muted/10">
