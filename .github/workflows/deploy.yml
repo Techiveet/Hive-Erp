@@ -4,27 +4,54 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
+
     steps:
-      - name: Deploy via SSH
+      - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_HOST_IP }}
-          username: ${{ secrets.VPS_SSH_USER }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           timeout: 60s
           command_timeout: 120m
           script: |
             set -Eeuo pipefail
-            if [ -d "/var/www/hive" ]; then
-              cd /var/www/hive
-            else
-              cd ~/projects/hive
+
+            PROJECT_DIR=""
+
+            for dir in /var/www/hive /var/www/Hive-Erp /var/www/hive-erp ~/projects/hive ~/projects/Hive-Erp; do
+              if [ -f "${dir}/docker-compose.prod.yml" ]; then
+                PROJECT_DIR="${dir}"
+                break
+              fi
+            done
+
+            if [ -z "${PROJECT_DIR}" ]; then
+              echo "Could not find project directory containing docker-compose.prod.yml" >&2
+              echo "Checked:" >&2
+              echo "  /var/www/hive" >&2
+              echo "  /var/www/Hive-Erp" >&2
+              echo "  /var/www/hive-erp" >&2
+              echo "  ~/projects/hive" >&2
+              echo "  ~/projects/Hive-Erp" >&2
+              exit 1
             fi
+
+            cd "${PROJECT_DIR}"
+            echo "Deploying from: $(pwd)"
+
             git fetch origin main
             git checkout main
             git pull --ff-only origin main
-            bash scripts/deploy-prod.sh
+
+            TRACE_DEPLOY=1 bash scripts/deploy-prod.sh
