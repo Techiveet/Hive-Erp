@@ -27,12 +27,24 @@ Route::get('/internal/caddy/allow-domain', function (Request $request) {
     $domain = strtolower(trim((string) $request->query('domain', '')));
 
     if ($domain === '') {
-        return response()->json(['allowed' => false, 'message' => 'Missing domain.'], 400);
+        abort(403);
     }
 
-    return Domain::query()->where('domain', $domain)->exists()
-        ? response()->json(['allowed' => true], 200)
-        : response()->json(['allowed' => false], 404);
+    if (filter_var($domain, FILTER_VALIDATE_IP)) {
+        abort(403);
+    }
+
+    if (! filter_var($domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+        abort(403);
+    }
+
+    $allowed = Domain::query()
+        ->where('domain', $domain)
+        ->exists();
+
+    abort_unless($allowed, 403);
+
+    return response()->noContent();
 });
 
 Route::get('/test-broadcast', function () {
