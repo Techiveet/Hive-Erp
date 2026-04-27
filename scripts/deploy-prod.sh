@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-  until compose exec -T meilisearch curl -fsS http://127.0.0.1:7700/health >/dev/null 2>&1; do
-    attempt=$((attempt + 1))
-    if [ "${attempt}" -ge 24 ]; then
-      echo "Meilisearch did not become ready in time." >&2
-      exit 1
     fi
     sleep 5
   done
