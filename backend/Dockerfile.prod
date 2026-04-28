@@ -19,17 +19,15 @@ RUN apk add --no-cache \
 
 # 2. Configure and Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_pgsql zip pcntl sockets opcache gd exif
+    && docker-php-ext-install -j"$(nproc)" pdo pdo_pgsql zip pcntl sockets gd exif
 
 # 3. Performance & Resource Tuning
 RUN echo "memory_limit=2G" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
     && echo "upload_max_filesize=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
-    && echo "post_max_size=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
-    && echo "opcache.enable_cli=1" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
-    && echo "opcache.jit_buffer_size=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
-    && echo "opcache.jit=tracing" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
+    && echo "post_max_size=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini
 
 # Redis is handled by Laravel Predis; do not compile the PECL phpredis extension.
+# OPcache is intentionally not compiled in the deploy image; source builds are too slow on the VPS.
 
 # 5. Bring in external binaries
 COPY --from=spiralscout/roadrunner:latest /usr/bin/rr /usr/bin/rr
