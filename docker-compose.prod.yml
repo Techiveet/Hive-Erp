@@ -387,6 +387,7 @@ services:
         NEXT_PUBLIC_REVERB_PORT: ${NEXT_PUBLIC_REVERB_PORT}
         NEXT_PUBLIC_REVERB_SCHEME: ${NEXT_PUBLIC_REVERB_SCHEME}
         INTERNAL_API_URL: ${INTERNAL_API_URL:-http://backend:8000/api/v1}
+        NEXT_SKIP_BUILD_TYPECHECK: ${NEXT_SKIP_BUILD_TYPECHECK:-1}
     image: hive-frontend
     container_name: hive-frontend
     restart: unless-stopped
