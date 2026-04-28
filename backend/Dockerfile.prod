@@ -29,15 +29,7 @@ RUN echo "memory_limit=2G" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.in
     && echo "opcache.jit_buffer_size=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
     && echo "opcache.jit=tracing" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
 
-# 4. Install Redis extension for high-speed caching
-RUN set -eux; \
-    apk add --no-cache --virtual .redis-build-deps $PHPIZE_DEPS linux-headers; \
-    pecl channel-update pecl.php.net || true; \
-    curl -fsSL -o /tmp/redis.tgz https://pecl.php.net/get/redis-6.1.0.tgz; \
-    pecl install /tmp/redis.tgz; \
-    docker-php-ext-enable redis; \
-    rm -f /tmp/redis.tgz; \
-    apk del .redis-build-deps
+# Redis is handled by Laravel Predis; do not compile the PECL phpredis extension.
 
 # 5. Bring in external binaries
 COPY --from=spiralscout/roadrunner:latest /usr/bin/rr /usr/bin/rr

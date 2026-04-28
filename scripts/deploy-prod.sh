@@ -159,6 +159,7 @@ ensure_runtime_env() {
   ensure_env_value REVERB_INTERNAL_URL "http://reverb:9000"
   ensure_env_value DB_INTERNAL_HOST "db"
   ensure_env_value REDIS_INTERNAL_HOST "redis"
+  ensure_env_value REDIS_CLIENT "predis"
   ensure_env_value MEILISEARCH_INTERNAL_URL "http://meilisearch:7700"
   ensure_env_value REMBG_INTERNAL_URL "http://rembg:5000"
   ensure_env_value GOTENBERG_INTERNAL_URL "http://gotenberg:3000"
