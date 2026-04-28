@@ -74,6 +74,16 @@ ensure_env_value() {
   fi
 }
 
+ensure_env_not_value() {
+  local key="$1"
+  local blocked="$2"
+  local fallback="$3"
+
+  if [ "$(get_env_value "${key}")" = "${blocked}" ]; then
+    set_env_value "${key}" "${fallback}"
+  fi
+}
+
 is_placeholder_secret() {
   local value="$1"
 
@@ -160,6 +170,7 @@ ensure_runtime_env() {
   ensure_env_value DB_INTERNAL_HOST "db"
   ensure_env_value REDIS_INTERNAL_HOST "redis"
   ensure_env_value REDIS_CLIENT "predis"
+  ensure_env_not_value REDIS_CLIENT "phpredis" "predis"
   ensure_env_value MEILISEARCH_INTERNAL_URL "http://meilisearch:7700"
   ensure_env_value REMBG_INTERNAL_URL "http://rembg:5000"
   ensure_env_value GOTENBERG_INTERNAL_URL "http://gotenberg:3000"

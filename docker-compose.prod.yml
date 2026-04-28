@@ -232,6 +232,7 @@ services:
       QUEUE_INTERNAL_HOST: ${QUEUE_INTERNAL_HOST:-queue}
       DB_HOST: ${DB_INTERNAL_HOST:-db}
       DB_INTERNAL_HOST: ${DB_INTERNAL_HOST:-db}
+      REDIS_CLIENT: predis
       REDIS_HOST: ${REDIS_INTERNAL_HOST:-redis}
       REDIS_INTERNAL_HOST: ${REDIS_INTERNAL_HOST:-redis}
       MEILISEARCH_HOST: ${MEILISEARCH_INTERNAL_URL:-http://meilisearch:7700}
@@ -297,6 +298,7 @@ services:
       HORIZON_DOMAIN: ${HORIZON_DOMAIN:-hive-queue.techiveet.com}
       DB_HOST: ${DB_INTERNAL_HOST:-db}
       DB_INTERNAL_HOST: ${DB_INTERNAL_HOST:-db}
+      REDIS_CLIENT: predis
       REDIS_HOST: ${REDIS_INTERNAL_HOST:-redis}
       REDIS_INTERNAL_HOST: ${REDIS_INTERNAL_HOST:-redis}
       MEILISEARCH_HOST: ${MEILISEARCH_INTERNAL_URL:-http://meilisearch:7700}
@@ -343,6 +345,7 @@ services:
       REVERB_DOMAIN: ${REVERB_DOMAIN:-hive-ws.techiveet.com}
       DB_HOST: ${DB_INTERNAL_HOST:-db}
       DB_INTERNAL_HOST: ${DB_INTERNAL_HOST:-db}
+      REDIS_CLIENT: predis
       REDIS_HOST: ${REDIS_INTERNAL_HOST:-redis}
       REDIS_INTERNAL_HOST: ${REDIS_INTERNAL_HOST:-redis}
       REVERB_SERVER_HOST: 0.0.0.0
