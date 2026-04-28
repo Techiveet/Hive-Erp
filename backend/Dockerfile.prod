@@ -1,34 +1,53 @@
-# 🚀 Bumped to alpine3.21 to ensure PostgreSQL 17 client tools (pg_dump) are installed
-FROM php:8.4-cli-alpine3.21
+# Alpine 3.21 ships PHP 8.4 packages and PostgreSQL 17 client tools.
+FROM alpine:3.21
 
-# 1. Install system dependencies
+# 1. Install PHP and system dependencies from binary packages.
 RUN apk add --no-cache \
-    postgresql-client \
-    postgresql-dev \
-    libzip-dev \
-    unzip \
-    git \
+    bash \
+    ca-certificates \
     curl \
-    linux-headers \
-    freetype-dev \
-    libjpeg-turbo-dev \
-    libpng-dev \
-    zlib-dev \
     ffmpeg \
-    $PHPIZE_DEPS
-
-# 2. Configure and install PHP extensions.
-# PDO is already bundled in the official PHP image; compiling it again adds noise and build work.
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo_pgsql zip pcntl sockets gd exif
+    git \
+    postgresql-client \
+    unzip \
+    php84 \
+    php84-bcmath \
+    php84-ctype \
+    php84-curl \
+    php84-dom \
+    php84-exif \
+    php84-fileinfo \
+    php84-gd \
+    php84-iconv \
+    php84-mbstring \
+    php84-opcache \
+    php84-openssl \
+    php84-pcntl \
+    php84-pdo \
+    php84-pdo_pgsql \
+    php84-phar \
+    php84-posix \
+    php84-session \
+    php84-simplexml \
+    php84-sockets \
+    php84-tokenizer \
+    php84-xml \
+    php84-xmlreader \
+    php84-xmlwriter \
+    php84-zip \
+    && ln -sf /usr/bin/php84 /usr/bin/php \
+    && (addgroup -g 82 -S www-data 2>/dev/null || true) \
+    && (adduser -u 82 -D -S -G www-data www-data 2>/dev/null || true)
 
 # 3. Performance & Resource Tuning
-RUN echo "memory_limit=2G" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
-    && echo "upload_max_filesize=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
-    && echo "post_max_size=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini
+RUN { \
+      echo "memory_limit=2G"; \
+      echo "upload_max_filesize=100M"; \
+      echo "post_max_size=100M"; \
+    } > /etc/php84/conf.d/99-hive.ini
 
 # Redis is handled by Laravel Predis; do not compile the PECL phpredis extension.
-# OPcache is intentionally not compiled in the deploy image; source builds are too slow on the VPS.
+# PHP extensions are installed from Alpine packages to avoid source builds on the VPS.
 
 # 5. Bring in external binaries
 COPY --from=spiralscout/roadrunner:latest /usr/bin/rr /usr/bin/rr
