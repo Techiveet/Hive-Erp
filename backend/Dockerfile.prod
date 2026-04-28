@@ -17,9 +17,10 @@ RUN apk add --no-cache \
     ffmpeg \
     $PHPIZE_DEPS
 
-# 2. Configure and Install PHP extensions
+# 2. Configure and install PHP extensions.
+# PDO is already bundled in the official PHP image; compiling it again adds noise and build work.
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" pdo pdo_pgsql zip pcntl sockets gd exif
+    && docker-php-ext-install pdo_pgsql zip pcntl sockets gd exif
 
 # 3. Performance & Resource Tuning
 RUN echo "memory_limit=2G" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \

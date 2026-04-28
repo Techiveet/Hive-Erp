@@ -15,6 +15,13 @@ compose() {
   docker compose -f "${COMPOSE_FILE}" "$@"
 }
 
+build_image() {
+  local service="$1"
+
+  echo "Building production image: ${service}"
+  compose build --progress plain "${service}"
+}
+
 fail() {
   local code="$1"
   local line="$2"
@@ -313,7 +320,9 @@ echo "Validating Docker Compose config..."
 compose config >/tmp/hive-compose-config.yml
 
 echo "Building production images..."
-compose build --progress plain caddy backend queue reverb frontend ffmpeg
+for service in caddy backend frontend ffmpeg; do
+  build_image "${service}"
+done
 
 echo "Starting dependencies..."
 compose up -d --remove-orphans redis db seaweedfs seaweedfs-bootstrap meilisearch rembg gotenberg ffmpeg
