@@ -1,0 +1,64 @@
+# 🚀 Bumped to alpine3.21 to ensure PostgreSQL 17 client tools (pg_dump) are installed
+FROM php:8.4-cli-alpine3.21
+
+# 1. Install system dependencies
+RUN apk add --no-cache \
+    postgresql-client \
+    postgresql-dev \
+    libzip-dev \
+    unzip \
+    git \
+    curl \
+    linux-headers \
+    freetype-dev \
+    libjpeg-turbo-dev \
+    libpng-dev \
+    zlib-dev \
+    ffmpeg \
+    $PHPIZE_DEPS
+
+# 2. Configure and Install PHP extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_pgsql zip pcntl sockets opcache gd exif
+
+# 3. Performance & Resource Tuning
+RUN echo "memory_limit=2G" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
+    && echo "upload_max_filesize=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
+    && echo "post_max_size=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-custom.ini \
+    && echo "opcache.enable_cli=1" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
+    && echo "opcache.jit_buffer_size=100M" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
+    && echo "opcache.jit=tracing" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
+
+RUN set -eux; \
+    apk add --no-cache --virtual .redis-build-deps $PHPIZE_DEPS linux-headers; \
+    pecl channel-update pecl.php.net || true; \
+    curl -fsSL -o /tmp/redis.tgz https://pecl.php.net/get/redis-6.1.0.tgz; \
+    pecl install /tmp/redis.tgz; \
+    docker-php-ext-enable redis; \
+    rm -f /tmp/redis.tgz; \
+    apk del .redis-build-deps
+
+# 5. Bring in external binaries
+COPY --from=spiralscout/roadrunner:latest /usr/bin/rr /usr/bin/rr
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# 6. Final Environment Setup
+WORKDIR /var/www/html
+
+# Copy codebase
+COPY . .
+
+# Ensure directories exist and have correct permissions for composer scripts
+RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache
+
+# Install dependencies optimized for production
+# We run as root first to allow scripts to run, or we could use --no-scripts
+RUN composer install --no-dev --optimize-autoloader
+
+# Final permission fix
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+EXPOSE 8000
+
+CMD ["php", "artisan", "octane:start", "--server=roadrunner", "--host=0.0.0.0", "--port=8000"]

@@ -109,4 +109,12 @@ class Product extends Model
         return $this->belongsToMany(Tag::class, 'product_tag', 'product_id', 'tag_id')
             ->withTimestamps();
     }
+
+    /**
+     * Handle logic when the product is fully approved via dynamic workflow.
+     */
+    public function onWorkflowFullyApproved(): void
+    {
+        $this->update(['status' => 'published']);
+    }
 }

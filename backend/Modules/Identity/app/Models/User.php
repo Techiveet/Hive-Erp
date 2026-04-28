@@ -85,7 +85,11 @@ class User extends Authenticatable
 
     public function receivesBroadcastNotificationsOn(): string
     {
-        return 'App.Models.User.' . $this->getKey();
+        $prefix = function_exists('tenant') && tenant('id')
+            ? 'tenant.' . tenant('id') . '.'
+            : '';
+
+        return $prefix . 'App.Models.User.' . $this->getKey();
     }
 
     public function searchableAs()

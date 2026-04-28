@@ -65,6 +65,7 @@ class TenantProvisioningService
                     'Modules/MailBox/database/migrations/tenant',
                     'Modules/Inventory/database/migrations',
                     'Modules/NightClub/database/migrations',
+                    'Modules/ProjectManagement/database/migrations',
                 ],
             ]);
 

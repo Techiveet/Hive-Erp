@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Layers, ChevronDown, ChevronRight, FileType, Mail, Boxes, Warehouse, MessageCircle, LayoutTemplate, RefreshCcw } from "lucide-react";
+import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Layers, ChevronDown, ChevronRight, FileType, Mail, Boxes, Warehouse, MessageCircle, LayoutTemplate, RefreshCcw, ListTodo, CalendarCheck, CheckCircle, Plus, KanbanSquare, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useChatAccess } from "@/hooks/use-chat-access";
@@ -103,6 +103,8 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   const [isModulesOpen, setIsModulesOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isWarehouseOpen, setIsWarehouseOpen] = useState(false);
+  const [isProjectManagementOpen, setIsProjectManagementOpen] = useState(false);
+  const [isWorkflowOpen, setIsWorkflowOpen] = useState(false);
   // 🚀 Apps dropdown state
   const [isAppsOpen, setIsAppsOpen] = useState(false);
   const canAccessConverter = hasAnyPermission(["manage_storage"]);
@@ -154,16 +156,25 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
 
   const filteredSecondary = useMemo(() => {
     if (!isMounted) return [];
-    return DASHBOARD_SECONDARY.filter(item => 
+    return DASHBOARD_SECONDARY.filter((item) => 
       hasAccess(item) && t(item.translationKey, item.fallbackLabel).toLowerCase().includes(searchQuery.toLowerCase())
+      && item.moduleId !== "projectmanagement" && item.moduleId !== "workflow"
     );
   }, [searchQuery, t, hasAnyPermission, isTenantNode, isMounted]);
 
-  const moduleNavItems = filteredNav.filter((item) => item.moduleId === "inventory" || item.moduleId === "nightclub" || item.moduleId === "warehouse");
-  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "nightclub" && item.moduleId !== "warehouse" && item.href !== "/dashboard/landing-templates");
+  const projectManagementFromSecondary = DASHBOARD_SECONDARY.filter((item) => item.moduleId === "projectmanagement");
+  
+  const moduleNavItems = [
+    ...filteredNav.filter((item) => item.moduleId === "inventory" || item.moduleId === "nightclub" || item.moduleId === "warehouse" || item.moduleId === "workflow" || item.moduleId === "projectmanagement"),
+    ...projectManagementFromSecondary,
+    ...filteredSecondary.filter((item) => item.moduleId === "workflow" || item.moduleId === "projectmanagement")
+  ];
+  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "nightclub" && item.moduleId !== "warehouse" && item.moduleId !== "workflow" && item.moduleId !== "projectmanagement" && item.href !== "/dashboard/landing-templates");
   const inventoryModuleItems = moduleNavItems.filter((item) => item.moduleId === "inventory");
   const nightclubModuleItems = moduleNavItems.filter((item) => item.moduleId === "nightclub");
   const warehouseModuleItems = moduleNavItems.filter((item) => item.moduleId === "warehouse");
+  const projectManagementModuleItems = moduleNavItems.filter((item) => item.moduleId === "projectmanagement");
+  const workflowModuleItems = moduleNavItems.filter((item) => item.moduleId === "workflow");
 
   useEffect(() => {
     if (pathname.startsWith("/dashboard/inventory")) {
@@ -176,6 +187,14 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
     }
     if (pathname.startsWith("/dashboard/nightclub")) {
       setIsModulesOpen(true);
+    }
+    if (pathname.startsWith("/dashboard/project-management")) {
+      setIsModulesOpen(true);
+      setIsProjectManagementOpen(true);
+    }
+    if (pathname.startsWith("/dashboard/workflow")) {
+      setIsModulesOpen(true);
+      setIsWorkflowOpen(true);
     }
     if (pathname.startsWith("/dashboard/tools/converter") || pathname.startsWith("/dashboard/mail") || pathname.startsWith("/dashboard/chat") || pathname.startsWith("/dashboard/landing-templates")) {
       setIsAppsOpen(true);
@@ -386,6 +405,128 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                             </Link>
                           );
                         })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {projectManagementModuleItems.length > 0 && (
+                      <div className="flex flex-col gap-1">
+                        <div className="group flex items-center justify-between rounded-xl px-2.5 py-1.5 text-[13px] font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground">
+                          <Link 
+                            href="/dashboard/project-management"
+                            className="flex items-center gap-3 flex-1 overflow-hidden"
+                          >
+                            <ListTodo className="h-4 w-4 shrink-0 text-primary" />
+                            <span className="truncate font-bold text-foreground">Project Management</span>
+                          </Link>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setIsProjectManagementOpen(!isProjectManagementOpen);
+                            }}
+                            className="p-1 hover:bg-muted rounded-md transition-colors"
+                          >
+                            {isProjectManagementOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
+                          </button>
+                        </div>
+                        
+                        {isProjectManagementOpen && (
+                          <div className="flex flex-col gap-1 pl-4 mb-2">
+                            <Link
+                              href="/dashboard/project-management"
+                              className={cn(
+                                "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                                pathname === "/dashboard/project-management"
+                                  ? "bg-primary/10 text-primary font-bold"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                              )}
+                            >
+                              <LayoutDashboard className="h-4 w-4 shrink-0" />
+                              <span>Overview</span>
+                            </Link>
+
+                            <Link
+                              href="/dashboard/project-management/projects"
+                              className={cn(
+                                "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                                pathname.startsWith("/dashboard/project-management/projects")
+                                  ? "bg-primary/10 text-primary font-bold"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                              )}
+                            >
+                              <KanbanSquare className="h-4 w-4 shrink-0" />
+                              <span>Projects</span>
+                            </Link>
+
+                            <Link
+                              href="/dashboard/project-management/my-tasks"
+                              className={cn(
+                                "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                                pathname.startsWith("/dashboard/project-management/my-tasks")
+                                  ? "bg-primary/10 text-primary font-bold"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                              )}
+                            >
+                              <CheckCircle className="h-4 w-4 shrink-0" />
+                              <span>My Tasks</span>
+                            </Link>
+
+                            <div className="pt-2 pb-1 pr-2">
+                              <Button 
+                                size="sm" 
+                                className="w-full h-8 text-[11px] font-bold rounded-lg gap-1.5 shadow-sm shadow-primary/20"
+                                onClick={() => {
+                                  // This will trigger the global modal if implemented, 
+                                  // but for now we just navigate to projects and let them click create
+                                  router.push("/dashboard/project-management/projects?create=true");
+                                }}
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                                Create Project
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {workflowModuleItems.length > 0 && (
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => setIsWorkflowOpen(!isWorkflowOpen)}
+                          className="group flex items-center justify-between rounded-xl px-2.5 py-1.5 text-[13px] font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground outline-none"
+                        >
+                          <div className="flex items-center gap-3">
+                            <CheckCircle className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{t("nav.workflow", "Workflow")}</span>
+                          </div>
+                          {isWorkflowOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
+                        </button>
+                        {isWorkflowOpen && (
+                          <div className="flex flex-col gap-1 pl-4">
+                            {workflowModuleItems.map((item) => {
+                              const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                              const Icon = item.icon;
+                              const label = t(item.translationKey, item.fallbackLabel);
+
+                              return (
+                                <Link
+                                  key={item.href}
+                                  id={item.tourId}
+                                  href={item.href}
+                                  className={cn(
+                                    "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                                    active
+                                      ? "bg-primary/10 text-primary font-bold"
+                                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                                  )}
+                                >
+                                  <Icon className="h-4 w-4 shrink-0" />
+                                  <span className="truncate">{label}</span>
+                                </Link>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

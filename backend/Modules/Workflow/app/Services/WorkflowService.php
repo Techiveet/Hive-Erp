@@ -112,7 +112,7 @@ class WorkflowService
             $model = $approval->approvable;
 
             if ($status === 'approved') {
-                $freshModel = $model->fresh();
+                $freshModel = $model ? $model->fresh() : null;
                 if ($freshModel && method_exists($freshModel, 'isFullyApproved') && $freshModel->isFullyApproved()) {
                     $this->onModelFullyApproved($freshModel);
                     $this->notifyRequester($approval, 'approved');

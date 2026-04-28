@@ -16,6 +16,7 @@ const SIDEBAR_KEY = "hive_sidebar_collapsed";
 export function DashboardShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const mainRef = React.useRef<HTMLElement>(null);
 
   useEffect(() => {
     try {
@@ -28,6 +29,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     syncUserSession();
+    
+    // 🚀 RESET SCROLL POSITION ON NAVIGATION
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
   }, [pathname]);
 
   const { startTour, isActive } = useTour();
@@ -110,7 +116,10 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col h-full relative">
           <DashboardTopbar />
 
-          <main className="mt-2 md:mt-4 flex-1 min-w-0 overflow-y-auto pr-0 sm:pr-1 scroll-smooth no-scrollbar">
+          <main 
+            ref={mainRef}
+            className="mt-2 md:mt-4 flex-1 min-w-0 overflow-y-auto pr-0 sm:pr-1 scroll-smooth no-scrollbar"
+          >
             <div className="min-h-full w-full rounded-2xl md:rounded-[2.5rem] border border-border/40 bg-card/60 p-3 sm:p-5 md:p-6 lg:p-8 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-500 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 pointer-events-none" />
               <OfflineStatusBanner />

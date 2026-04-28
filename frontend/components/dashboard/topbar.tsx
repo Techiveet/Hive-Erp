@@ -31,7 +31,7 @@ const getApiUrl = () => {
 
 const getTenantAwareEndpoint = (path: string) => {
   const base = getApiUrl();
-  return isTenantSession() ? `${base}/tenant${path}` : `${base}${path}`;
+  return `${base}${path}`;
 };
 
 // 🚀 SECURE TOPBAR AVATAR

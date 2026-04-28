@@ -1,0 +1,23 @@
+{
+    "name": "nwidart/projectmanagement",
+    "description": "",
+    "authors": [
+        {
+            "name": "Antigravity Agent",
+            "email": "agent@antigravity.ai"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\ProjectManagement\\": "app/",
+            "Modules\\ProjectManagement\\Database\\Factories\\": "database/factories/",
+            "Modules\\ProjectManagement\\Database\\Seeders\\": "database/seeders/"
+        }
+    }
+}

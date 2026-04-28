@@ -28,10 +28,11 @@ class WorkflowApprovalStatusChanged implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         $channels = [];
+        $prefix = $this->tenantId ? "tenant.{$this->tenantId}." : '';
         
         // Notify the requester
         if ($this->approval->requested_by) {
-            $channels[] = new PrivateChannel('user.'.$this->approval->requested_by.'.workflow');
+            $channels[] = new PrivateChannel($prefix . 'user.'.$this->approval->requested_by.'.workflow');
         }
 
         if ($this->tenantId) {

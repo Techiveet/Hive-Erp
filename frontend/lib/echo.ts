@@ -5,7 +5,7 @@ import { getBackendOrigin, getTenantHeaders, getTenantId } from "@/lib/runtime-c
 declare global {
   interface Window {
     Pusher: typeof Pusher;
-    Echo?: Echo<any>;
+    Echo?: Echo<"reverb">;
     __hiveEchoSessionKey?: string;
   }
 }
@@ -30,6 +30,14 @@ export const getChatPresenceChannelName = () => {
 
 export const getConversationPresenceChannelName = (conversationId: number | string) => {
   return `${getTenantChannelPrefix()}chat.conversation.${conversationId}.presence`;
+};
+
+export const getProjectManagementChannelName = () => {
+  return `${getTenantChannelPrefix()}project-management`;
+};
+
+export const getProjectManagementProjectChannelName = (projectId: number | string) => {
+  return `${getTenantChannelPrefix()}project-management.project.${projectId}`;
 };
 
 export const getWorkflowChannelName = (userId: number | string) => {

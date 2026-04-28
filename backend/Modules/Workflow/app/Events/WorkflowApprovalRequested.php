@@ -26,13 +26,14 @@ class WorkflowApprovalRequested implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         $channels = [];
+        $prefix = $this->tenantId ? "tenant.{$this->tenantId}." : '';
         
         if ($this->approval->user_id) {
-            $channels[] = new PrivateChannel('user.'.$this->approval->user_id.'.workflow');
+            $channels[] = new PrivateChannel($prefix . 'user.'.$this->approval->user_id.'.workflow');
         }
         
         if ($this->approval->role_id) {
-            $channels[] = new PrivateChannel('role.'.$this->approval->role_id.'.workflow');
+            $channels[] = new PrivateChannel($prefix . 'role.'.$this->approval->role_id.'.workflow');
         }
 
         if ($this->tenantId) {

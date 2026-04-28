@@ -132,14 +132,23 @@ export function MobileSidebar() {
     );
   }, [searchQuery, t, hasAnyPermission, isTenantNode, isMounted]);
 
-  const moduleNavItems = filteredNav.filter((item) => item.moduleId === "inventory" || item.moduleId === "nightclub");
-  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "nightclub");
+  const moduleNavItems = [
+    ...filteredNav.filter((item) => item.moduleId === "inventory" || item.moduleId === "nightclub" || item.moduleId === "warehouse" || item.moduleId === "workflow" || item.moduleId === "projectmanagement"),
+    ...filteredSecondary.filter((item) => item.moduleId === "projectmanagement" || item.moduleId === "workflow")
+  ];
+  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "nightclub" && item.moduleId !== "warehouse" && item.moduleId !== "workflow" && item.moduleId !== "projectmanagement");
   const inventoryModuleItems = moduleNavItems.filter((item) => item.moduleId === "inventory");
   const nightclubModuleItems = moduleNavItems.filter((item) => item.moduleId === "nightclub");
+  const warehouseModuleItems = moduleNavItems.filter((item) => item.moduleId === "warehouse");
+  const projectManagementModuleItems = moduleNavItems.filter((item) => item.moduleId === "projectmanagement");
+  const workflowModuleItems = moduleNavItems.filter((item) => item.moduleId === "workflow");
 
   useEffect(() => {
     if (pathname.startsWith("/dashboard/inventory")) {
       setIsInventoryOpen(true);
+    }
+    if (pathname.startsWith("/dashboard/project-management")) {
+      setIsModulesOpen(true);
     }
   }, [pathname]);
 
@@ -225,42 +234,78 @@ export function MobileSidebar() {
 
                         {isModulesOpen && (
                           <div className="flex flex-col gap-1">
-                            {inventoryModuleItems.length > 0 && (
+                            {warehouseModuleItems.length > 0 && (
                               <div className="flex flex-col gap-1">
-                                <button
-                                  onClick={() => setIsInventoryOpen(!isInventoryOpen)}
-                                  className="flex items-center justify-between rounded-2xl px-4 py-2 text-xs font-black uppercase text-muted-foreground tracking-widest transition-colors hover:bg-muted/50"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <Boxes className="h-4 w-4" />
-                                    <span>{t("nav.inventory", "Inventory")}</span>
-                                  </div>
-                                  {isInventoryOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                </button>
-                                {isInventoryOpen && (
-                                  <div className="flex flex-col gap-1 pl-4">
-                                    {inventoryModuleItems.map((item) => {
-                                      const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
-                                      const Icon = item.icon;
-                                      return (
-                                        <SheetClose asChild key={item.href}>
-                                          <Link
-                                            href={item.href}
-                                            className={cn(
-                                              "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200",
-                                              active
-                                                ? "bg-primary/10 text-primary font-bold"
-                                                : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                                            )}
-                                          >
-                                            <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground")} />
-                                            <span className="truncate">{t(item.translationKey, item.fallbackLabel)}</span>
-                                          </Link>
-                                        </SheetClose>
-                                      );
-                                    })}
-                                  </div>
-                                )}
+                                {warehouseModuleItems.map((item) => {
+                                  const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                                  const Icon = item.icon;
+                                  return (
+                                    <SheetClose asChild key={item.href}>
+                                      <Link
+                                        href={item.href}
+                                        className={cn(
+                                          "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200",
+                                          active
+                                            ? "bg-primary/10 text-primary font-bold"
+                                            : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                                        )}
+                                      >
+                                        <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground")} />
+                                        <span className="truncate">{t(item.translationKey, item.fallbackLabel)}</span>
+                                      </Link>
+                                    </SheetClose>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {projectManagementModuleItems.length > 0 && (
+                              <div className="flex flex-col gap-1">
+                                {projectManagementModuleItems.map((item) => {
+                                  const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                                  const Icon = item.icon;
+                                  return (
+                                    <SheetClose asChild key={item.href}>
+                                      <Link
+                                        href={item.href}
+                                        className={cn(
+                                          "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200",
+                                          active
+                                            ? "bg-primary/10 text-primary font-bold"
+                                            : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                                        )}
+                                      >
+                                        <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground")} />
+                                        <span className="truncate">{t(item.translationKey, item.fallbackLabel)}</span>
+                                      </Link>
+                                    </SheetClose>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {workflowModuleItems.length > 0 && (
+                              <div className="flex flex-col gap-1">
+                                {workflowModuleItems.map((item) => {
+                                  const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                                  const Icon = item.icon;
+                                  return (
+                                    <SheetClose asChild key={item.href}>
+                                      <Link
+                                        href={item.href}
+                                        className={cn(
+                                          "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200",
+                                          active
+                                            ? "bg-primary/10 text-primary font-bold"
+                                            : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                                        )}
+                                      >
+                                        <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground")} />
+                                        <span className="truncate">{t(item.translationKey, item.fallbackLabel)}</span>
+                                      </Link>
+                                    </SheetClose>
+                                  );
+                                })}
                               </div>
                             )}
 

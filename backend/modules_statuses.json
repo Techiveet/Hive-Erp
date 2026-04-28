@@ -9,5 +9,6 @@
     "Inventory": true,
     "Warehouse": true,
     "Chat": true,
-    "Workflow": true
+    "Workflow": true,
+    "ProjectManagement": true
 }

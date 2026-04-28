@@ -11,22 +11,33 @@ class NotificationCenterController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $limit = max(1, min((int) $request->integer('limit', 10), 50));
+        try {
+            $user = $request->user();
+            $limit = max(1, min((int) $request->integer('limit', 10), 50));
 
-        $notifications = $user->notifications()
-            ->latest()
-            ->limit($limit)
-            ->get();
+            $notifications = $user->notifications()
+                ->latest()
+                ->limit($limit)
+                ->get();
 
-        return response()->json([
-            'data' => [
-                'unread_count' => $user->unreadNotifications()->count(),
-                'notifications' => $notifications
-                    ->map(fn (DatabaseNotification $notification) => $this->transformNotification($notification))
-                    ->values(),
-            ],
-        ]);
+            return response()->json([
+                'data' => [
+                    'unread_count' => $user->unreadNotifications()->count(),
+                    'notifications' => $notifications
+                        ->map(fn (DatabaseNotification $notification) => $this->transformNotification($notification))
+                        ->values(),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to fetch notifications: ' . $e->getMessage());
+            return response()->json([
+                'data' => [
+                    'unread_count' => 0,
+                    'notifications' => [],
+                ],
+                'error' => 'Notification service temporarily unavailable.'
+            ], 200); // Return 200 to keep UI happy but with empty data
+        }
     }
 
     public function markRead(Request $request): JsonResponse

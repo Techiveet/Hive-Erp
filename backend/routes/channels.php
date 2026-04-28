@@ -2,6 +2,9 @@
 
 use Illuminate\Support\Facades\Broadcast;
 use Modules\Chat\Models\Conversation;
+use Modules\ProjectManagement\Models\Project;
+
+\Illuminate\Support\Facades\Log::debug('channels.php loaded');
 
 Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
@@ -13,6 +16,38 @@ Broadcast::channel('Modules.Identity.Models.User.{id}', function ($user, $id) {
 
 Broadcast::channel('user.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
+}, ['guards' => ['sanctum']]);
+
+Broadcast::channel('tenant.{tenant_id}.App.Models.User.{id}', function ($user, $tenant_id, $id) {
+    if (!function_exists('tenant') || !tenant('id') || (string) tenant('id') !== (string) $tenant_id) {
+        return false;
+    }
+    return (int) $user->id === (int) $id;
+}, ['guards' => ['sanctum']]);
+
+Broadcast::channel('tenant.{tenant_id}.Modules.Identity.Models.User.{id}', function ($user, $tenant_id, $id) {
+    if (!function_exists('tenant') || !tenant('id') || (string) tenant('id') !== (string) $tenant_id) {
+        return false;
+    }
+    return (int) $user->id === (int) $id;
+}, ['guards' => ['sanctum']]);
+
+Broadcast::channel('tenant.{tenant_id}.user.{id}', function ($user, $tenant_id, $id) {
+    if (!function_exists('tenant') || !tenant('id') || (string) tenant('id') !== (string) $tenant_id) {
+        return false;
+    }
+    return (int) $user->id === (int) $id;
+}, ['guards' => ['sanctum']]);
+
+Broadcast::channel('tenant.{tenant_id}.user.{user_id}.workflow', function ($user, $tenant_id, $user_id) {
+    if (!function_exists('tenant') || !tenant('id') || (string) tenant('id') !== (string) $tenant_id) {
+        return false;
+    }
+    return (int) $user->id === (int) $user_id;
+}, ['guards' => ['sanctum']]);
+
+Broadcast::channel('tenant.{tenant_id}.workflow', function ($user, $tenant_id) {
+    return function_exists('tenant') && tenant('id') && (string) tenant('id') === (string) $tenant_id;
 }, ['guards' => ['sanctum']]);
 
 Broadcast::channel('tenant.{tenant_id}.user.{user_id}.mail', function ($user, $tenant_id, $user_id) {
@@ -129,4 +164,39 @@ Broadcast::channel('tenant.{tenant_id}.chat.conversation.{conversation_id}.prese
         'avatar_url' => $user->avatar_url,
         'email' => $user->email,
     ];
+}, ['guards' => ['sanctum']]);
+
+Broadcast::channel('project-management', function ($user) {
+    return (bool) $user;
+}, ['guards' => ['sanctum']]);
+
+Broadcast::channel('tenant.{tenant_id}.project-management', function ($user, $tenant_id) {
+    return function_exists('tenant')
+        && tenant('id')
+        && (string) tenant('id') === (string) $tenant_id
+        && (bool) $user;
+}, ['guards' => ['sanctum']]);
+
+Broadcast::channel('project-management.project.{project_id}', function ($user, $project_id) {
+    return Project::query()
+        ->whereKey($project_id)
+        ->where(function ($query) use ($user) {
+            $query->where('created_by', $user->id)
+                ->orWhereHas('members', fn ($memberQuery) => $memberQuery->where('user_id', $user->id));
+        })
+        ->exists();
+}, ['guards' => ['sanctum']]);
+
+Broadcast::channel('tenant.{tenant_id}.project-management.project.{project_id}', function ($user, $tenant_id, $project_id) {
+    if (! function_exists('tenant') || ! tenant('id') || (string) tenant('id') !== (string) $tenant_id) {
+        return false;
+    }
+
+    return Project::query()
+        ->whereKey($project_id)
+        ->where(function ($query) use ($user) {
+            $query->where('created_by', $user->id)
+                ->orWhereHas('members', fn ($memberQuery) => $memberQuery->where('user_id', $user->id));
+        })
+        ->exists();
 }, ['guards' => ['sanctum']]);

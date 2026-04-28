@@ -10,6 +10,7 @@ storage/*
 !storage/logs/.gitkeep
 
 # Specially ignore massive app storage and tenants
+public/storage
 storage/app/*
 storage/tenant*
 storage/framework/cache/*
@@ -21,6 +22,9 @@ storage/debugbar
 # Logs and debug
 *.log
 .phpunit.result.cache
+.env
+.env.*
+!.env.example
 
 # IDE and metadata
 .idea

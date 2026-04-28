@@ -134,7 +134,7 @@ class WorkflowApprovalController extends Controller
             $validated = $request->validate([
                 'approvable_type' => 'required|string',
                 'approvable_id' => 'required|integer',
-                'approvers' => 'required|array',
+                'approvers' => 'nullable|array',
                 'approvers.*.user_id' => 'nullable|integer',
                 'approvers.*.role_id' => 'nullable|integer',
                 'approvers.*.sequence' => 'nullable|integer',
@@ -148,12 +148,23 @@ class WorkflowApprovalController extends Controller
                 return response()->json(['error' => "Model class {$modelClass} not found"], 422);
             }
 
-            $created = DB::transaction(function () use ($validated, $modelClass, $modelId, $user) {
+            // Resolve the model instance
+            $model = $modelClass::find($modelId);
+            if (!$model) {
+                return response()->json(['error' => "Model instance not found"], 404);
+            }
+
+            $created = DB::transaction(function () use ($validated, $model, $user) {
+                if (empty($validated['approvers'])) {
+                    // Try to apply automatic workflow
+                    return $this->workflowService->applyWorkflow($model);
+                }
+
                 $records = [];
                 foreach ($validated['approvers'] as $data) {
                     $records[] = WorkflowApproval::create([
-                        'approvable_type' => $modelClass,
-                        'approvable_id' => $modelId,
+                        'approvable_type' => get_class($model),
+                        'approvable_id' => $model->id,
                         'user_id' => $data['user_id'] ?? null,
                         'role_id' => $data['role_id'] ?? null,
                         'sequence' => $data['sequence'] ?? 1,
@@ -165,6 +176,13 @@ class WorkflowApprovalController extends Controller
                 }
                 return $records;
             });
+
+            if (empty($created)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No approvers were assigned and no automatic workflow rules found.',
+                ], 422);
+            }
 
             \Log::info('Approvals created', [
                 'count' => count($created)

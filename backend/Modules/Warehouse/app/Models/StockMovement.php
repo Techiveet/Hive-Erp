@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Warehouse\Models\Concerns\BelongsToWarehouseTenant;
+use Modules\Warehouse\Models\WarehouseStock;
+use Modules\Warehouse\Models\WarehouseLocation;
 
 class StockMovement extends Model
 {
@@ -52,8 +54,35 @@ class StockMovement extends Model
      */
     public function onWorkflowFullyApproved(): void
     {
-        // For movements, we might want to trigger actual stock adjustments here 
-        // if they weren't done immediately.
+        $this->process();
+    }
+
+    /**
+     * Execute the stock adjustment.
+     */
+    public function process(): void
+    {
+        // For movements, we trigger actual stock adjustments here.
+        $stock = WarehouseStock::firstOrNew([
+            'warehouse_location_id' => $this->to_location_id,
+            'product_id' => $this->product_id,
+            'batch_number' => $this->batch_number,
+        ]);
+
+        $stock->on_hand = ($stock->on_hand ?? 0) + $this->quantity;
+        $stock->save();
+
+        if ($this->from_location_id) {
+            $fromStock = WarehouseStock::where('warehouse_location_id', $this->from_location_id)
+                ->where('product_id', $this->product_id)
+                ->where('batch_number', $this->batch_number)
+                ->first();
+            
+            if ($fromStock) {
+                $fromStock->on_hand -= $this->quantity;
+                $fromStock->save();
+            }
+        }
     }
 
     /**

@@ -127,7 +127,7 @@ class CoreServiceProvider extends ModuleServiceProvider
         // ⏰ 4. SCHEDULER & OBSERVERS
         // =========================================================================
         $this->app->booted(function () {
-            if ($this->app->runningInConsole()) {
+            if ($this->shouldConfigureSchedules()) {
                 $schedule = $this->app->make(Schedule::class);
                 $this->configureSchedules($schedule);
             }
@@ -185,6 +185,17 @@ class CoreServiceProvider extends ModuleServiceProvider
         } catch (\Throwable $e) {
             Log::error("Failed to load backup settings: " . $e->getMessage());
         }
+    }
+
+    protected function shouldConfigureSchedules(): bool
+    {
+        if (! $this->app->runningInConsole()) {
+            return false;
+        }
+
+        $command = (string) ($_SERVER['argv'][1] ?? '');
+
+        return str_starts_with($command, 'schedule:');
     }
 }
 

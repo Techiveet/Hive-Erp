@@ -25,7 +25,7 @@ export function TopbarMailIcon({ activeUser }: { activeUser: any }) {
 
   const getTenantAwareEndpoint = (path: string) => {
     const base = getApiUrl();
-    return isTenantSession() ? `${base}/tenant${path}` : `${base}${path}`;
+    return `${base}${path}`;
   };
 
   const { data: unreadMailData } = useQuery({

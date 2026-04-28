@@ -1,0 +1,11 @@
+{
+    "name": "ProjectManagement",
+    "alias": "projectmanagement",
+    "description": "Premium Project Management Module - Projects, Boards, Tasks, and Team Collaboration",
+    "keywords": ["project", "management", "kanban", "tasks", "collaboration"],
+    "priority": 10,
+    "providers": [
+        "Modules\\ProjectManagement\\Providers\\ProjectManagementServiceProvider"
+    ],
+    "files": []
+}
