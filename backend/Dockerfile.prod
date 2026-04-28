@@ -19,17 +19,20 @@ RUN apk add --no-cache \
     php84-fileinfo \
     php84-gd \
     php84-iconv \
+    php84-intl \
     php84-mbstring \
     php84-opcache \
     php84-openssl \
     php84-pcntl \
     php84-pdo \
     php84-pdo_pgsql \
+    php84-pdo_sqlite \
     php84-phar \
     php84-posix \
     php84-session \
     php84-simplexml \
     php84-sockets \
+    php84-sqlite3 \
     php84-tokenizer \
     php84-xml \
     php84-xmlreader \
