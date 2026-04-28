@@ -22,6 +22,14 @@ build_image() {
   compose build --progress plain "${service}"
 }
 
+log_service() {
+  local service="$1"
+  local lines="${2:-100}"
+
+  echo "${service} logs:" >&2
+  compose logs --tail="${lines}" "${service}" >&2 || true
+}
+
 fail() {
   local code="$1"
   local line="$2"
@@ -33,17 +41,18 @@ fail() {
   echo "Exit code: ${code}" >&2
   echo "Working directory: $(pwd)" >&2
 
+  echo "Docker disk usage:" >&2
+  docker system df >&2 || true
+
   echo "Compose status:" >&2
-  compose ps >&2 || true
+  compose ps -a >&2 || true
 
-  echo "Backend logs:" >&2
-  compose logs --tail=120 backend >&2 || true
+  for service in backend frontend queue reverb caddy ffmpeg seaweedfs-bootstrap meilisearch; do
+    log_service "${service}" 100
+  done
 
-  echo "Caddy logs:" >&2
-  compose logs --tail=120 caddy >&2 || true
-
-  echo "Queue logs:" >&2
-  compose logs --tail=80 queue >&2 || true
+  echo "Deployment failed at line ${line}: ${cmd}" >&2
+  echo "Exit code: ${code}" >&2
 
   exit "${code}"
 }
