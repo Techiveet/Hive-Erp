@@ -1,5 +1,10 @@
 FROM python:3.12-slim
 
+ARG DEBIAN_FRONTEND=noninteractive
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_ROOT_USER_ACTION=ignore
+
 # Install FFmpeg (full build with all codecs)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \

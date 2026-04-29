@@ -58,4 +58,4 @@ jobs:
             git checkout main
             git pull --ff-only origin main
 
-            NEXT_SKIP_BUILD_TYPECHECK=1 TRACE_DEPLOY=1 bash scripts/deploy-prod.sh
+            NEXT_SKIP_BUILD_TYPECHECK=1 bash scripts/deploy-prod.sh

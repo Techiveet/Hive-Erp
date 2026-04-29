@@ -17,7 +17,9 @@ DEPLOY_COMPOSE_COMMAND=""
 
 compose() {
   DEPLOY_COMPOSE_COMMAND="docker compose -f ${COMPOSE_FILE} $*"
-  echo "Running: ${DEPLOY_COMPOSE_COMMAND}" >&2
+  if [ "${COMPOSE_QUIET:-0}" != "1" ]; then
+    echo "Running: ${DEPLOY_COMPOSE_COMMAND}"
+  fi
   docker compose -f "${COMPOSE_FILE}" "$@"
 }
 
@@ -26,7 +28,18 @@ build_image() {
 
   DEPLOY_STEP="Building production image: ${service}"
   echo "Building production image: ${service}"
-  compose build --progress plain "${service}"
+  compose --progress plain build "${service}"
+}
+
+validate_caddy_config() {
+  local output
+
+  if ! output="$(COMPOSE_QUIET=1 compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile 2>&1)"; then
+    printf '%s\n' "${output}" >&2
+    return 1
+  fi
+
+  echo "Caddy config is valid."
 }
 
 log_service() {
@@ -339,7 +352,7 @@ wait_for_service() {
   local status=""
 
   while true; do
-    container_id="$(compose ps -a -q "${service}" 2>/dev/null | head -n 1 || true)"
+    container_id="$(COMPOSE_QUIET=1 compose ps -a -q "${service}" 2>/dev/null | head -n 1 || true)"
 
     if [ -n "${container_id}" ]; then
       status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${container_id}" 2>/dev/null || true)"
@@ -373,7 +386,7 @@ wait_for_completed_service() {
   local exit_code=""
 
   while true; do
-    container_id="$(compose ps -a -q "${service}" 2>/dev/null | head -n 1 || true)"
+    container_id="$(COMPOSE_QUIET=1 compose ps -a -q "${service}" 2>/dev/null | head -n 1 || true)"
 
     if [ -n "${container_id}" ]; then
       status="$(docker inspect --format='{{.State.Status}}' "${container_id}" 2>/dev/null || true)"
@@ -413,7 +426,7 @@ configure_caddy_runtime
 
 echo "Validating Docker Compose config..."
 DEPLOY_STEP="Validating Docker Compose config"
-compose config >/tmp/hive-compose-config.yml
+COMPOSE_QUIET=1 compose config >/tmp/hive-compose-config.yml
 
 echo "Building production images..."
 for service in caddy backend frontend ffmpeg; do
@@ -490,7 +503,7 @@ DEPLOY_STEP="Waiting for caddy"
 wait_for_service caddy
 
 DEPLOY_STEP="Validating Caddy config"
-compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile 2>&1
+validate_caddy_config
 
 DEPLOY_STEP="Listing Compose services"
 compose ps
