@@ -44,7 +44,7 @@ class User extends Authenticatable
         'two_factor_recovery_codes',
     ];
 
-    protected $appends = ['avatar_url'];
+    protected $appends = ['avatar_url', 'two_factor_enabled'];
 
     /**
      * Manual Factory Bridge
@@ -258,5 +258,10 @@ class User extends Authenticatable
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('Identity & Access');
+    }
+
+    public function getTwoFactorEnabledAttribute(): bool
+    {
+        return !is_null($this->two_factor_confirmed_at);
     }
 }

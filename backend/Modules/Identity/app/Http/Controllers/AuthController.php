@@ -444,25 +444,44 @@ class AuthController extends Controller
             'permissions' => $user->getAllPermissions()->pluck('name'),
             'central_control_override' => $user->hasCentralControlOverride(),
             'has_completed_welcome_tour' => (bool) $user->has_completed_welcome_tour,
-            'two_factor_enabled' => $twoFactorEnabled ?? (!empty($user->two_factor_secret) && $user->two_factor_confirmed_at !== null),
+            'two_factor_enabled' => $twoFactorEnabled ?? $user->two_factor_enabled,
             'business_type' => $tenant?->business_type ?? null,
-            'module_access' => $tenant
-                ? app(TenantSubscriptionService::class)->buildModuleAccess($tenant)
-                : [
-                    'plan' => 'central',
-                    'subscription_status' => 'active',
-                    'active_modules' => TenantModuleCatalog::slugs(),
-                    'statuses' => collect(TenantModuleCatalog::catalog())
-                        ->mapWithKeys(fn (array $module) => [
-                            $module['slug'] => [
-                                'active' => true,
-                                'included_in_plan' => true,
-                                'name' => $module['name'],
-                                'monthly_price_etb' => (float) ($module['monthly_price_etb'] ?? 0),
-                            ],
-                        ])
-                        ->all(),
-                ],
+            'module_access' => $this->resolveModuleAccess($tenant),
         ];
+    }
+
+    private function resolveModuleAccess(?\Modules\Tenancy\Models\Tenant $tenant): array
+    {
+        if (!$tenant) {
+            return [
+                'plan' => 'central',
+                'subscription_status' => 'active',
+                'active_modules' => TenantModuleCatalog::slugs(),
+                'statuses' => collect(TenantModuleCatalog::catalog())
+                    ->mapWithKeys(fn (array $module) => [
+                        $module['slug'] => [
+                            'active' => true,
+                            'included_in_plan' => true,
+                            'name' => $module['name'],
+                            'monthly_price_etb' => (float) ($module['monthly_price_etb'] ?? 0),
+                        ],
+                    ])
+                    ->all(),
+            ];
+        }
+
+        try {
+            return app(TenantSubscriptionService::class)->buildModuleAccess($tenant);
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to resolve module access for tenant ' . $tenant->id . ': ' . $e->getMessage());
+
+            // Return a safe fallback so the user can still log in
+            return [
+                'plan' => 'fallback',
+                'subscription_status' => 'active',
+                'active_modules' => TenantModuleCatalog::slugs(),
+                'error' => 'Subscription service unavailable',
+            ];
+        }
     }
 }

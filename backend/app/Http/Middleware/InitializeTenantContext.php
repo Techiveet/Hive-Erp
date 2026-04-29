@@ -19,76 +19,91 @@ class InitializeTenantContext
 
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->is('api/internal/caddy/allow-domain')) {
-            if ($this->tenancy->initialized) {
-                $this->tenancy->end();
+        try {
+            if ($request->is('api/internal/caddy/allow-domain')) {
+                if ($this->tenancy->initialized) {
+                    $this->tenancy->end();
+                }
+
+                return $next($request);
             }
 
-            return $next($request);
-        }
+            $host = $request->getHost();
+            $centralDomains = collect(config('tenancy.central_domains', []))
+                ->map(fn ($domain) => explode(':', (string) $domain)[0])
+                ->filter()
+                ->values()
+                ->all();
 
-        $host = $request->getHost();
-        $centralDomains = collect(config('tenancy.central_domains', []))
-            ->map(fn ($domain) => explode(':', (string) $domain)[0])
-            ->filter()
-            ->values()
-            ->all();
+            $tenantKey = $request->header('X-Tenant');
+            $tenantFromHost = in_array($host, $centralDomains, true)
+                ? null
+                : $this->resolveTenant($host);
+            $tenantFromHeader = $tenantKey ? $this->resolveTenant($tenantKey) : null;
 
-        $tenantKey = $request->header('X-Tenant');
-        $tenantFromHost = in_array($host, $centralDomains, true)
-            ? null
-            : $this->resolveTenant($host);
-        $tenantFromHeader = $tenantKey ? $this->resolveTenant($tenantKey) : null;
+            if ($tenantFromHost) {
+                if ($tenantFromHeader && (string) $tenantFromHeader->id !== (string) $tenantFromHost->id) {
+                    return $this->invalidTenantContextResponse(
+                        'Tenant header does not match the resolved tenant host.',
+                        'TENANT_HOST_HEADER_MISMATCH',
+                        400
+                    );
+                }
 
-        if ($tenantFromHost) {
-            if ($tenantFromHeader && (string) $tenantFromHeader->id !== (string) $tenantFromHost->id) {
-                return $this->invalidTenantContextResponse(
-                    'Tenant header does not match the resolved tenant host.',
-                    'TENANT_HOST_HEADER_MISMATCH',
-                    400
-                );
+                $tenant = $tenantFromHost;
+            } elseif ($tenantKey) {
+                if (!$tenantFromHeader) {
+                    return $this->tenantNotFoundResponse($request);
+                }
+
+                if (
+                    !$this->allowsUnsignedTenantHeader($request)
+                    && !$this->tenantRequestSignature->matches(
+                        (string) $tenantFromHeader->id,
+                        $this->tenantRequestSignature->fromRequest($request)
+                    )
+                ) {
+                    return $this->invalidTenantContextResponse(
+                        'Tenant context signature is missing or invalid. Please authenticate again.',
+                        'TENANT_CONTEXT_SIGNATURE_INVALID',
+                        401
+                    );
+                }
+
+                $tenant = $tenantFromHeader;
+            } else {
+                if ($this->tenancy->initialized) {
+                    $this->tenancy->end();
+                }
+
+                return $next($request);
             }
 
-            $tenant = $tenantFromHost;
-        } elseif ($tenantKey) {
-            if (!$tenantFromHeader) {
+            if (!$tenant) {
                 return $this->tenantNotFoundResponse($request);
             }
 
-            if (
-                !$this->allowsUnsignedTenantHeader($request)
-                && !$this->tenantRequestSignature->matches(
-                    (string) $tenantFromHeader->id,
-                    $this->tenantRequestSignature->fromRequest($request)
-                )
-            ) {
-                return $this->invalidTenantContextResponse(
-                    'Tenant context signature is missing or invalid. Please authenticate again.',
-                    'TENANT_CONTEXT_SIGNATURE_INVALID',
-                    401
-                );
-            }
-
-            $tenant = $tenantFromHeader;
-        } else {
-            if ($this->tenancy->initialized) {
-                $this->tenancy->end();
-            }
+            // Always initialize the tenant for the current request. Under Octane /
+            // RoadRunner workers are reused, so skipping initialization when a
+            // previous request already bootstrapped tenancy makes auth appear
+            // random across requests.
+            $this->tenancy->initialize($tenant);
 
             return $next($request);
+        } catch (\Throwable $e) {
+            \Log::error('Tenant initialization failed: ' . $e->getMessage(), [
+                'exception' => $e,
+                'host' => $request->getHost(),
+                'tenant_header' => $request->header('X-Tenant'),
+                'path' => $request->path()
+            ]);
+
+            return response()->json([
+                'message' => 'The system could not establish a connection to your workspace database. Please contact support.',
+                'error' => config('app.debug') ? $e->getMessage() : 'Database connection failed.',
+                'code' => 'TENANT_INITIALIZATION_FAILED'
+            ], 500);
         }
-
-        if (!$tenant) {
-            return $this->tenantNotFoundResponse($request);
-        }
-
-        // Always initialize the tenant for the current request. Under Octane /
-        // RoadRunner workers are reused, so skipping initialization when a
-        // previous request already bootstrapped tenancy makes auth appear
-        // random across requests.
-        $this->tenancy->initialize($tenant);
-
-        return $next($request);
     }
 
     private function resolveTenant(string $tenantKey): ?Tenant
