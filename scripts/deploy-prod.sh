@@ -20,7 +20,7 @@ compose() {
   if [ "${COMPOSE_QUIET:-0}" != "1" ]; then
     echo "Running: ${DEPLOY_COMPOSE_COMMAND}"
   fi
-  docker compose -f "${COMPOSE_FILE}" "$@"
+  docker compose -f "${COMPOSE_FILE}" "$@" 2>&1
 }
 
 build_image() {
