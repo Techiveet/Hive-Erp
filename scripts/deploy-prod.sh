@@ -339,7 +339,7 @@ wait_for_service() {
   local status=""
 
   while true; do
-    container_id="$(compose ps -q "${service}" 2>/dev/null | head -n 1 || true)"
+    container_id="$(compose ps -a -q "${service}" 2>/dev/null | head -n 1 || true)"
 
     if [ -n "${container_id}" ]; then
       status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${container_id}" 2>/dev/null || true)"
@@ -373,7 +373,7 @@ wait_for_completed_service() {
   local exit_code=""
 
   while true; do
-    container_id="$(compose ps -q "${service}" 2>/dev/null | head -n 1 || true)"
+    container_id="$(compose ps -a -q "${service}" 2>/dev/null | head -n 1 || true)"
 
     if [ -n "${container_id}" ]; then
       status="$(docker inspect --format='{{.State.Status}}' "${container_id}" 2>/dev/null || true)"
