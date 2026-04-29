@@ -8,6 +8,7 @@ fi
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 MIN_FREE_DISK_MB="${MIN_FREE_DISK_MB:-5120}"
+POST_BUILD_MIN_FREE_DISK_MB="${POST_BUILD_MIN_FREE_DISK_MB:-1024}"
 RUN_SCOUT_IMPORT="${RUN_SCOUT_IMPORT:-0}"
 SKIP_FALLBACK_DOMAIN_SYNC="${SKIP_FALLBACK_DOMAIN_SYNC:-0}"
 PRUNE_DOCKER_BEFORE_DEPLOY="${PRUNE_DOCKER_BEFORE_DEPLOY:-1}"
@@ -169,16 +170,14 @@ ensure_post_build_disk_space() {
 
   echo "Free disk after image builds: ${free_mb} MB"
 
-  if [ "${free_mb}" -lt "${MIN_FREE_DISK_MB}" ]; then
-    echo "Low disk space after image builds. Pruning Docker build cache..."
-    docker builder prune -af || true
-  fi
+  echo "Pruning Docker build cache after image builds..."
+  docker builder prune -af || true
 
   free_mb="$(free_disk_mb)"
   echo "Free disk after post-build cache prune: ${free_mb} MB"
 
-  if [ "${free_mb}" -lt "${MIN_FREE_DISK_MB}" ]; then
-    echo "Insufficient disk space after image builds. Need ${MIN_FREE_DISK_MB} MB, found ${free_mb} MB." >&2
+  if [ "${free_mb}" -lt "${POST_BUILD_MIN_FREE_DISK_MB}" ]; then
+    echo "Insufficient disk space after image builds. Need ${POST_BUILD_MIN_FREE_DISK_MB} MB, found ${free_mb} MB." >&2
     echo "Docker build cache was pruned, but deploy still needs more free disk before services restart." >&2
     docker system df >&2 || true
     exit 1
