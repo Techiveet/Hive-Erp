@@ -10,6 +10,7 @@ COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 MIN_FREE_DISK_MB="${MIN_FREE_DISK_MB:-5120}"
 RUN_SCOUT_IMPORT="${RUN_SCOUT_IMPORT:-0}"
 SKIP_FALLBACK_DOMAIN_SYNC="${SKIP_FALLBACK_DOMAIN_SYNC:-0}"
+PRUNE_DOCKER_BEFORE_DEPLOY="${PRUNE_DOCKER_BEFORE_DEPLOY:-1}"
 DEPLOY_STEP="initializing"
 DEPLOY_COMPOSE_COMMAND=""
 
@@ -132,17 +133,24 @@ free_disk_mb() {
   df -Pm . | awk 'NR==2 {print $4}'
 }
 
+prune_unused_docker_resources() {
+  docker builder prune -af || true
+  docker image prune -af || true
+  docker container prune -f || true
+}
+
 ensure_disk_space() {
   local free_mb
   free_mb="$(free_disk_mb)"
 
   echo "Free disk before deploy: ${free_mb} MB"
 
-  if [ "${free_mb}" -lt "${MIN_FREE_DISK_MB}" ]; then
-    echo "Low disk space. Pruning Docker cache..."
-    docker builder prune -af || true
-    docker image prune -af || true
-    docker container prune -f || true
+  if [ "${PRUNE_DOCKER_BEFORE_DEPLOY}" = "1" ]; then
+    echo "Pruning unused Docker resources before image builds..."
+    prune_unused_docker_resources
+  elif [ "${free_mb}" -lt "${MIN_FREE_DISK_MB}" ]; then
+    echo "Low disk space. Pruning unused Docker resources..."
+    prune_unused_docker_resources
   fi
 
   free_mb="$(free_disk_mb)"
