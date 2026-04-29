@@ -15,13 +15,14 @@ DEPLOY_COMPOSE_COMMAND=""
 
 compose() {
   DEPLOY_COMPOSE_COMMAND="docker compose -f ${COMPOSE_FILE} $*"
-  echo "Running: ${DEPLOY_COMPOSE_COMMAND}"
+  echo "Running: ${DEPLOY_COMPOSE_COMMAND}" >&2
   docker compose -f "${COMPOSE_FILE}" "$@"
 }
 
 build_image() {
   local service="$1"
 
+  DEPLOY_STEP="Building production image: ${service}"
   echo "Building production image: ${service}"
   compose build --progress plain "${service}"
 }
@@ -149,6 +150,28 @@ ensure_disk_space() {
 
   if [ "${free_mb}" -lt "${MIN_FREE_DISK_MB}" ]; then
     echo "Insufficient disk space. Need ${MIN_FREE_DISK_MB} MB, found ${free_mb} MB." >&2
+    docker system df >&2 || true
+    exit 1
+  fi
+}
+
+ensure_post_build_disk_space() {
+  local free_mb
+  free_mb="$(free_disk_mb)"
+
+  echo "Free disk after image builds: ${free_mb} MB"
+
+  if [ "${free_mb}" -lt "${MIN_FREE_DISK_MB}" ]; then
+    echo "Low disk space after image builds. Pruning Docker build cache..."
+    docker builder prune -af || true
+  fi
+
+  free_mb="$(free_disk_mb)"
+  echo "Free disk after post-build cache prune: ${free_mb} MB"
+
+  if [ "${free_mb}" -lt "${MIN_FREE_DISK_MB}" ]; then
+    echo "Insufficient disk space after image builds. Need ${MIN_FREE_DISK_MB} MB, found ${free_mb} MB." >&2
+    echo "Docker build cache was pruned, but deploy still needs more free disk before services restart." >&2
     docker system df >&2 || true
     exit 1
   fi
@@ -334,49 +357,112 @@ wait_for_service() {
   done
 }
 
+wait_for_completed_service() {
+  local service="$1"
+  local attempts="${2:-36}"
+  local attempt=0
+  local container_id=""
+  local status=""
+  local exit_code=""
+
+  while true; do
+    container_id="$(compose ps -q "${service}" 2>/dev/null | head -n 1 || true)"
+
+    if [ -n "${container_id}" ]; then
+      status="$(docker inspect --format='{{.State.Status}}' "${container_id}" 2>/dev/null || true)"
+      exit_code="$(docker inspect --format='{{.State.ExitCode}}' "${container_id}" 2>/dev/null || true)"
+    else
+      status="missing"
+      exit_code=""
+    fi
+
+    if [ "${status}" = "exited" ] && [ "${exit_code}" = "0" ]; then
+      echo "${service} completed successfully"
+      return
+    fi
+
+    if [ "${status}" = "exited" ] && [ "${exit_code}" != "0" ]; then
+      echo "${service} failed with exit code ${exit_code}" >&2
+      compose logs --tail=150 "${service}" >&2 || true
+      exit 1
+    fi
+
+    attempt=$((attempt + 1))
+
+    if [ "${attempt}" -ge "${attempts}" ]; then
+      echo "${service} did not complete. Last status: ${status}, exit code: ${exit_code}" >&2
+      compose logs --tail=150 "${service}" >&2 || true
+      exit 1
+    fi
+
+    sleep 5
+  done
+}
+
 ensure_required_files
 ensure_disk_space
 ensure_runtime_env
 configure_caddy_runtime
 
 echo "Validating Docker Compose config..."
+DEPLOY_STEP="Validating Docker Compose config"
 compose config >/tmp/hive-compose-config.yml
 
 echo "Building production images..."
 for service in caddy backend frontend ffmpeg; do
   build_image "${service}"
 done
+DEPLOY_STEP="Checking free disk after image builds"
+ensure_post_build_disk_space
 
 echo "Starting dependencies..."
+DEPLOY_STEP="Starting dependency services"
 compose up -d --remove-orphans redis db seaweedfs seaweedfs-bootstrap meilisearch rembg gotenberg ffmpeg
 
+DEPLOY_STEP="Waiting for redis"
 wait_for_service redis
+DEPLOY_STEP="Waiting for database"
 wait_for_service db
+DEPLOY_STEP="Waiting for meilisearch"
 wait_for_service meilisearch
+DEPLOY_STEP="Waiting for ffmpeg"
 wait_for_service ffmpeg
+DEPLOY_STEP="Waiting for object storage bootstrap"
+wait_for_completed_service seaweedfs-bootstrap
 
 echo "Starting backend..."
+DEPLOY_STEP="Starting backend"
 compose up -d backend
+DEPLOY_STEP="Waiting for backend"
 wait_for_service backend
 
 echo "Running Laravel deploy commands..."
+DEPLOY_STEP="Linking Laravel storage"
 compose exec -T backend php artisan storage:link || true
+DEPLOY_STEP="Clearing Laravel caches"
 compose exec -T backend php artisan optimize:clear
+DEPLOY_STEP="Running central migrations"
 compose exec -T backend php artisan migrate --force
+DEPLOY_STEP="Running tenant migrations"
 compose exec -T backend php artisan tenants:migrate --force
+DEPLOY_STEP="Syncing system access"
 compose exec -T backend php artisan hive:sync-system-access --force
 
 if [ "${SKIP_FALLBACK_DOMAIN_SYNC}" -eq 0 ]; then
+  DEPLOY_STEP="Syncing fallback domains"
   compose exec -T backend php artisan hive:sync-fallback-domains
 fi
 
+DEPLOY_STEP="Caching Laravel config"
 compose exec -T backend php artisan config:cache
+DEPLOY_STEP="Caching Laravel views"
 compose exec -T backend php artisan view:cache
 
 if [ "$(get_env_value SCOUT_DRIVER)" = "meilisearch" ]; then
   echo "Meilisearch is enabled."
 
   if [ "${RUN_SCOUT_IMPORT}" = "1" ]; then
+    DEPLOY_STEP="Importing Scout indexes"
     compose exec -T backend php artisan scout:import-all
   else
     echo "Skipping scout:import-all. Set RUN_SCOUT_IMPORT=1 to run it."
@@ -384,15 +470,22 @@ if [ "$(get_env_value SCOUT_DRIVER)" = "meilisearch" ]; then
 fi
 
 echo "Starting app services..."
+DEPLOY_STEP="Starting app services"
 compose up -d queue reverb frontend caddy
 
+DEPLOY_STEP="Waiting for queue"
 wait_for_service queue
+DEPLOY_STEP="Waiting for reverb"
 wait_for_service reverb
+DEPLOY_STEP="Waiting for frontend"
 wait_for_service frontend
+DEPLOY_STEP="Waiting for caddy"
 wait_for_service caddy
 
+DEPLOY_STEP="Validating Caddy config"
 compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
 
+DEPLOY_STEP="Listing Compose services"
 compose ps
 
 echo "Deployment completed successfully."
