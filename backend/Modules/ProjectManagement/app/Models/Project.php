@@ -17,17 +17,24 @@ class Project extends Model
         'name',
         'description',
         'status',
+        'priority',
         'start_date',
         'end_date',
+        'project_manager_id',
+        'client_stakeholder',
+        'tags',
+        'attachments',
         'created_by',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'tags' => 'array',
+        'attachments' => 'array',
     ];
 
-    protected $appends = ['progress', 'tasks_count'];
+    protected $appends = ['progress', 'tasks_count', 'completed_tasks_count'];
 
     public function getProgressAttribute()
     {
@@ -48,9 +55,21 @@ class Project extends Model
         return $this->attributes['tasks_count'] ?? $this->tasks()->count();
     }
 
+    public function getCompletedTasksCountAttribute()
+    {
+        return $this->attributes['completed_tasks_count'] ?? $this->tasks()->whereHas('column', function ($query) {
+            $query->where('is_done', true);
+        })->count();
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function projectManager()
+    {
+        return $this->belongsTo(User::class, 'project_manager_id');
     }
 
     public function members()

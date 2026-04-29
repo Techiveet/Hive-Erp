@@ -3,6 +3,7 @@
 namespace Modules\Inventory\Models\Concerns;
 
 use Modules\Inventory\Models\Product;
+use Modules\Inventory\Support\InventoryTenantContext;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Str;
 
@@ -38,13 +39,14 @@ trait SupportsProductCatalog
     public function syncWithCatalog(): void
     {
         $data = $this->toCatalogArray();
-        $tenantId = $data['tenant_id'] ?? $this->tenant_id ?? 'central';
+        $tenantId = $data['tenant_id'] ?? $this->tenant_id ?? InventoryTenantContext::id();
         $sku = $data['sku'] ?? $this->sku ?? (string) Str::uuid();
 
         // 1. Try to find by direct source link
         $product = Product::withoutGlobalScopes()
             ->where('source_type', get_class($this))
             ->where('source_id', $this->id)
+            ->where('tenant_id', $tenantId)
             ->first();
 
         // 2. If not found, try to find by tenant and sku (adoption logic)

@@ -9,7 +9,9 @@ use Modules\ProjectManagement\Models\Column;
 use Modules\ProjectManagement\Models\TaskChecklist;
 use Modules\ProjectManagement\Models\TaskComment;
 use Modules\ProjectManagement\Events\ProjectManagementUpdated;
+use App\Notifications\ProjectManagementNotification;
 use Illuminate\Support\Facades\DB;
+use Modules\Identity\Models\User;
 
 class TaskController extends Controller
 {
@@ -67,6 +69,16 @@ class TaskController extends Controller
             'task' => $task->toArray(),
         ], $task->project_id));
 
+        if ($task->assigned_to && $task->assigned_to !== auth()->id()) {
+            $task->assignee->notify(new ProjectManagementNotification('pm_task_assigned', [
+                'title' => 'New Task Assigned',
+                'body' => "You have been assigned to: {$task->title}",
+                'url' => "/dashboard/projects?projectId={$task->project_id}&taskId={$task->id}",
+                'task_id' => $task->id,
+                'project_id' => $task->project_id,
+            ]));
+        }
+
         return response()->json($task, 201);
     }
 
@@ -97,6 +109,7 @@ class TaskController extends Controller
             'due_date' => 'nullable|date',
             'assigned_to' => 'nullable|exists:users,id',
             'order' => 'sometimes|integer',
+            'attachments' => 'nullable|array',
         ]);
 
         if ($validator->fails()) {
@@ -109,6 +122,7 @@ class TaskController extends Controller
             $this->ensureColumnBelongsToProject($validated['column_id'], $task->project_id);
         }
 
+        $oldAssigneeId = $task->getOriginal('assigned_to');
         $task->update($validated);
 
         $task->load(['assignee:id,name,email,avatar_path', 'creator:id,name,avatar_path', 'column:id,name', 'project:id,name']);
@@ -116,6 +130,16 @@ class TaskController extends Controller
         event(new ProjectManagementUpdated('task.updated', [
             'task' => $task->toArray(),
         ], $task->project_id));
+
+        if ($task->assigned_to && $task->assigned_to !== auth()->id() && $task->assigned_to !== $oldAssigneeId) {
+            $task->assignee->notify(new ProjectManagementNotification('pm_task_assigned', [
+                'title' => 'Task Assigned',
+                'body' => "You have been assigned to: {$task->title}",
+                'url' => "/dashboard/projects?projectId={$task->project_id}&taskId={$task->id}",
+                'task_id' => $task->id,
+                'project_id' => $task->project_id,
+            ]));
+        }
 
         return response()->json($task);
     }
@@ -270,6 +294,17 @@ class TaskController extends Controller
             'comment' => $comment->toArray(),
             'task_id' => $task->id,
         ], $task->project_id));
+
+        if ($task->assigned_to && $task->assigned_to !== auth()->id()) {
+            $task->assignee->notify(new ProjectManagementNotification('pm_task_comment', [
+                'title' => 'New Task Comment',
+                'body' => "New comment on your task: {$task->title}",
+                'url' => "/dashboard/projects?projectId={$task->project_id}&taskId={$task->id}",
+                'task_id' => $task->id,
+                'project_id' => $task->project_id,
+                'sender_id' => auth()->id(),
+            ]));
+        }
 
         return response()->json($comment, 201);
     }

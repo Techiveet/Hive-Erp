@@ -23,10 +23,12 @@ class Task extends Model
         'assigned_to',
         'created_by',
         'order',
+        'attachments',
     ];
 
     protected $casts = [
         'due_date' => 'date',
+        'attachments' => 'array',
     ];
 
     public function project()

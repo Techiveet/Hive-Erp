@@ -78,6 +78,7 @@ export function MobileSidebar() {
   const [isTenantNode, setIsTenantNode] = useState(false);
   const [isModulesOpen, setIsModulesOpen] = useState(true);
   const [isInventoryOpen, setIsInventoryOpen] = useState(true);
+  const canAccessConverter = hasAnyPermission(["use_document_converter", "manage_storage"]);
 
   // 🚀 PREVENT HYDRATION ERRORS
   useEffect(() => {
@@ -343,15 +344,17 @@ export function MobileSidebar() {
                       {t('nav.apps_tools', 'Apps & Tools')}
                     </div>
                     
-                    <SheetClose asChild>
-                      <Link 
-                        href="/dashboard/tools/converter"
-                        className={cn("flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200", pathname.includes('/dashboard/tools/converter') ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")}
-                      >
-                        <FileType className={cn("h-5 w-5", pathname.includes('/dashboard/tools/converter') ? "text-primary-foreground" : "text-muted-foreground")} />
-                        <span className="truncate">{t('nav.tools_converter', 'HTML to PDF')}</span>
-                      </Link>
-                    </SheetClose>
+                    {canAccessConverter && (
+                      <SheetClose asChild>
+                        <Link
+                          href="/dashboard/tools/converter"
+                          className={cn("flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200", pathname.includes('/dashboard/tools/converter') ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")}
+                        >
+                          <FileType className={cn("h-5 w-5", pathname.includes('/dashboard/tools/converter') ? "text-primary-foreground" : "text-muted-foreground")} />
+                          <span className="truncate">{t('nav.tools_converter', 'HTML to PDF')}</span>
+                        </Link>
+                      </SheetClose>
+                    )}
 
                     <SheetClose asChild>
                       <Link 

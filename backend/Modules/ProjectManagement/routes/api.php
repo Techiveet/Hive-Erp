@@ -10,7 +10,8 @@ Route::middleware([
     \App\Http\Middleware\InitializeTenantContext::class,
     'auth:sanctum',
     'active_status',
-    'dynamic_timeout'
+    'dynamic_timeout',
+    'tenant_module:project_management',
 ])
     ->prefix('v1/project-management')
     ->group(function () {

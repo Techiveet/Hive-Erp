@@ -36,6 +36,13 @@ class TenantsSeeder extends Seeder
                 'admin_email' => 'admin@tesla.com',
             ],
             [
+                'id' => 'techive',
+                'name' => 'Techive',
+                'plan' => 'business',
+                'business_type' => 'software-development',
+                'admin_email' => 'admin@techive.com',
+            ],
+            [
                 'id' => 'selam-bistro',
                 'name' => 'Selam Bistro',
                 'plan' => 'business',

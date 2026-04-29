@@ -9,6 +9,7 @@ import { FloatingPlayer } from "@/components/ui/floating-player";
 import { ChatSyncProvider } from "@/components/providers/chat-sync-provider";
 import { MailSyncProvider } from "@/components/providers/mail-sync-provider";
 import { WorkflowSyncProvider } from "@/components/providers/workflow-sync-provider";
+import { ProjectManagementSyncProvider } from "@/modules/projectmanagement/providers/pm-sync-provider";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
@@ -25,6 +26,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <ChatSyncProvider />
       <MailSyncProvider />
       <WorkflowSyncProvider />
+      <ProjectManagementSyncProvider />
       <GlobalAudioProvider>
         <TranslationProvider> 
           {/* 🚀 THE FIX: Removed hardcoded prop. It now fetches dynamically! */}

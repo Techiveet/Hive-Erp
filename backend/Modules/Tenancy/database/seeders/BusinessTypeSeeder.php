@@ -42,6 +42,57 @@ class BusinessTypeSeeder extends Seeder
                 'icon'        => 'layout-dashboard',
             ],
             [
+                'key'         => 'software-development',
+                'label'       => 'Software Development',
+                'description' => 'Delivery-focused workspace for product teams, engineering agencies, and software studios.',
+                'icon'        => 'code-2',
+                'default_template' => [
+                    'theme' => [
+                        'accent'      => '#2563eb',
+                        'accent_soft' => '#dbeafe',
+                        'surface'     => '#eff6ff',
+                        'canvas'      => 'linear-gradient(135deg, #eff6ff 0%, #f8fafc 44%, #ecfeff 100%)',
+                    ],
+                    'hero' => [
+                        'eyebrow'         => 'Software Delivery',
+                        'title'           => 'Build, ship, and support software with a workspace tuned for delivery.',
+                        'description'     => 'Present product strategy, engineering capability, and delivery confidence from a polished tenant homepage.',
+                        'primary_label'   => 'Open Project Workspace',
+                        'secondary_label' => 'View Delivery Services',
+                        'announcement'    => 'Project planning, internal communication, and document conversion are ready for software teams.',
+                    ],
+                    'stats' => [
+                        ['value' => '24/7', 'label' => 'delivery visibility'],
+                        ['value' => '3x', 'label' => 'faster handoffs'],
+                        ['value' => '99.9%', 'label' => 'platform uptime focus'],
+                    ],
+                    'highlights' => [
+                        ['kicker' => 'Planning', 'title' => 'Keep product work visible from idea to release', 'description' => 'Frame roadmaps, project status, and team accountability with less operational drag.'],
+                        ['kicker' => 'Collaboration', 'title' => 'Give delivery teams one operational rhythm', 'description' => 'Connect internal messages, project notes, and client-ready outputs in one workspace.'],
+                        ['kicker' => 'Execution', 'title' => 'Turn delivery progress into confident reporting', 'description' => 'Make stakeholders see what is moving, what is blocked, and what ships next.'],
+                    ],
+                    'spotlight' => [
+                        'heading'     => 'Designed for software companies and product teams',
+                        'description' => 'The sections emphasize technical capability, communication, and reliable delivery.',
+                        'items' => [
+                            ['title' => 'Manage active projects', 'description' => 'Track delivery work, priorities, tasks, and team ownership.'],
+                            ['title' => 'Coordinate internal communication', 'description' => 'Use mailbox and chat workflows for tenant-scoped collaboration.'],
+                            ['title' => 'Prepare client-ready documents', 'description' => 'Convert project notes and HTML deliverables into polished PDF output.'],
+                        ],
+                    ],
+                    'testimonials' => [
+                        ['quote' => 'The workspace helped our clients understand delivery progress without another meeting.', 'author' => 'Mikael T.', 'role' => 'Product Lead'],
+                        ['quote' => 'Project boards and team communication finally live in the same operational flow.', 'author' => 'Hana B.', 'role' => 'Engineering Manager'],
+                    ],
+                    'final_cta' => [
+                        'title'           => 'Give your delivery team a sharper operating system.',
+                        'description'     => 'Make software planning, communication, and client outputs easier to manage from one place.',
+                        'primary_label'   => 'Start Project Work',
+                        'secondary_label' => 'Review Team Services',
+                    ],
+                ],
+            ],
+            [
                 'key'         => 'retail',
                 'label'       => 'Retail Store',
                 'description' => 'Merchandising-focused layout for launches, collections, and store traffic.',

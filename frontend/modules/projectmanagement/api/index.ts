@@ -27,7 +27,9 @@ type TaskQueryParams = {
   per_page?: number;
 };
 
-type ProjectPayload = Partial<Pick<Project, "name" | "description" | "status" | "start_date" | "end_date">>;
+type ProjectPayload = Partial<Pick<Project, "name" | "description" | "status" | "priority" | "start_date" | "end_date" | "project_manager_id" | "client_stakeholder" | "tags" | "attachments">> & {
+  assigned_to?: number[];
+};
 
 type TaskPayload = Partial<{
   project_id: string;
@@ -38,6 +40,7 @@ type TaskPayload = Partial<{
   due_date: string | null;
   assigned_to: number | null;
   order: number;
+  attachments: any[] | null;
 }>;
 
 type BoardPayload = Partial<Pick<Board, "project_id" | "name" | "order">>;

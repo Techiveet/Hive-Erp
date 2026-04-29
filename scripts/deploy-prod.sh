@@ -10,8 +10,12 @@ COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 MIN_FREE_DISK_MB="${MIN_FREE_DISK_MB:-5120}"
 RUN_SCOUT_IMPORT="${RUN_SCOUT_IMPORT:-0}"
 SKIP_FALLBACK_DOMAIN_SYNC="${SKIP_FALLBACK_DOMAIN_SYNC:-0}"
+DEPLOY_STEP="initializing"
+DEPLOY_COMPOSE_COMMAND=""
 
 compose() {
+  DEPLOY_COMPOSE_COMMAND="docker compose -f ${COMPOSE_FILE} $*"
+  echo "Running: ${DEPLOY_COMPOSE_COMMAND}"
   docker compose -f "${COMPOSE_FILE}" "$@"
 }
 
@@ -34,9 +38,15 @@ fail() {
   local code="$1"
   local line="$2"
   local cmd="$3"
+  local failed_step="${DEPLOY_STEP:-unknown}"
+  local failed_compose_command="${DEPLOY_COMPOSE_COMMAND:-}"
 
   set +e
 
+  echo "Deployment step: ${failed_step}" >&2
+  if [ -n "${failed_compose_command}" ]; then
+    echo "Last Docker Compose command: ${failed_compose_command}" >&2
+  fi
   echo "Deployment failed at line ${line}: ${cmd}" >&2
   echo "Exit code: ${code}" >&2
   echo "Working directory: $(pwd)" >&2
@@ -51,6 +61,10 @@ fail() {
     log_service "${service}" 100
   done
 
+  echo "Deployment step: ${failed_step}" >&2
+  if [ -n "${failed_compose_command}" ]; then
+    echo "Last Docker Compose command: ${failed_compose_command}" >&2
+  fi
   echo "Deployment failed at line ${line}: ${cmd}" >&2
   echo "Exit code: ${code}" >&2
 

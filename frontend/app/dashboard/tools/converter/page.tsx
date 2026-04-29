@@ -32,7 +32,32 @@ const getApiUrl = () => {
     return getBackendApiRoot();
 };
 
-function CloudFilePickerModal({ isOpen, mode, onClose, onSelect }: any) {
+type PickerMode = 'html' | 'asset';
+
+type CloudFile = {
+    id?: string | number;
+    name?: string;
+    media_details?: {
+        name?: string;
+    };
+};
+
+type CatalogModule = {
+    slug: string;
+};
+
+type CloudFilePickerModalProps = {
+    isOpen: boolean;
+    mode: PickerMode | null;
+    onClose: () => void;
+    onSelect: (file: CloudFile) => void;
+};
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+    return error instanceof Error && error.message ? error.message : fallback;
+};
+
+function CloudFilePickerModal({ isOpen, mode, onClose, onSelect }: CloudFilePickerModalProps) {
     const { t } = useTranslation();
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -64,10 +89,11 @@ function CloudFilePickerModal({ isOpen, mode, onClose, onSelect }: any) {
 export default function FileConverterPage() {
     const { t } = useTranslation();
     const { startTour } = useTour();
-    const { hasPermission, isLoaded } = usePermissions();
+    const { hasAnyPermission, isLoaded } = usePermissions();
     const { hasModule } = useTenantModuleAccess();
     const [checkoutOpen, setCheckoutOpen] = useState(false);
-    const canManageStorage = hasPermission("manage_storage");
+    const canUseDocumentConverter = hasAnyPermission(["use_document_converter", "manage_storage"]);
+    const canUseStorage = hasAnyPermission(["view_storage", "manage_storage"]);
     const tenantId = getTenantId();
     const isTenantWorkspace = Boolean(tenantId);
     const hasDocumentConverter = !isTenantWorkspace || hasModule("document_converter");
@@ -75,12 +101,12 @@ export default function FileConverterPage() {
     const { data: subscriptionData } = useQuery({
         queryKey: ["tenant-current-subscriptions", "converter"],
         queryFn: fetchCurrentTenantSubscriptions,
-        enabled: isTenantWorkspace && canManageStorage,
+        enabled: isTenantWorkspace && canUseDocumentConverter,
         staleTime: 300_000,
     });
     const converterModule =
         subscriptionData?.data?.module_subscriptions?.catalog_modules?.find(
-            (module: any) => module.slug === "document_converter"
+            (module: CatalogModule) => module.slug === "document_converter"
         ) ?? null;
     const paymentMethods = subscriptionData?.data?.payment_methods ?? [];
     
@@ -108,7 +134,7 @@ export default function FileConverterPage() {
     const [isDraggingAssets, setIsDraggingAssets] = useState(false);
     const [isConverting, setIsConverting] = useState(false);
     const [isSavingToCloud, setIsSavingToCloud] = useState(false);
-    const [pickerMode, setPickerMode] = useState<'html' | 'asset' | null>(null);
+    const [pickerMode, setPickerMode] = useState<PickerMode | null>(null);
     const [isFetchingServerAsset, setIsFetchingServerAsset] = useState(false);
     
     const htmlInputRef = useRef<HTMLInputElement>(null);
@@ -152,7 +178,7 @@ export default function FileConverterPage() {
         );
     }
 
-    if (!canManageStorage) {
+    if (!canUseDocumentConverter) {
         return (
             <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 rounded-[2rem] border border-border/50 bg-card/40 p-8 text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10">
@@ -255,7 +281,7 @@ export default function FileConverterPage() {
     
     const removeAsset = (index: number) => setAssets(prev => prev.filter((_, i) => i !== index));
 
-    const handleCloudFileSelect = async (serverFile: any) => {
+    const handleCloudFileSelect = async (serverFile: CloudFile) => {
         const mode = pickerMode; setPickerMode(null);
         if (!serverFile || !serverFile.id) return toast.error(t('tools.toast_invalid_cloud', "Invalid file selected."));
 
@@ -281,7 +307,7 @@ export default function FileConverterPage() {
                 setAssets(prev => [...prev, fileObj]);
                 toast.success(`${fileName} ${t('tools.toast_asset_secure', "attached!")}`, { id: toastId });
             }
-        } catch (error) {
+        } catch {
             toast.error(t('tools.toast_import_failed', "Failed to import file."), { id: toastId });
         } finally {
             setIsFetchingServerAsset(false);
@@ -354,8 +380,8 @@ export default function FileConverterPage() {
             toast.success(t('tools.toast_success', "Conversion successful! PDF Ready."), { id: toastId });
             setTimeout(() => { document.getElementById('tour-converter-output')?.scrollIntoView({ behavior: 'smooth' }); }, 100);
 
-        } catch (error: any) {
-            toast.error(error.message || t('tools.toast_unexpected', "An unexpected error occurred."), { id: toastId });
+        } catch (error) {
+            toast.error(getErrorMessage(error, t('tools.toast_unexpected', "An unexpected error occurred.")), { id: toastId });
         } finally {
             setIsConverting(false);
         }
@@ -467,11 +493,13 @@ export default function FileConverterPage() {
                                             <h4 className="text-sm font-bold mb-1">{t('tools.upload_local_html', "Upload Local HTML")}</h4>
                                             <p className="text-xs text-muted-foreground">{t('tools.drag_drop_click', "Drag & drop or click")}</p>
                                         </div>
-                                        <div onClick={() => !isFetchingServerAsset && setPickerMode('html')} className="flex-1 p-8 border-2 border-dashed border-indigo-500/40 bg-indigo-500/5 hover:bg-indigo-500/10 rounded-3xl transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center text-indigo-500">
-                                            {isFetchingServerAsset && pickerMode === 'html' ? <Loader2 className="h-8 w-8 mb-3 animate-spin" /> : <FolderSearch className="h-8 w-8 mb-3" />}
-                                            <h4 className="text-sm font-bold mb-1">{t('tools.select_cloud_html', "Select Cloud HTML")}</h4>
-                                            <p className="text-xs opacity-70">{t('tools.pick_file_manager', "Pick from File Manager")}</p>
-                                        </div>
+                                        {canUseStorage && (
+                                            <div onClick={() => !isFetchingServerAsset && setPickerMode('html')} className="flex-1 p-8 border-2 border-dashed border-indigo-500/40 bg-indigo-500/5 hover:bg-indigo-500/10 rounded-3xl transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center text-indigo-500">
+                                                {isFetchingServerAsset && pickerMode === 'html' ? <Loader2 className="h-8 w-8 mb-3 animate-spin" /> : <FolderSearch className="h-8 w-8 mb-3" />}
+                                                <h4 className="text-sm font-bold mb-1">{t('tools.select_cloud_html', "Select Cloud HTML")}</h4>
+                                                <p className="text-xs opacity-70">{t('tools.pick_file_manager', "Pick from File Manager")}</p>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <div className="flex flex-col flex-1 border rounded-3xl overflow-hidden bg-muted/30 relative group animate-in fade-in zoom-in-95 min-h-[350px]">
@@ -519,10 +547,12 @@ export default function FileConverterPage() {
                                 <UploadCloud className="h-5 w-5 mb-2 text-muted-foreground" />
                                 <span className="text-sm font-bold">{t('tools.upload_local_file', "Upload Local File")}</span>
                             </div>
-                            <div onClick={() => !isFetchingServerAsset && setPickerMode('asset')} className="flex-1 p-6 border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 rounded-2xl transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center text-primary">
-                                {isFetchingServerAsset && pickerMode === 'asset' ? <Loader2 className="h-5 w-5 mb-2 animate-spin" /> : <FolderSearch className="h-5 w-5 mb-2" />}
-                                <span className="text-sm font-bold">{t('tools.select_cloud_asset', "Select Cloud Asset")}</span>
-                            </div>
+                            {canUseStorage && (
+                                <div onClick={() => !isFetchingServerAsset && setPickerMode('asset')} className="flex-1 p-6 border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 rounded-2xl transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center text-primary">
+                                    {isFetchingServerAsset && pickerMode === 'asset' ? <Loader2 className="h-5 w-5 mb-2 animate-spin" /> : <FolderSearch className="h-5 w-5 mb-2" />}
+                                    <span className="text-sm font-bold">{t('tools.select_cloud_asset', "Select Cloud Asset")}</span>
+                                </div>
+                            )}
                         </div>
 
                         {assets.length > 0 && (
@@ -597,7 +627,9 @@ export default function FileConverterPage() {
                                 <h3 className="text-xl font-bold font-space uppercase tracking-widest text-foreground">{t('tools.pdf_ready', "PDF Ready for Review")}</h3>
                             </div>
                             <div className="flex flex-wrap items-center gap-3">
-                                <Button onClick={handleSaveToCloud} disabled={isSavingToCloud} className="rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/20">{isSavingToCloud ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} {t('tools.save_to_cloud', "Save to Cloud")}</Button>
+                                {canUseStorage && (
+                                    <Button onClick={handleSaveToCloud} disabled={isSavingToCloud} className="rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/20">{isSavingToCloud ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} {t('tools.save_to_cloud', "Save to Cloud")}</Button>
+                                )}
                                 <Button onClick={handleDiscard} variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"><X className="h-4 w-4" /></Button>
                             </div>
                         </div>
@@ -606,7 +638,9 @@ export default function FileConverterPage() {
                 )}
             </div>
             
-            <CloudFilePickerModal isOpen={pickerMode !== null} mode={pickerMode} onClose={() => setPickerMode(null)} onSelect={handleCloudFileSelect} />
+            {canUseStorage && (
+                <CloudFilePickerModal isOpen={pickerMode !== null} mode={pickerMode} onClose={() => setPickerMode(null)} onSelect={handleCloudFileSelect} />
+            )}
         </div>
     );
 }

@@ -63,6 +63,7 @@ final class AccessControlCatalog
             'view_backups', 'manage_backups',
             'view_system_dashboard', 'manage_system_settings',
             'view_storage', 'manage_storage',
+            'use_document_converter',
             'manage_brand_settings', 'manage_general_settings', 'manage_payment_settings', 'manage_localization',
             'view_api_docs',
             'view_module_subscriptions', 'manage_module_subscriptions',
@@ -118,6 +119,7 @@ final class AccessControlCatalog
                 'manage_system_settings',
                 'view_backups', 'manage_backups',
                 'view_storage', 'manage_storage',
+                'use_document_converter',
                 'view_module_subscriptions', 'manage_module_subscriptions',
                 'manage_brand_settings', 'manage_general_settings', 'manage_localization', 'view_api_docs',
                 'view_invoices', 'manage_invoices',
@@ -226,6 +228,23 @@ final class AccessControlCatalog
                 'complete_nightclub_reservations',
                 'view_nightclub_service_orders',
             ],
+        ];
+    }
+
+    /**
+     * Permissions for the seeded Techive software-development tenant.
+     *
+     * @return array<int, string>
+     */
+    public static function softwareDevelopmentTenantAdminPermissions(): array
+    {
+        return [
+            'view_system_dashboard',
+            'view_profile', 'edit_profile',
+            'view_users',
+            'view_chat', 'manage_chat',
+            'view_module_subscriptions',
+            'use_document_converter',
         ];
     }
 

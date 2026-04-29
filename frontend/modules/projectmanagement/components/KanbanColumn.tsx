@@ -48,7 +48,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({ column, tasks, onAdd
       >
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
-            <KanbanTask key={task.id} task={task} onOpen={onTaskClick} />
+            <KanbanTask key={task.id} task={task} onOpen={onTaskClick} isDone={column.is_done} />
           ))}
         </SortableContext>
       </div>

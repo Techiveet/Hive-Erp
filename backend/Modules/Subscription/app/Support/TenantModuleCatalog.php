@@ -66,6 +66,17 @@ class TenantModuleCatalog
                 'monthly_price_etb' => 899,
             ],
             [
+                'slug' => 'project_management',
+                'name' => 'Project Management',
+                'description' => 'Plan software delivery, organize boards, assign tasks, track teams, and review project reports in one tenant workspace.',
+                'category' => 'Business Apps',
+                'tone' => 'blue',
+                'recommended_plans' => ['business', 'enterprise', 'overlord'],
+                'business_types' => ['software-development'],
+                'monthly_price_etb' => 899,
+                'route_hints' => ['/dashboard/project-management'],
+            ],
+            [
                 'slug' => 'advanced_analytics',
                 'name' => 'Advanced Analytics',
                 'description' => 'Unlock richer dashboards, trend breakdowns, and operational KPI snapshots for the tenant.',

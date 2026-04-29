@@ -20,6 +20,7 @@ export const SETTINGS_ROUTE_PERMISSIONS = [
 export const ALERTS_ROUTE_PERMISSIONS = ["view_alerts"] as const;
 export const AUDIT_LOG_ROUTE_PERMISSIONS = ["view_logs"] as const;
 export const API_DOCS_ROUTE_PERMISSIONS = ["view_api_docs"] as const;
+export const DOCUMENT_CONVERTER_ROUTE_PERMISSIONS = ["use_document_converter", "manage_storage"] as const;
 export const DIRECT_TRANSFER_REVIEW_ROUTE_PERMISSIONS = ["manage_tenants", "manage_payment_settings", "manage_general_settings"] as const;
 export const NIGHTCLUB_ROUTE_PERMISSIONS = [
   "view_nightclub_tables",
@@ -121,8 +122,8 @@ export function canAccessDashboardRoute(rawPath: string, access: RoutePermission
     return access.hasAnyPermission([...INVENTORY_ROUTE_PERMISSIONS]);
   }
 
-  if (matchesPrefix(path, "/dashboard/tools/converter")) {
-    return access.hasPermission("manage_storage");
+  if (matchesPrefix(path, "/dashboard/tools/converter") || matchesPrefix(path, "/dashboard/tools/converters")) {
+    return access.hasAnyPermission([...DOCUMENT_CONVERTER_ROUTE_PERMISSIONS]);
   }
 
   return true;

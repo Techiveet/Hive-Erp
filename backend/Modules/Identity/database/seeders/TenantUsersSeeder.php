@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\Identity\Models\Permission;
 use Modules\Identity\Models\User;
+use Modules\Identity\Support\AccessControlCatalog;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 class TenantUsersSeeder extends Seeder
@@ -31,10 +33,19 @@ class TenantUsersSeeder extends Seeder
         );
 
         $admin->guard_name = $guard;
-        $admin->syncRoles(['Super Admin']);
-        $admin->syncPermissions(
-            Permission::where('guard_name', $guard)->pluck('name')->all()
-        );
+
+        if ($tenantId === 'techive') {
+            $role = Role::firstOrCreate(['name' => 'Software Development Admin', 'guard_name' => $guard]);
+            $permissions = AccessControlCatalog::softwareDevelopmentTenantAdminPermissions();
+            $role->syncPermissions($permissions);
+            $admin->syncRoles([$role->name]);
+            $admin->syncPermissions($permissions);
+        } else {
+            $admin->syncRoles(['Super Admin']);
+            $admin->syncPermissions(
+                Permission::where('guard_name', $guard)->pluck('name')->all()
+            );
+        }
 
         $staff = [
             ['email' => "hr@{$tenantId}.com", 'name' => 'Sarah HR', 'role' => 'HR Manager'],

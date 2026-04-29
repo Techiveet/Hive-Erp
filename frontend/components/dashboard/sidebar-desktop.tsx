@@ -107,7 +107,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   const [isWorkflowOpen, setIsWorkflowOpen] = useState(false);
   // 🚀 Apps dropdown state
   const [isAppsOpen, setIsAppsOpen] = useState(false);
-  const canAccessConverter = hasAnyPermission(["manage_storage"]);
+  const canAccessConverter = hasAnyPermission(["use_document_converter", "manage_storage"]);
   const canAccessLandingTemplates = hasAnyPermission(["manage_tenants", "provision_tenants"]);
 
   useEffect(() => {
@@ -778,4 +778,3 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
     </div>
   );
 }
-

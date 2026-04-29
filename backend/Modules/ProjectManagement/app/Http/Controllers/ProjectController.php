@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\ProjectManagement\Models\Project;
 use Modules\ProjectManagement\Events\ProjectManagementUpdated;
+use App\Notifications\ProjectManagementNotification;
 use Illuminate\Support\Facades\DB;
+use Modules\Identity\Models\User;
 
 class ProjectController extends Controller
 {
@@ -24,8 +26,12 @@ class ProjectController extends Controller
                 in_array($request->string('status')->toString(), ['planning', 'active', 'on_hold', 'completed', 'archived'], true),
                 fn ($query) => $query->where('status', $request->string('status')->toString())
             )
-            ->withCount(['tasks', 'members'])
-            ->with(['creator:id,name,avatar_path', 'members.user:id,name,avatar_path'])
+            ->withCount([
+                'tasks',
+                'members',
+                'tasks as completed_tasks_count' => fn ($query) => $query->whereHas('column', fn ($query) => $query->where('is_done', true)),
+            ])
+            ->with(['creator:id,name,avatar_path', 'projectManager:id,name,avatar_path', 'members.user:id,name,avatar_path'])
             ->latest()
             ->paginate($request->integer('per_page', 15));
 
@@ -41,8 +47,12 @@ class ProjectController extends Controller
             'planning' => Project::where('status', 'planning')->count(),
         ];
 
-        $recent = Project::withCount(['tasks', 'members'])
-            ->with(['members.user:id,name,avatar_path'])
+        $recent = Project::withCount([
+                'tasks',
+                'members',
+                'tasks as completed_tasks_count' => fn ($query) => $query->whereHas('column', fn ($query) => $query->where('is_done', true)),
+            ])
+            ->with(['projectManager:id,name,avatar_path', 'members.user:id,name,avatar_path'])
             ->latest()
             ->take(6)
             ->get();
@@ -59,20 +69,46 @@ class ProjectController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'status' => 'sometimes|string|in:planning,active,on_hold,completed,archived',
+            'priority' => 'sometimes|string|in:low,medium,high,urgent',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
+            'project_manager_id' => 'nullable|exists:users,id',
+            'client_stakeholder' => 'nullable|string|max:255',
+            'tags' => 'nullable|array',
+            'attachments' => 'nullable|array',
+            'assigned_to' => 'nullable|array',
+            'assigned_to.*' => 'exists:users,id',
         ]);
 
         $project = DB::transaction(function () use ($validated) {
-            $project = Project::create(array_merge($validated, [
-                'created_by' => auth()->id(),
-            ]));
+            $project = Project::create(array_merge(
+                collect($validated)->except(['assigned_to'])->toArray(),
+                ['created_by' => auth()->id()]
+            ));
 
             // Add creator as owner
             $project->members()->create([
                 'user_id' => auth()->id(),
                 'role' => 'owner',
             ]);
+
+            // Add project manager if specified and not the creator
+            if (!empty($validated['project_manager_id']) && $validated['project_manager_id'] != auth()->id()) {
+                $project->members()->updateOrCreate(
+                    ['user_id' => $validated['project_manager_id']],
+                    ['role' => 'manager']
+                );
+            }
+
+            // Add assigned members
+            if (!empty($validated['assigned_to'])) {
+                foreach ($validated['assigned_to'] as $userId) {
+                    $project->members()->updateOrCreate(
+                        ['user_id' => $userId],
+                        ['role' => 'member']
+                    );
+                }
+            }
 
             // Create default board and columns
             $board = $project->boards()->create([
@@ -89,7 +125,7 @@ class ProjectController extends Controller
                 ]);
             }
 
-            $project->load('boards.columns', 'members.user:id,name,email,avatar_path', 'creator:id,name,avatar_path');
+            $project->load('boards.columns', 'members.user:id,name,email,avatar_path', 'creator:id,name,avatar_path', 'projectManager:id,name,avatar_path');
 
             return $project;
         });
@@ -97,6 +133,15 @@ class ProjectController extends Controller
         event(new ProjectManagementUpdated('project.created', [
             'project' => $project->toArray(),
         ], $project->id));
+
+        if ($project->project_manager_id && $project->project_manager_id !== auth()->id()) {
+            $project->projectManager->notify(new ProjectManagementNotification('pm_project_assigned', [
+                'title' => 'Project Manager Assignment',
+                'body' => "You have been assigned as the manager for: {$project->name}",
+                'url' => "/dashboard/projects?projectId={$project->id}",
+                'project_id' => $project->id,
+            ]));
+        }
 
         return response()->json($project, 201);
     }
@@ -107,7 +152,8 @@ class ProjectController extends Controller
             'boards.columns.tasks.assignee',
             'boards.columns.tasks.creator:id,name,avatar_path',
             'members.user:id,name,email,avatar_path',
-            'creator:id,name,avatar_path'
+            'creator:id,name,avatar_path',
+            'projectManager:id,name,avatar_path',
         ])->findOrFail($id);
 
         return response()->json($project);
@@ -116,19 +162,35 @@ class ProjectController extends Controller
     public function update(Request $request, $id)
     {
         $project = Project::findOrFail($id);
-        $project->update($request->validate([
+        $oldPmId = $project->getOriginal('project_manager_id');
+        $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'status' => 'sometimes|required|string|in:planning,active,on_hold,completed,archived',
+            'priority' => 'sometimes|string|in:low,medium,high,urgent',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
-        ]));
+            'project_manager_id' => 'nullable|exists:users,id',
+            'client_stakeholder' => 'nullable|string|max:255',
+            'tags' => 'nullable|array',
+            'attachments' => 'nullable|array',
+        ]);
+        $project->update($validated);
 
-        $project->load('members.user:id,name,email,avatar_path', 'creator:id,name,avatar_path');
+        $project->load('members.user:id,name,email,avatar_path', 'creator:id,name,avatar_path', 'projectManager:id,name,avatar_path');
 
         event(new ProjectManagementUpdated('project.updated', [
             'project' => $project->toArray(),
         ], $project->id));
+
+        if ($project->project_manager_id && $project->project_manager_id !== auth()->id() && $project->project_manager_id !== $oldPmId) {
+            $project->projectManager->notify(new ProjectManagementNotification('pm_project_assigned', [
+                'title' => 'Project Manager Assignment',
+                'body' => "You have been assigned as the manager for: {$project->name}",
+                'url' => "/dashboard/projects?projectId={$project->id}",
+                'project_id' => $project->id,
+            ]));
+        }
 
         return response()->json($project);
     }

@@ -14,17 +14,30 @@ export interface Project {
   name: string;
   description: string | null;
   status: ProjectStatus;
+  priority: TaskPriority;
   start_date: string | null;
   end_date: string | null;
+  project_manager_id: number | null;
+  client_stakeholder: string | null;
+  tags: string[] | null;
   created_by: number;
   created_at: string;
   updated_at: string;
   creator?: User;
+  project_manager?: User;
   members?: ProjectMember[];
   boards?: Board[];
   tasks_count?: number;
+  completed_tasks_count?: number;
   members_count?: number;
   progress?: number;
+  attachments?: ProjectAttachment[] | null;
+}
+
+export interface ProjectAttachment {
+  path?: string | null;
+  name?: string | null;
+  url?: string | null;
 }
 
 export interface ProjectMember {
@@ -71,6 +84,7 @@ export interface Task {
   column?: { id: string, name: string };
   checklists?: TaskChecklist[];
   comments?: TaskComment[];
+  attachments?: ProjectAttachment[] | null;
 }
 
 export interface TaskChecklist {

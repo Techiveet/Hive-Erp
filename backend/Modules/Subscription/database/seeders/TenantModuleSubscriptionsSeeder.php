@@ -16,7 +16,7 @@ class TenantModuleSubscriptionsSeeder extends Seeder
                 ->where('tenant_id', $tenant->id)
                 ->first();
 
-            if ($existing) {
+            if ($existing && $tenant->id !== 'techive') {
                 $this->command?->line("   -> Skipping subscription seed for [{$tenant->id}] because a configuration already exists.");
                 return;
             }
@@ -25,7 +25,7 @@ class TenantModuleSubscriptionsSeeder extends Seeder
                 $tenant,
                 $this->subscriptionProfileFor($tenant),
                 'database-seeder',
-                true
+                $existing === null
             );
 
             $moduleCount = count($subscription->module_subscriptions['enabled_modules'] ?? []);
@@ -64,6 +64,14 @@ class TenantModuleSubscriptionsSeeder extends Seeder
                         'description' => 'Track battery health, charging readiness, and service flags across field vehicles.',
                     ],
                 ],
+            ],
+            'techive' => [
+                'enabled_modules' => [
+                    'project_management',
+                    'document_converter',
+                    'mailbox',
+                ],
+                'custom_modules' => [],
             ],
             'selam-bistro' => [
                 'enabled_modules' => array_values(array_unique([

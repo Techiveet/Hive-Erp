@@ -1,0 +1,508 @@
+"use client";
+
+import React, { useMemo, useState } from "react";
+import {
+  addDays,
+  differenceInCalendarDays,
+  eachDayOfInterval,
+  eachMonthOfInterval,
+  endOfDay,
+  format,
+  isAfter,
+  isBefore,
+  isValid,
+  startOfDay,
+} from "date-fns";
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Download,
+  Filter,
+  Flag,
+  Layers3,
+  Search,
+  TimerReset,
+  UserRound,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { Project, Task, TaskPriority } from "../types";
+
+interface ProjectGanttChartProps {
+  project: Project;
+  tasks: Task[];
+  onTaskClick?: (task: Task) => void;
+}
+
+type GroupMode = "status" | "assignee" | "priority";
+type StatusFilter = "all" | "scheduled" | "unscheduled" | "overdue" | "completed";
+type ZoomLevel = "compact" | "comfortable" | "wide";
+
+type TimelineTask = Task & {
+  inferred_start: Date | null;
+  inferred_end: Date | null;
+  durationDays: number;
+  isDone: boolean;
+  isOverdue: boolean;
+  isUnscheduled: boolean;
+  health: "complete" | "overdue" | "at-risk" | "scheduled" | "unscheduled";
+};
+
+const priorityColors: Record<TaskPriority, string> = {
+  low: "bg-emerald-500",
+  medium: "bg-sky-500",
+  high: "bg-amber-500",
+  urgent: "bg-rose-500",
+};
+
+const healthColors: Record<TimelineTask["health"], string> = {
+  complete: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  overdue: "border-rose-200 bg-rose-50 text-rose-700",
+  "at-risk": "border-amber-200 bg-amber-50 text-amber-700",
+  scheduled: "border-sky-200 bg-sky-50 text-sky-700",
+  unscheduled: "border-slate-200 bg-slate-50 text-slate-700",
+};
+
+const zoomConfig: Record<ZoomLevel, { dayWidth: number; rowHeight: number; label: string }> = {
+  compact: { dayWidth: 28, rowHeight: 56, label: "Compact" },
+  comfortable: { dayWidth: 42, rowHeight: 68, label: "Comfortable" },
+  wide: { dayWidth: 64, rowHeight: 78, label: "Wide" },
+};
+
+function parseDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return isValid(date) ? startOfDay(date) : null;
+}
+
+function initials(name?: string | null) {
+  return (name || "U")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function isTaskDone(task: Task) {
+  return task.column?.name?.toLowerCase() === "done";
+}
+
+function inferDuration(priority: TaskPriority) {
+  if (priority === "urgent") return 2;
+  if (priority === "high") return 4;
+  if (priority === "medium") return 5;
+  return 7;
+}
+
+function csvEscape(value: string | number | null | undefined) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({ project, tasks, onTaskClick }) => {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "all">("all");
+  const [groupMode, setGroupMode] = useState<GroupMode>("status");
+  const [zoom, setZoom] = useState<ZoomLevel>("comfortable");
+
+  const today = startOfDay(new Date());
+  const projectStart = parseDate(project.start_date);
+  const projectEnd = parseDate(project.end_date);
+
+  const timelineTasks = useMemo<TimelineTask[]>(() => {
+    return tasks.map((task) => {
+      const dueDate = parseDate(task.due_date);
+      const durationDays = inferDuration(task.priority);
+      const startDate = dueDate ? addDays(dueDate, -durationDays) : null;
+      const done = isTaskDone(task);
+      const overdue = !!dueDate && isBefore(dueDate, today) && !done;
+      const atRisk = !!dueDate && !done && !overdue && differenceInCalendarDays(dueDate, today) <= 3;
+
+      return {
+        ...task,
+        inferred_start: startDate,
+        inferred_end: dueDate,
+        durationDays,
+        isDone: done,
+        isOverdue: overdue,
+        isUnscheduled: !dueDate,
+        health: done ? "complete" : overdue ? "overdue" : atRisk ? "at-risk" : dueDate ? "scheduled" : "unscheduled",
+      };
+    });
+  }, [tasks, today]);
+
+  const scheduledTasks = timelineTasks.filter((task) => task.inferred_start && task.inferred_end);
+  const earliestTaskDate = scheduledTasks.reduce<Date | null>((earliest, task) => {
+    if (!task.inferred_start) return earliest;
+    return !earliest || isBefore(task.inferred_start, earliest) ? task.inferred_start : earliest;
+  }, null);
+  const latestTaskDate = scheduledTasks.reduce<Date | null>((latest, task) => {
+    if (!task.inferred_end) return latest;
+    return !latest || isAfter(task.inferred_end, latest) ? task.inferred_end : latest;
+  }, null);
+
+  const rangeStart = projectStart || earliestTaskDate || today;
+  const rangeEnd = projectEnd || latestTaskDate || addDays(rangeStart, 30);
+  const paddedStart = addDays(rangeStart, -2);
+  const paddedEnd = addDays(rangeEnd, 2);
+  const totalDays = Math.max(differenceInCalendarDays(paddedEnd, paddedStart), 1);
+  const days = eachDayOfInterval({ start: paddedStart, end: paddedEnd });
+  const months = eachMonthOfInterval({ start: paddedStart, end: paddedEnd });
+  const chartWidth = Math.max(days.length * zoomConfig[zoom].dayWidth, 720);
+  const todayOffset = differenceInCalendarDays(today, paddedStart);
+  const todayLeft = (todayOffset / totalDays) * chartWidth;
+
+  const filteredTasks = timelineTasks.filter((task) => {
+    const matchesSearch = `${task.title} ${task.description || ""} ${task.assignee?.name || ""} ${task.column?.name || ""}`
+      .toLowerCase()
+      .includes(search.toLowerCase());
+    const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter;
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "scheduled" && !task.isUnscheduled) ||
+      (statusFilter === "unscheduled" && task.isUnscheduled) ||
+      (statusFilter === "overdue" && task.isOverdue) ||
+      (statusFilter === "completed" && task.isDone);
+
+    return matchesSearch && matchesPriority && matchesStatus;
+  });
+
+  const groupedTasks = useMemo(() => {
+    const groups = new Map<string, TimelineTask[]>();
+    for (const task of filteredTasks) {
+      const key =
+        groupMode === "assignee"
+          ? task.assignee?.name || "Unassigned"
+          : groupMode === "priority"
+            ? `${task.priority[0].toUpperCase()}${task.priority.slice(1)} priority`
+            : task.column?.name || "No status";
+      groups.set(key, [...(groups.get(key) || []), task]);
+    }
+    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [filteredTasks, groupMode]);
+
+  const completedCount = timelineTasks.filter((task) => task.isDone).length;
+  const overdueCount = timelineTasks.filter((task) => task.isOverdue).length;
+  const unscheduledCount = timelineTasks.filter((task) => task.isUnscheduled).length;
+  const atRiskCount = timelineTasks.filter((task) => task.health === "at-risk").length;
+  const completionRate = timelineTasks.length > 0 ? Math.round((completedCount / timelineTasks.length) * 100) : 0;
+  const scheduledRate = timelineTasks.length > 0 ? Math.round(((timelineTasks.length - unscheduledCount) / timelineTasks.length) * 100) : 0;
+
+  const exportCsv = () => {
+    const rows = [
+      ["Task", "Status", "Priority", "Assignee", "Start", "Due", "Health"],
+      ...filteredTasks.map((task) => [
+        task.title,
+        task.column?.name || "",
+        task.priority,
+        task.assignee?.name || "Unassigned",
+        task.inferred_start ? format(task.inferred_start, "yyyy-MM-dd") : "",
+        task.inferred_end ? format(task.inferred_end, "yyyy-MM-dd") : "",
+        task.health,
+      ]),
+    ];
+    const blob = new Blob([rows.map((row) => row.map(csvEscape).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-gantt.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="flex h-full min-h-[620px] flex-col overflow-hidden rounded-md border bg-card shadow-sm">
+      <div className="border-b bg-muted/20 p-4">
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-bold">Project Schedule</h2>
+              <Badge className="border-none bg-violet-500/10 text-violet-600">{completionRate}% complete</Badge>
+              {overdueCount > 0 && <Badge className="border-none bg-rose-500/10 text-rose-600">{overdueCount} overdue</Badge>}
+              {atRiskCount > 0 && <Badge className="border-none bg-amber-500/10 text-amber-600">{atRiskCount} at risk</Badge>}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {format(rangeStart, "MMM d, yyyy")} - {format(rangeEnd, "MMM d, yyyy")} · {timelineTasks.length} tasks
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={exportCsv} disabled={filteredTasks.length === 0}>
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+            <Button variant="outline" size="icon-sm" onClick={() => setZoom("compact")} aria-label="Zoom out">
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon-sm" onClick={() => setZoom("wide")} aria-label="Zoom in">
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          <Metric icon={CheckCircle2} label="Completion" value={`${completionRate}%`} progress={completionRate} />
+          <Metric icon={CalendarClock} label="Scheduled" value={`${scheduledRate}%`} progress={scheduledRate} />
+          <Metric icon={AlertTriangle} label="Overdue" value={overdueCount} tone={overdueCount > 0 ? "danger" : "good"} />
+          <Metric icon={TimerReset} label="Unscheduled" value={unscheduledCount} tone={unscheduledCount > 0 ? "warning" : "good"} />
+        </div>
+
+        <div className="mt-4 grid gap-2 lg:grid-cols-[minmax(220px,1fr)_170px_170px_170px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tasks, assignees, status..." className="pl-9" />
+          </div>
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
+            <SelectTrigger>
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All tasks</SelectItem>
+              <SelectItem value="scheduled">Scheduled</SelectItem>
+              <SelectItem value="unscheduled">Unscheduled</SelectItem>
+              <SelectItem value="overdue">Overdue</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={priorityFilter} onValueChange={(value) => setPriorityFilter(value as TaskPriority | "all")}>
+            <SelectTrigger>
+              <Flag className="mr-2 h-4 w-4" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All priority</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={groupMode} onValueChange={(value) => setGroupMode(value as GroupMode)}>
+            <SelectTrigger>
+              <Layers3 className="mr-2 h-4 w-4" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="status">Group status</SelectItem>
+              <SelectItem value="assignee">Group assignee</SelectItem>
+              <SelectItem value="priority">Group priority</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {timelineTasks.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">
+          <CalendarClock className="h-10 w-10" />
+          <div>
+            <p className="font-semibold text-foreground">No tasks to schedule yet</p>
+            <p className="mt-1 text-sm">Create tasks with due dates to build a delivery plan.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-auto">
+          <div className="min-w-[980px]">
+            <div className="sticky top-0 z-20 grid grid-cols-[320px_1fr] border-b bg-card">
+              <div className="border-r p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Work item</p>
+                <p className="text-xs text-muted-foreground">{filteredTasks.length} visible · {zoomConfig[zoom].label}</p>
+              </div>
+              <div className="overflow-hidden">
+                <div className="relative h-16" style={{ width: chartWidth }}>
+                  {months.map((month) => {
+                    const left = Math.max(0, differenceInCalendarDays(month, paddedStart) * zoomConfig[zoom].dayWidth);
+                    return (
+                      <div key={month.toISOString()} className="absolute top-2 text-xs font-semibold text-muted-foreground" style={{ left }}>
+                        {format(month, "MMM yyyy")}
+                      </div>
+                    );
+                  })}
+                  <div className="absolute bottom-0 left-0 grid h-8" style={{ width: chartWidth, gridTemplateColumns: `repeat(${days.length}, ${zoomConfig[zoom].dayWidth}px)` }}>
+                    {days.map((day) => (
+                      <div key={day.toISOString()} className="border-l px-1 text-[10px] text-muted-foreground">
+                        {format(day, "d")}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {groupedTasks.length === 0 ? (
+              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                No tasks match the current filters.
+              </div>
+            ) : (
+              groupedTasks.map(([group, groupTasks]) => (
+                <div key={group}>
+                  <div className="sticky top-16 z-10 grid grid-cols-[320px_1fr] border-b bg-muted/40">
+                    <div className="border-r px-4 py-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">{group}</div>
+                    <div className="px-4 py-2 text-xs text-muted-foreground">{groupTasks.length} tasks</div>
+                  </div>
+                  {groupTasks.map((task) => (
+                    <TimelineRow
+                      key={task.id}
+                      task={task}
+                      chartWidth={chartWidth}
+                      dayWidth={zoomConfig[zoom].dayWidth}
+                      rowHeight={zoomConfig[zoom].rowHeight}
+                      paddedStart={paddedStart}
+                      onTaskClick={onTaskClick}
+                    />
+                  ))}
+                </div>
+              ))
+            )}
+
+            {todayOffset >= 0 && todayOffset <= totalDays && (
+              <div
+                className="pointer-events-none sticky bottom-0 z-30 ml-[320px] h-0"
+                aria-hidden="true"
+              >
+                <div className="relative" style={{ width: chartWidth }}>
+                  <div className="absolute bottom-0 top-[-9999px] w-px bg-rose-500" style={{ left: todayLeft }} />
+                  <div className="absolute -top-6 rounded-sm bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white" style={{ left: Math.max(0, todayLeft - 18) }}>
+                    Today
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+function Metric({
+  icon: Icon,
+  label,
+  value,
+  progress,
+  tone = "neutral",
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  progress?: number;
+  tone?: "neutral" | "good" | "warning" | "danger";
+}) {
+  const toneClass = {
+    neutral: "text-sky-600 bg-sky-500/10",
+    good: "text-emerald-600 bg-emerald-500/10",
+    warning: "text-amber-600 bg-amber-500/10",
+    danger: "text-rose-600 bg-rose-500/10",
+  }[tone];
+
+  return (
+    <div className="rounded-md border bg-background p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-xl font-bold">{value}</p>
+        </div>
+        <div className={`rounded-md p-2 ${toneClass}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+      {typeof progress === "number" && <Progress value={progress} className="mt-3 h-1.5" />}
+    </div>
+  );
+}
+
+function TimelineRow({
+  task,
+  chartWidth,
+  dayWidth,
+  rowHeight,
+  paddedStart,
+  onTaskClick,
+}: {
+  task: TimelineTask;
+  chartWidth: number;
+  dayWidth: number;
+  rowHeight: number;
+  paddedStart: Date;
+  onTaskClick?: (task: Task) => void;
+}) {
+  const startOffset = task.inferred_start ? Math.max(0, differenceInCalendarDays(task.inferred_start, paddedStart)) : 0;
+  const endOffset = task.inferred_end ? Math.max(startOffset + 1, differenceInCalendarDays(endOfDay(task.inferred_end), paddedStart)) : startOffset + 1;
+  const left = startOffset * dayWidth;
+  const width = task.isUnscheduled ? 120 : Math.max((endOffset - startOffset + 1) * dayWidth, 80);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onTaskClick?.(task)}
+      className="grid w-full grid-cols-[320px_1fr] border-b text-left transition-colors hover:bg-muted/20"
+      style={{ minHeight: rowHeight }}
+    >
+      <div className="border-r p-3">
+        <div className="flex items-start gap-3">
+          <Avatar className="mt-0.5 h-8 w-8 bg-muted">
+            <AvatarImage src={task.assignee?.avatar_path || undefined} />
+            <AvatarFallback className="text-[10px]">{initials(task.assignee?.name)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="line-clamp-1 text-sm font-semibold">{task.title}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <Badge variant="outline" className="rounded-sm capitalize">{task.column?.name || "No status"}</Badge>
+              <Badge className={`${healthColors[task.health]} rounded-sm border capitalize`}>{task.health.replace("-", " ")}</Badge>
+            </div>
+            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <UserRound className="h-3 w-3" />
+              {task.assignee?.name || "Unassigned"}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div
+        className="relative"
+        style={{
+          width: chartWidth,
+          backgroundImage: "linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px)",
+          backgroundSize: `${dayWidth}px 100%`,
+        }}
+      >
+        {task.isUnscheduled ? (
+          <div className="absolute top-1/2 ml-4 flex h-8 -translate-y-1/2 items-center rounded-md border border-dashed bg-background px-3 text-xs font-semibold text-muted-foreground">
+            Needs due date
+          </div>
+        ) : (
+          <div
+            className={`${priorityColors[task.priority]} absolute top-1/2 flex h-8 -translate-y-1/2 items-center rounded-md px-3 shadow-sm`}
+            style={{ left, width: Math.min(width, Math.max(80, chartWidth - left)) }}
+          >
+            <span className="truncate text-xs font-semibold text-white">
+              {task.title}
+            </span>
+            <span className="ml-auto shrink-0 pl-2 text-[10px] font-bold text-white/90">
+              {task.inferred_end ? format(task.inferred_end, "MMM d") : ""}
+            </span>
+          </div>
+        )}
+        {task.isOverdue && task.inferred_end && (
+          <div className="absolute top-2 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700" style={{ left: Math.min(chartWidth - 72, left + width + 8) }}>
+            Late
+          </div>
+        )}
+      </div>
+    </button>
+  );
+}

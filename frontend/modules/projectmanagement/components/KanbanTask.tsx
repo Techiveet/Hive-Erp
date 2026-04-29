@@ -10,6 +10,7 @@ import { format } from "date-fns";
 interface KanbanTaskProps {
   task: Task;
   onOpen?: (task: Task) => void;
+  isDone?: boolean;
 }
 
 const priorityColors: Record<string, string> = {
@@ -19,7 +20,7 @@ const priorityColors: Record<string, string> = {
   urgent: "text-red-500",
 };
 
-export const KanbanTask: React.FC<KanbanTaskProps> = ({ task, onOpen }) => {
+export const KanbanTask: React.FC<KanbanTaskProps> = ({ task, onOpen, isDone }) => {
   const {
     attributes,
     listeners,
@@ -40,6 +41,11 @@ export const KanbanTask: React.FC<KanbanTaskProps> = ({ task, onOpen }) => {
     transform: CSS.Translate.toString(transform),
   };
 
+  const isOverdue = 
+    !isDone && 
+    task.due_date && 
+    new Date(task.due_date) < new Date();
+
   if (isDragging) {
     return (
       <div
@@ -59,13 +65,13 @@ export const KanbanTask: React.FC<KanbanTaskProps> = ({ task, onOpen }) => {
       className="group"
       onClick={() => onOpen?.(task)}
     >
-      <Card className="mb-3 cursor-grab active:cursor-grabbing hover:border-primary/50 transition-all duration-200 border-muted-foreground/10 shadow-sm hover:shadow-md">
+      <Card className={`mb-3 cursor-grab active:cursor-grabbing hover:border-primary/50 transition-all duration-200 border-muted-foreground/10 shadow-sm hover:shadow-md ${isOverdue ? 'border-red-500/30' : ''}`}>
         <CardContent className="p-3 space-y-3">
           <div className="flex justify-between items-start gap-2">
-            <h4 className="text-sm font-semibold leading-tight line-clamp-2">
+            <h4 className={`text-sm font-semibold leading-tight line-clamp-2 ${isOverdue ? 'text-red-500' : ''}`}>
               {task.title}
             </h4>
-            <Flag className={`h-3.5 w-3.5 shrink-0 ${priorityColors[task.priority]}`} />
+            <Flag className={`h-3.5 w-3.5 shrink-0 ${priorityColors[task.priority]} ${isOverdue ? 'animate-pulse' : ''}`} />
           </div>
 
           {task.description && (
@@ -76,14 +82,14 @@ export const KanbanTask: React.FC<KanbanTaskProps> = ({ task, onOpen }) => {
 
           <div className="flex flex-wrap items-center gap-3 pt-1">
             {task.due_date && (
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+              <div className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${isOverdue ? 'text-red-500 bg-red-500/10 font-bold' : 'text-muted-foreground bg-muted/50'}`}>
                 <Calendar className="h-3 w-3" />
+                {isOverdue ? 'Overdue: ' : ''}
                 {format(new Date(task.due_date), "MMM d")}
               </div>
             )}
 
             <div className="flex items-center gap-3 ml-auto">
-               {/* Indicators like comments/checklists could go here */}
                <Avatar className="h-5 w-5">
                 <AvatarImage src={task.assignee?.avatar_path || undefined} />
                 <AvatarFallback className="text-[8px]">
