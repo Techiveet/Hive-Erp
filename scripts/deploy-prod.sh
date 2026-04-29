@@ -490,7 +490,7 @@ DEPLOY_STEP="Waiting for caddy"
 wait_for_service caddy
 
 DEPLOY_STEP="Validating Caddy config"
-compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
+compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile 2>&1
 
 DEPLOY_STEP="Listing Compose services"
 compose ps

@@ -1,49 +1,49 @@
 {
-    on_demand_tls {
-        ask http://backend:8000/api/internal/caddy/allow-domain
-    }
+	on_demand_tls {
+		ask http://backend:8000/api/internal/caddy/allow-domain
+	}
 }
 
 {$FRONTEND_DOMAIN} {
-    encode zstd gzip
-    reverse_proxy frontend:3000
+	encode zstd gzip
+	reverse_proxy frontend:3000
 }
 
 {$BACKEND_DOMAIN} {
-    encode zstd gzip
-    reverse_proxy backend:8000
+	encode zstd gzip
+	reverse_proxy backend:8000
 }
 
 {$REVERB_DOMAIN} {
-    encode zstd gzip
-    reverse_proxy reverb:9000
+	encode zstd gzip
+	reverse_proxy reverb:9000
 }
 
 {$HORIZON_DOMAIN} {
-    encode zstd gzip
-    reverse_proxy backend:8000
+	encode zstd gzip
+	reverse_proxy backend:8000
 }
 
 {$MEILISEARCH_DOMAIN} {
-    encode zstd gzip
-    reverse_proxy meilisearch:7700
+	encode zstd gzip
+	reverse_proxy meilisearch:7700
 }
 
 {$REMBG_DOMAIN} {
-    encode zstd gzip
-    reverse_proxy rembg:5000
+	encode zstd gzip
+	reverse_proxy rembg:5000
 }
 
 {$GOTENBERG_DOMAIN} {
-    encode zstd gzip
-    reverse_proxy gotenberg:3000
+	encode zstd gzip
+	reverse_proxy gotenberg:3000
 }
 
 https:// {
-    tls {
-        on_demand
-    }
+	tls {
+		on_demand
+	}
 
-    encode zstd gzip
-    reverse_proxy frontend:3000
+	encode zstd gzip
+	reverse_proxy frontend:3000
 }
