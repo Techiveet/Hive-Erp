@@ -217,6 +217,8 @@ return [
             base_path('Modules/Workflow/database/migrations'),
             base_path('Modules/Inventory/database/migrations'),
             base_path('Modules/ProjectManagement/database/migrations'),
+            base_path('Modules/Hospitality/database/migrations'),
+            base_path('Modules/Warehouse/database/migrations'),
         ],
         '--realpath' => true,
     ],

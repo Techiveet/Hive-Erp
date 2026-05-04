@@ -246,6 +246,7 @@ export default function BusinessTypesPage() {
       </div>
 
       <DataTable
+        key={businessTypes.length}
         columns={columns}
         data={businessTypes}
         totalEntries={totalEntries}
