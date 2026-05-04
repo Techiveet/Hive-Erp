@@ -1,9 +1,11 @@
 "use client";
 
-import React from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Pencil, Trash2, Save, Building2 } from "lucide-react";
+import React, { useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
+import { Loader2, Plus, Pencil, Save, Building2, Search } from "lucide-react";
 import { toast } from "sonner";
+import { useDebounce } from "@/hooks/use-debounce";
 
 import { DataTable } from "@/components/datatable/data-table";
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "@/store/use-translation";
 import { getAuthHeaders, getBackendApiRoot } from "@/lib/runtime-context";
+import type { ColumnDef } from "@tanstack/react-table";
 
 type BusinessType = {
   key: string;
@@ -54,78 +57,116 @@ const DEFAULT_TYPES: BusinessType[] = [
 export default function BusinessTypesPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
 
-  const [form, setForm] = React.useState<FormState>(DEFAULT_FORM);
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [editingKey, setEditingKey] = React.useState<string | null>(null);
+  const page = parseInt(searchParams.get("page") || "0", 10);
+  const size = parseInt(searchParams.get("size") || "10", 10);
+  const search = searchParams.get("search") || "";
+  const sortCol = searchParams.get("sortCol") || "label";
+  const sortDir = searchParams.get("sortDir") || "asc";
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["settings", "landing-templates"],
+  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  const [isOpen, setIsOpen] = useState(false);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+
+  const [localSearch, setLocalSearch] = useState(search);
+  const debouncedSearch = useDebounce(localSearch, 400);
+
+  const [selectedRows, setSelectedRows] = useState<Record<string, boolean>>({});
+
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ["settings", "business-types", page, size, debouncedSearch, sortCol, sortDir],
     queryFn: async () => {
-      const url = `${getBackendApiRoot()}/settings/landing-templates`;
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("size", String(size));
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      params.set("sortCol", sortCol);
+      params.set("sortDir", sortDir);
+
+      const url = `${getBackendApiRoot()}/settings/landing-templates?${params.toString()}`;
       const headers = getAuthHeaders();
-      console.log("[BusinessTypes] Fetching from:", url);
       const res = await fetch(url, { headers });
       const json = await res.json();
-      console.log("[BusinessTypes] Fetched data:", JSON.stringify(json, null, 2));
-      return (json?.data?.business_types ?? DEFAULT_TYPES) as BusinessType[];
+      return json;
     },
   });
 
-  const saveMutation = useMutation({
-    mutationFn: async (types: BusinessType[]) => {
-      const url = `${getBackendApiRoot()}/settings/landing-templates`;
-      const headers = getAuthHeaders({ "Content-Type": "application/json" });
-      const payload = { business_types: types };
-      console.log("[BusinessTypes] Saving to:", url);
-      console.log("[BusinessTypes] Payload:", JSON.stringify(payload, null, 2));
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
+  const businessTypes = data?.data?.business_types ?? data?.business_types ?? DEFAULT_TYPES;
+  const totalEntries = data?.total ?? businessTypes.length;
+
+  const saveMutation = useQueryClient({
+    queryKey: ["settings", "business-types"]
+  });
+
+  const handleSave = useCallback(async (types: BusinessType[]) => {
+    const url = `${getBackendApiRoot()}/settings/landing-templates`;
+    const headers = getAuthHeaders({ "Content-Type": "application/json" });
+    const payload = { business_types: types };
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.message || `Failed to save (${res.status})`);
+    }
+    return res.json();
+  }, []);
+
+  const handleQueryChange = useCallback((newParams: Record<string, unknown>) => {
+    const params = new URLSearchParams();
+    if (newParams.page !== undefined) params.set("page", String(newParams.page));
+    if (newParams.size !== undefined) params.set("size", String(newParams.size));
+    if (newParams.search !== undefined && newParams.search) params.set("search", String(newParams.search));
+    if (newParams.sortCol) params.set("sortCol", String(newParams.sortCol));
+    if (newParams.sortDir) params.set("sortDir", String(newParams.sortDir));
+
+    const newUrl = `/dashboard/settings/business-types?${params.toString()}`;
+    window.history.pushState({}, "", newUrl);
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  const handleDeleteRows = useCallback(async (rows: BusinessType[]) => {
+    const keysToDelete = rows.map(r => r.key);
+    const newTypes = businessTypes.filter(bt => !keysToDelete.includes(bt.key));
+    await handleSave(newTypes);
+    queryClient.setQueryData(["settings", "business-types", page, size, debouncedSearch, sortCol, sortDir], {
+      ...data,
+      data: { business_types: newTypes },
+      total: newTypes.length
+    });
+    toast.success(`Deleted ${rows.length} business type(s)`);
+  }, [businessTypes, handleSave, queryClient, data, page, size, debouncedSearch, sortCol, sortDir]);
+
+  const handleSubmit = async () => {
+    let newTypes: BusinessType[];
+    if (editingKey) {
+      newTypes = businessTypes.map((bt) =>
+        bt.key === editingKey ? { key: form.key, label: form.label, description: form.description, icon: form.icon } : bt
+      );
+    } else {
+      newTypes = [...businessTypes, { key: form.key, label: form.label, description: form.description, icon: form.icon }];
+    }
+
+    try {
+      await handleSave(newTypes);
+      queryClient.setQueryData(["settings", "business-types", page, size, debouncedSearch, sortCol, sortDir], {
+        ...data,
+        data: { business_types: newTypes },
+        total: newTypes.length
       });
-      const responseData = await res.json().catch(() => ({}));
-      console.log("[BusinessTypes] Response status:", res.status);
-      console.log("[BusinessTypes] Response body:", JSON.stringify(responseData, null, 2));
-      if (!res.ok) {
-        console.log("[BusinessTypes] Error response:", responseData);
-        throw new Error(responseData.message || `Failed to save (${res.status})`);
-      }
-      return responseData;
-    },
-    onSuccess: (data) => {
-      console.log("[BusinessTypes] Saved successfully:", data);
-      // After save, directly update the cache with new types
-      const newTypes = data?.data?.business_types || data;
-      if (Array.isArray(newTypes)) {
-        queryClient.setQueryData(["settings", "landing-templates"], newTypes);
-      } else {
-        queryClient.invalidateQueries({ queryKey: ["settings", "landing-templates"] });
-      }
-      // Also invalidate tenant-subscription-catalog so tenants page refreshes
-      queryClient.invalidateQueries({ queryKey: ["tenant-subscription-catalog"] });
-      queryClient.invalidateQueries({ queryKey: ["settings", "landing-templates"] });
       toast.success("Business types saved successfully");
       setIsOpen(false);
       setForm(DEFAULT_FORM);
       setEditingKey(null);
-    },
-    onError: (error: Error) => {
-      console.error("[BusinessTypes] Save error:", error);
-      toast.error(error.message || "Failed to save business types");
-    },
-  });
-
-  const businessTypes = data ?? DEFAULT_TYPES;
-
-  const handleSubmit = () => {
-    const newTypes = editingKey
-      ? businessTypes.map((bt) => (bt.key === editingKey ? { key: form.key, label: form.label, description: form.description, icon: form.icon } : bt))
-      : [...businessTypes, { key: form.key, label: form.label, description: form.description, icon: form.icon }];
-
-    // Optimistically update the cache before mutation
-    queryClient.setQueryData(["settings", "landing-templates"], newTypes);
-    saveMutation.mutate(newTypes);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save");
+    }
   };
 
   const handleEdit = (bt: BusinessType) => {
@@ -134,17 +175,96 @@ export default function BusinessTypesPage() {
     setIsOpen(true);
   };
 
-  const handleDelete = (key: string) => {
-    if (confirm("Delete this business type?")) {
-      saveMutation.mutate(businessTypes.filter((bt) => bt.key !== key));
+  const handleDelete = async (key: string) => {
+    const newTypes = businessTypes.filter((bt) => bt.key !== key);
+    try {
+      await handleSave(newTypes);
+      queryClient.setQueryData(["settings", "business-types", page, size, debouncedSearch, sortCol, sortDir], {
+        ...data,
+        data: { business_types: newTypes },
+        total: newTypes.length
+      });
+      toast.success("Business type deleted");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete");
     }
   };
 
-  const columns = [
+  const handleCopy = useCallback(() => {
+    const tableText = businessTypes
+      .map((bt, i) => `${i + 1}. ${bt.label} (${bt.key}): ${bt.description}`)
+      .join("\n");
+    navigator.clipboard.writeText(tableText);
+    toast.success("Business types copied to clipboard");
+  }, [businessTypes]);
+
+  const handlePrint = useCallback(() => {
+    const printWindow = window.open("", "_blank", "width=800,height=600");
+    if (!printWindow) return;
+    
+    const html = `
+      <html>
+        <head><title>Business Types</title></head>
+        <body style="font-family: system-ui; padding: 40px;">
+          <h1 style="margin-bottom: 20px;">Business Types</h1>
+          <table border="1" cellpadding="10" style="width: 100%; border-collapse: collapse;">
+            <thead><tr style="background: #f3f4f6;"><th>#</th><th>Label</th><th>Key</th><th>Description</th></tr></thead>
+            <tbody>
+              ${businessTypes.map((bt, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td><strong>${bt.label}</strong></td>
+                  <td><code>${bt.key}</code></td>
+                  <td>${bt.description}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.print();
+  }, [businessTypes]);
+
+  const handleExport = useCallback(async (format: string) => {
+    const exportData = businessTypes.map((bt, i) => ({
+      "#": i + 1,
+      "Label": bt.label,
+      "Key": bt.key,
+      "Description": bt.description,
+      "Icon": bt.icon,
+    }));
+
+    if (format === "csv") {
+      const headers = Object.keys(exportData[0] || {}).join(",");
+      const rows = exportData.map(row => Object.values(row).map(v => `"${v}"`).join(",")).join("\n");
+      const blob = new Blob([headers + "\n" + rows], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "business-types.csv";
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("Exported to CSV");
+    } else if (format === "json") {
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "business-types.json";
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("Exported to JSON");
+    }
+  }, [businessTypes]);
+
+  const columns: ColumnDef<BusinessType>[] = [
     {
       accessorKey: "label",
       header: "Business Type",
-      cell: ({ row }: any) => (
+      cell: ({ row }) => (
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
             <Building2 className="h-5 w-5 text-primary" />
@@ -159,23 +279,32 @@ export default function BusinessTypesPage() {
     {
       accessorKey: "description",
       header: "Description",
-      cell: ({ row }: any) => <span className="text-sm text-muted-foreground">{row.original.description}</span>,
+      cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.description}</span>,
+    },
+    {
+      accessorKey: "icon",
+      header: "Icon",
+      cell: ({ row }) => <code className="text-xs bg-muted px-2 py-1 rounded">{row.original.icon}</code>,
     },
     {
       id: "actions",
       header: "Actions",
-      cell: ({ row }: any) => (
+      size: 100,
+      cell: ({ row }) => (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => handleEdit(row.original)}>
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="outline" className="text-red-500" onClick={() => handleDelete(row.original.key)}>
-            <Trash2 className="h-4 w-4" />
+          <Button size="sm" variant="outline" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(row.original.key)}>
+            <span className="sr-only">Delete</span>
+            ×
           </Button>
         </div>
       ),
     },
   ];
+
+  const exportUrl = `${getBackendApiRoot()}/settings/landing-templates/export?search=${encodeURIComponent(search)}&sortCol=${sortCol}&sortDir=${sortDir}`;
 
   return (
     <div className="space-y-6 p-6">
@@ -193,10 +322,31 @@ export default function BusinessTypesPage() {
       <DataTable
         columns={columns}
         data={businessTypes}
-        totalEntries={businessTypes.length}
+        totalEntries={totalEntries}
         loading={isLoading}
+        loadingExtra={isFetching}
+        pageIndex={page}
+        pageSize={size}
+        pageSizeOptions={[10, 25, 50, 100]}
+        onQueryChange={handleQueryChange}
         searchPlaceholder="Search business types..."
-        onQueryChange={() => {}}
+        searchValue={localSearch}
+        onSearchChange={setLocalSearch}
+        enableRowSelection={true}
+        selectedRowIds={selectedRows}
+        onSelectionChange={(rows) => setSelectedRows(rows)}
+        onDeleteRows={handleDeleteRows}
+        onRefresh={handleRefresh}
+        exportEndpoint={exportUrl}
+        resourceName="business-types"
+        syncWithUrl={true}
+        onCopy={handleCopy}
+        onPrint={handlePrint}
+        onExport={handleExport}
+        canCopy={true}
+        canExport={true}
+        canPrint={true}
+        canRefresh={true}
       />
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -234,12 +384,19 @@ export default function BusinessTypesPage() {
                 placeholder="Brief description of this business type"
               />
             </div>
+            <div className="space-y-2">
+              <Label>Icon</Label>
+              <Input
+                value={form.icon}
+                onChange={(e) => setForm({ ...form, icon: e.target.value })}
+                placeholder="e.g. building-2, hotel, utensils"
+              />
+            </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={!form.key || !form.label || saveMutation.isPending}>
-              {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button onClick={handleSubmit} disabled={!form.key || !form.label}>
               <Save className="mr-2 h-4 w-4" />
               Save
             </Button>
