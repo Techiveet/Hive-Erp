@@ -5,6 +5,7 @@ namespace Modules\Core\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Core\Support\BrandSettingsStore;
 use Modules\Tenancy\Support\TenantLandingTemplateCatalog;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -12,6 +13,7 @@ class TenantLandingTemplateSettingsController extends Controller
 {
     public function __construct(
         protected TenantLandingTemplateCatalog $landingTemplates,
+        protected BrandSettingsStore $brandSettingsStore,
     ) {
     }
 
@@ -64,7 +66,7 @@ class TenantLandingTemplateSettingsController extends Controller
         }, $businessTypes, array_keys($businessTypes));
 
         if (in_array($type, ['copy', 'print'])) {
-            $branding = get_brand_settings();
+            $branding = $this->brandSettingsStore->getProtectedSettings();
             return response()->json([
                 'data' => $exportData,
                 'branding' => [
@@ -72,7 +74,7 @@ class TenantLandingTemplateSettingsController extends Controller
                     'footer_text' => $branding['footer_text'] ?? 'HIVE.OS',
                     'document_header_color' => $branding['document_header_color'] ?? '#1E293B',
                     'company_tax_id' => $branding['company_tax_id'] ?? null,
-                    'logo_url' => $branding['logo_url'] ?? null,
+                    'logo_url' => $branding['logo_light'] ?? null,
                 ],
                 'exported_at' => now()->toIso8601String(),
                 'total' => count($exportData),
