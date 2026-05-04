@@ -195,6 +195,30 @@ class BusinessTypeSeeder extends Seeder
                 ],
             ],
             [
+                'key'         => 'nightclub',
+                'label'       => 'Nightclub',
+                'description' => 'High-energy nightlife template for events, guest lists, and VIP experiences.',
+                'icon'        => 'music',
+            ],
+            [
+                'key'         => 'bar',
+                'label'       => 'Bar',
+                'description' => 'Casual bar template for drinks, events, and social gatherings.',
+                'icon'        => 'wine',
+            ],
+            [
+                'key'         => 'cafe',
+                'label'       => 'Café',
+                'description' => 'Cozy café template for coffee, pastries, and relaxed dining experiences.',
+                'icon'        => 'coffee',
+            ],
+            [
+                'key'         => 'lounge',
+                'label'       => 'Lounge',
+                'description' => 'Sophisticated lounge template for upscale drinks, small plates, and private events.',
+                'icon'        => 'armchair',
+            ],
+            [
                 'key'         => 'hotel',
                 'label'       => 'Hotel',
                 'description' => 'Premium hospitality layout for rooms, amenities, and concierge-ready booking flows.',
