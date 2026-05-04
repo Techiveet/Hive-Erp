@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Modules\Core\Support\BrandSettingsStore;
 use Modules\Tenancy\Support\TenantLandingTemplateCatalog;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class TenantLandingTemplateSettingsController extends Controller
 {
@@ -53,7 +54,7 @@ class TenantLandingTemplateSettingsController extends Controller
     public function export(Request $request): StreamedResponse|JsonResponse
     {
         $businessTypes = $this->landingTemplates->businessTypesPayload();
-        $type = $request->get('type', 'csv');
+        $type = $request->get('type', $request->get('format', 'csv'));
 
         $exportData = array_map(function ($type, $index) {
             return [
@@ -81,9 +82,48 @@ class TenantLandingTemplateSettingsController extends Controller
             ]);
         }
 
+        $branding = $this->brandSettingsStore->getProtectedSettings();
+        $appTitle = $branding['app_title'] ?? 'HIVE.OS';
+        $headerColor = $branding['document_header_color'] ?? '#1E293B';
+        $companyTaxId = $branding['company_tax_id'] ?? '';
+        $footerText = $branding['footer_text'] ?? 'HIVE.OS';
+        $logoUrl = $branding['logo_light'] ?? null;
+
+        if ($type === 'pdf') {
+            $pdf = Pdf::loadView('core::exports.generic-table-export', [
+                'title' => 'Business Types',
+                'headers' => ['#', 'Key', 'Label', 'Description', 'Icon'],
+                'rows' => $exportData,
+                'appTitle' => $appTitle,
+                'headerColor' => $headerColor,
+                'companyTaxId' => $companyTaxId,
+                'footerText' => $footerText,
+                'logoUrl' => $logoUrl,
+                'generatedAt' => now()->format('Y-m-d H:i:s'),
+            ]);
+            return $pdf->download("business-types-" . date('Y-m-d') . ".pdf");
+        }
+
+        if (in_array($type, ['xlsx', 'excel'])) {
+            $headers = ['#', 'Key', 'Label', 'Description', 'Icon'];
+            $rows = array_map(fn($row) => array_values($row), $exportData);
+            $callback = function () use ($headers, $rows) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, $headers);
+                foreach ($rows as $row) {
+                    fputcsv($handle, $row);
+                }
+                fclose($handle);
+            };
+            return response()->stream($callback, 200, [
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => 'attachment; filename="business-types-' . date('Y-m-d') . '.csv"',
+            ]);
+        }
+
+        // Default to CSV
         $headers = ['#', 'Key', 'Label', 'Description', 'Icon'];
         $rows = array_map(fn($row) => array_values($row), $exportData);
-
         $callback = function () use ($headers, $rows) {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, $headers);
@@ -92,7 +132,6 @@ class TenantLandingTemplateSettingsController extends Controller
             }
             fclose($handle);
         };
-
         return response()->stream($callback, 200, [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="business-types-' . date('Y-m-d') . '.csv"',
