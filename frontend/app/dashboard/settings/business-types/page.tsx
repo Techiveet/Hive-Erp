@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { Loader2, Plus, Pencil, Save, Building2, Search } from "lucide-react";
+import { Plus, Pencil, Save, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { useDebounce } from "@/hooks/use-debounce";
 
@@ -94,10 +94,6 @@ export default function BusinessTypesPage() {
 
   const businessTypes = data?.data?.business_types ?? data?.business_types ?? DEFAULT_TYPES;
   const totalEntries = data?.total ?? businessTypes.length;
-
-  const saveMutation = useQueryClient({
-    queryKey: ["settings", "business-types"]
-  });
 
   const handleSave = useCallback(async (types: BusinessType[]) => {
     const url = `${getBackendApiRoot()}/settings/landing-templates`;
@@ -190,76 +186,6 @@ export default function BusinessTypesPage() {
     }
   };
 
-  const handleCopy = useCallback(() => {
-    const tableText = businessTypes
-      .map((bt, i) => `${i + 1}. ${bt.label} (${bt.key}): ${bt.description}`)
-      .join("\n");
-    navigator.clipboard.writeText(tableText);
-    toast.success("Business types copied to clipboard");
-  }, [businessTypes]);
-
-  const handlePrint = useCallback(() => {
-    const printWindow = window.open("", "_blank", "width=800,height=600");
-    if (!printWindow) return;
-    
-    const html = `
-      <html>
-        <head><title>Business Types</title></head>
-        <body style="font-family: system-ui; padding: 40px;">
-          <h1 style="margin-bottom: 20px;">Business Types</h1>
-          <table border="1" cellpadding="10" style="width: 100%; border-collapse: collapse;">
-            <thead><tr style="background: #f3f4f6;"><th>#</th><th>Label</th><th>Key</th><th>Description</th></tr></thead>
-            <tbody>
-              ${businessTypes.map((bt, i) => `
-                <tr>
-                  <td>${i + 1}</td>
-                  <td><strong>${bt.label}</strong></td>
-                  <td><code>${bt.key}</code></td>
-                  <td>${bt.description}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `;
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.print();
-  }, [businessTypes]);
-
-  const handleExport = useCallback(async (format: string) => {
-    const exportData = businessTypes.map((bt, i) => ({
-      "#": i + 1,
-      "Label": bt.label,
-      "Key": bt.key,
-      "Description": bt.description,
-      "Icon": bt.icon,
-    }));
-
-    if (format === "csv") {
-      const headers = Object.keys(exportData[0] || {}).join(",");
-      const rows = exportData.map(row => Object.values(row).map(v => `"${v}"`).join(",")).join("\n");
-      const blob = new Blob([headers + "\n" + rows], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "business-types.csv";
-      a.click();
-      window.URL.revokeObjectURL(url);
-      toast.success("Exported to CSV");
-    } else if (format === "json") {
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "business-types.json";
-      a.click();
-      window.URL.revokeObjectURL(url);
-      toast.success("Exported to JSON");
-    }
-  }, [businessTypes]);
-
   const columns: ColumnDef<BusinessType>[] = [
     {
       accessorKey: "label",
@@ -339,13 +265,6 @@ export default function BusinessTypesPage() {
         exportEndpoint={exportUrl}
         resourceName="business-types"
         syncWithUrl={true}
-        onCopy={handleCopy}
-        onPrint={handlePrint}
-        onExport={handleExport}
-        canCopy={true}
-        canExport={true}
-        canPrint={true}
-        canRefresh={true}
       />
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

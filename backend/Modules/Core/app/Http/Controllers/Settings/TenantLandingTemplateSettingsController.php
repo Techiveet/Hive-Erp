@@ -51,26 +51,36 @@ class TenantLandingTemplateSettingsController extends Controller
     public function export(Request $request): StreamedResponse|JsonResponse
     {
         $businessTypes = $this->landingTemplates->businessTypesPayload();
-        $format = $request->get('format', 'csv');
+        $type = $request->get('type', 'csv');
 
-        if ($format === 'json') {
+        $exportData = array_map(function ($type, $index) {
+            return [
+                '#' => $index + 1,
+                'key' => $type['key'] ?? '',
+                'label' => $type['label'] ?? '',
+                'description' => $type['description'] ?? '',
+                'icon' => $type['icon'] ?? '',
+            ];
+        }, $businessTypes, array_keys($businessTypes));
+
+        if (in_array($type, ['copy', 'print'])) {
+            $branding = get_brand_settings();
             return response()->json([
-                'data' => $businessTypes,
+                'data' => $exportData,
+                'branding' => [
+                    'app_title' => $branding['app_title'] ?? 'HIVE.OS',
+                    'footer_text' => $branding['footer_text'] ?? 'HIVE.OS',
+                    'document_header_color' => $branding['document_header_color'] ?? '#1E293B',
+                    'company_tax_id' => $branding['company_tax_id'] ?? null,
+                    'logo_url' => $branding['logo_url'] ?? null,
+                ],
                 'exported_at' => now()->toIso8601String(),
-                'total' => count($businessTypes),
+                'total' => count($exportData),
             ]);
         }
 
         $headers = ['#', 'Key', 'Label', 'Description', 'Icon'];
-        $rows = array_map(function ($type, $index) {
-            return [
-                $index + 1,
-                $type['key'] ?? '',
-                $type['label'] ?? '',
-                $type['description'] ?? '',
-                $type['icon'] ?? '',
-            ];
-        }, $businessTypes, array_keys($businessTypes));
+        $rows = array_map(fn($row) => array_values($row), $exportData);
 
         $callback = function () use ($headers, $rows) {
             $handle = fopen('php://output', 'w');
