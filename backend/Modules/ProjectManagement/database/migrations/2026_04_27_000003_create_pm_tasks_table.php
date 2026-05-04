@@ -13,9 +13,18 @@ return new class extends Migration
                 $table->uuid('id')->primary();
                 $table->foreignUuid('project_id')->constrained('pm_projects')->onDelete('cascade');
                 $table->foreignUuid('column_id')->constrained('pm_columns')->onDelete('cascade');
+                
                 $table->string('title');
-                $table->text('description')->nullable();
+                
+                // FIX: Removed ->change(). Defined directly as longText for Base64 signatures.
+                $table->longText('description');
+                
+                // NEW UI FIELDS: Tags, Progress, and Effort
+                $table->json('tags')->nullable();
                 $table->string('priority')->default('medium');
+                $table->integer('progress')->default(0);
+                $table->string('effort')->nullable();
+                
                 $table->date('due_date')->nullable();
                 $table->foreignId('assigned_to')->nullable()->constrained('users');
                 $table->foreignId('created_by')->constrained('users');

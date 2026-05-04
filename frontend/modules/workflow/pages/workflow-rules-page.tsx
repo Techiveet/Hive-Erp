@@ -38,10 +38,10 @@ const APPROVABLE_MODELS = [
   // Identity Module
   { label: "Identity → User", value: "Modules\\Identity\\Models\\User" },
   { label: "Identity → Role", value: "Modules\\Identity\\Models\\Role" },
-  // NightClub Module
-  { label: "NightClub → Reservation", value: "Modules\\NightClub\\Models\\Reservation" },
-  { label: "NightClub → ServiceOrder", value: "Modules\\NightClub\\Models\\ServiceOrder" },
-  { label: "NightClub → Table", value: "Modules\\NightClub\\Models\\Table" },
+  // Hospitality Module
+  { label: "Hospitality → Reservation", value: "Modules\\Hospitality\\Models\\Reservation" },
+  { label: "Hospitality → ServiceOrder", value: "Modules\\Hospitality\\Models\\ServiceOrder" },
+  { label: "Hospitality → Table", value: "Modules\\Hospitality\\Models\\Table" },
   // Chat Module
   { label: "Chat → Conversation", value: "Modules\\Chat\\Models\\Conversation" },
   // MailBox Module

@@ -34,21 +34,39 @@ class EnsureTenantModuleEnabled
         $current = $this->subscriptions->currentForTenant($tenant);
         $status = $current['status'];
 
-        if (in_array($status, ['active', 'grace_period'], true) && TenantModuleCatalog::isModuleActive(
-            $current['module_subscriptions'] ?? null,
-            $moduleSlug,
-            $tenant->plan
-        )) {
-            return $next($request);
+        $moduleSlugs = collect(preg_split('/[|,]/', $moduleSlug) ?: [])
+            ->map(fn (string $slug) => trim($slug))
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($moduleSlugs === []) {
+            $moduleSlugs = [$moduleSlug];
+        }
+
+        if (in_array($status, TenantSubscriptionService::ACCESS_STATUSES, true)) {
+            foreach ($moduleSlugs as $candidateSlug) {
+                if (TenantModuleCatalog::isModuleActive(
+                    $current['module_subscriptions'] ?? null,
+                    $candidateSlug,
+                    $tenant->plan
+                )) {
+                    return $next($request);
+                }
+            }
         }
 
         $catalog = TenantModuleCatalog::catalogMap();
-        $module = $catalog[$moduleSlug] ?? ['slug' => $moduleSlug, 'name' => Str::headline($moduleSlug)];
+        $primaryModuleSlug = $moduleSlugs[0] ?? $moduleSlug;
+        $module = $catalog[$primaryModuleSlug] ?? ['slug' => $primaryModuleSlug, 'name' => Str::headline($primaryModuleSlug)];
+        $moduleNames = collect($moduleSlugs)
+            ->map(fn (string $slug) => $catalog[$slug]['name'] ?? Str::headline($slug))
+            ->join(', ', ' or ');
 
         return response()->json([
             'message' => $status === 'expired'
                 ? "The tenant subscription expired on {$current['expires_at']}. Renew it to restore module access."
-                : "{$module['name']} is not active for this tenant subscription.",
+                : "{$moduleNames} is not active for this tenant subscription.",
             'code' => $status === 'expired'
                 ? 'TENANT_SUBSCRIPTION_EXPIRED'
                 : 'TENANT_MODULE_SUBSCRIPTION_REQUIRED',

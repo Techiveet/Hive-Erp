@@ -101,6 +101,7 @@ foreach ($centralDomains as $domain) {
                 Route::post('/payments', [PaymentGatewaySettingsController::class, 'store'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
                 Route::get('/landing-templates', [TenantLandingTemplateSettingsController::class, 'index'])->middleware('permission:manage_tenants|provision_tenants,sanctum');
                 Route::post('/landing-templates', [TenantLandingTemplateSettingsController::class, 'store'])->middleware('permission:manage_tenants|provision_tenants,sanctum');
+                Route::get('/landing-templates/export', [TenantLandingTemplateSettingsController::class, 'export'])->middleware('permission:manage_tenants|provision_tenants,sanctum');
                 Route::get('/direct-transfer/reviews', [DirectTransferReviewController::class, 'index'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
                 Route::post('/direct-transfer/reviews/{orderId}/approve', [DirectTransferReviewController::class, 'approve'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
                 Route::post('/direct-transfer/reviews/{orderId}/reject', [DirectTransferReviewController::class, 'reject'])->middleware('permission:manage_payment_settings|manage_general_settings|manage_tenants,sanctum');
@@ -133,7 +134,7 @@ foreach ($centralDomains as $domain) {
                 Route::post('/publish', [LocalizationController::class, 'publishTranslations'])->middleware('permission:manage_localization,sanctum');
             });
 
-            Route::prefix('files')->middleware('tenant_module:media_library')->group(function () {
+            Route::prefix('files')->middleware('tenant_module:file_manager|media_library|video_player|audio_player')->group(function () {
                 Route::get('/', [FileManagerController::class, 'index'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
                 Route::post('/folder', [FileManagerController::class, 'createFolder'])->middleware('permission:manage_storage,sanctum');
                 Route::post('/upload', [FileManagerController::class, 'uploadFile'])->middleware('permission:manage_storage,sanctum');
@@ -254,7 +255,7 @@ Route::middleware([
             Route::post('/publish', [LocalizationController::class, 'publishTranslations'])->middleware('permission:manage_localization,sanctum');
         });
 
-        Route::prefix('files')->middleware('tenant_module:media_library')->group(function () {
+        Route::prefix('files')->middleware('tenant_module:file_manager|media_library|video_player|audio_player')->group(function () {
             Route::get('/', [FileManagerController::class, 'index'])->middleware('permission:view_storage|manage_storage|edit_profile|manage_brand_settings,sanctum');
             Route::post('/folder', [FileManagerController::class, 'createFolder'])->middleware('permission:manage_storage,sanctum');
             Route::post('/upload', [FileManagerController::class, 'uploadFile'])->middleware('permission:manage_storage,sanctum');
@@ -279,7 +280,7 @@ Route::middleware([
             Route::delete('/{type}/{id}', [FileManagerController::class, 'destroy'])->whereIn('type', ['file', 'folder'])->middleware('permission:manage_storage,sanctum');
         });
 
-        Route::prefix('playlists')->middleware('tenant_module:media_library')->group(function () {
+        Route::prefix('playlists')->middleware('tenant_module:file_manager|media_library|video_player|audio_player')->group(function () {
             Route::get('/', [PlaylistController::class, 'index']);
             Route::post('/', [PlaylistController::class, 'store']);
             Route::put('/{id}', [PlaylistController::class, 'update']);

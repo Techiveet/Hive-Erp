@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, forwardRef, useImperativeHandle, useState } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import { Node, mergeAttributes, Extension } from '@tiptap/core';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
@@ -44,12 +44,124 @@ import {
   Baseline,
   Smile,
   Maximize2,
-  Minimize2
+  Minimize2,
+  X
 } from 'lucide-react';
 
 export interface RichTextEditorRef {
   insertMedia: (url: string, type: 'image' | 'video' | 'audio' | 'raw') => void;
 }
+
+const ImageNodeView = (props: any) => {
+  const { node, updateAttributes, deleteNode, selected } = props;
+  
+  return (
+    <NodeViewWrapper 
+      className={cn(
+        "relative inline-block group my-4", 
+        node.attrs.align === 'center' ? 'block mx-auto' : node.attrs.align === 'right' ? 'float-right ml-4' : 'float-left mr-4'
+      )}
+      style={{ width: node.attrs.width ? `${node.attrs.width}px` : 'auto', maxWidth: '100%' }}
+    >
+      <div className={cn("relative overflow-visible inline-block max-w-full", selected && "ring-2 ring-primary ring-offset-2 rounded-md")}>
+        <img 
+          src={node.attrs.src} 
+          alt={node.attrs.alt} 
+          className="rounded-md w-full h-auto max-w-full border shadow-sm"
+        />
+        
+        {/* Controls Overlay */}
+        <div className={cn(
+          "absolute -top-3 -right-3 flex gap-1 opacity-0 transition-opacity", 
+          selected && "opacity-100", 
+          "group-hover:opacity-100 z-10"
+        )}>
+          {/* Alignment controls */}
+          <div className="bg-background border shadow-sm rounded-md flex overflow-hidden">
+            <button 
+              className={cn("p-1 hover:bg-muted text-muted-foreground", node.attrs.align === 'left' && "bg-muted text-foreground")} 
+              onClick={(e) => { e.preventDefault(); updateAttributes({ align: 'left' }); }}
+              title="Align Left"
+              type="button"
+            >
+              <AlignLeft className="w-3.5 h-3.5" />
+            </button>
+            <button 
+              className={cn("p-1 hover:bg-muted text-muted-foreground", node.attrs.align === 'center' && "bg-muted text-foreground")} 
+              onClick={(e) => { e.preventDefault(); updateAttributes({ align: 'center' }); }}
+              title="Align Center"
+              type="button"
+            >
+              <AlignCenter className="w-3.5 h-3.5" />
+            </button>
+            <button 
+              className={cn("p-1 hover:bg-muted text-muted-foreground", node.attrs.align === 'right' && "bg-muted text-foreground")} 
+              onClick={(e) => { e.preventDefault(); updateAttributes({ align: 'right' }); }}
+              title="Align Right"
+              type="button"
+            >
+              <AlignRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          
+          <button 
+            onClick={(e) => { e.preventDefault(); deleteNode(); }} 
+            className="bg-destructive text-destructive-foreground p-1 rounded-md shadow-sm hover:opacity-90"
+            title="Remove"
+            type="button"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Resize Handle */}
+        <div className={cn(
+          "absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-primary rounded-full cursor-nwse-resize opacity-0 transition-opacity",
+          selected && "opacity-100",
+          "group-hover:opacity-100 z-10 shadow-sm border-2 border-background"
+        )}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const startX = e.clientX;
+          const startWidth = (e.currentTarget.parentElement?.querySelector('img') as HTMLImageElement)?.offsetWidth || 200;
+          
+          const onMouseMove = (moveEvent: MouseEvent) => {
+            const currentX = moveEvent.clientX;
+            const newWidth = Math.max(50, startWidth + (currentX - startX));
+            updateAttributes({ width: newWidth });
+          };
+          
+          const onMouseUp = () => {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+          };
+          
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', onMouseUp);
+        }}
+        />
+      </div>
+    </NodeViewWrapper>
+  );
+};
+
+const CustomImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+      },
+      align: {
+        default: 'center',
+      },
+    };
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ImageNodeView);
+  },
+});
 
 interface RichTextEditorProps {
   value: string;
@@ -162,7 +274,7 @@ const AudioExtension = Node.create({
   },
 });
 
-const MenuBar = ({ editor, onOpenMediaPicker, isFullscreen, toggleFullscreen }: { editor: any, onOpenMediaPicker?: () => void, isFullscreen: boolean, toggleFullscreen: () => void }) => {
+const MenuBar = ({ editor, onOpenMediaPicker, onOpenSignaturePad, isFullscreen, toggleFullscreen }: { editor: any, onOpenMediaPicker?: () => void, onOpenSignaturePad: () => void, isFullscreen: boolean, toggleFullscreen: () => void }) => {
   if (!editor) {
     return null;
   }
@@ -413,9 +525,16 @@ const MenuBar = ({ editor, onOpenMediaPicker, isFullscreen, toggleFullscreen }: 
         </PopoverContent>
       </Popover>
 
-      <SignaturePad 
-        onSave={(dataUrl) => editor.chain().focus().setImage({ src: dataUrl }).run()} 
-      />
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+        title="Add Signature"
+        type="button"
+        onClick={onOpenSignaturePad}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+      </Button>
 
       <div className="flex-1" />
       <Button 
@@ -435,6 +554,7 @@ const MenuBar = ({ editor, onOpenMediaPicker, isFullscreen, toggleFullscreen }: 
 export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
   ({ value, onChange, placeholder = "Write something...", className, onOpenMediaPicker }, ref) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isSignatureOpen, setIsSignatureOpen] = useState(false);
     
     const editor = useEditor({
       immediatelyRender: false,
@@ -473,7 +593,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         FontSize as any,
         Underline,
         Highlight,
-        Image.configure({
+        CustomImage.configure({
           inline: true,
           allowBase64: true,
           HTMLAttributes: {
@@ -555,11 +675,19 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         "border border-input overflow-hidden rounded-md flex flex-col bg-background transition-shadow shadow-sm max-w-[100vw]",
         isFullscreen ? "fixed inset-0 z-[100] rounded-none border-none shadow-xl" : "focus-within:ring-1 focus-within:ring-ring"
       )}>
-        <MenuBar 
-           editor={editor} 
-           onOpenMediaPicker={onOpenMediaPicker} 
-           isFullscreen={isFullscreen} 
-           toggleFullscreen={() => setIsFullscreen(!isFullscreen)} 
+        <SignaturePad
+          open={isSignatureOpen}
+          onOpenChange={setIsSignatureOpen}
+          onSave={(dataUrl) => {
+            if (editor) editor.chain().focus().setImage({ src: dataUrl }).run();
+          }}
+        />
+        <MenuBar
+           editor={editor}
+           onOpenMediaPicker={onOpenMediaPicker}
+           onOpenSignaturePad={() => setIsSignatureOpen(true)}
+           isFullscreen={isFullscreen}
+           toggleFullscreen={() => setIsFullscreen(!isFullscreen)}
         />
         <div 
            className={cn("overflow-y-auto cursor-text text-sm flex-1", isFullscreen ? "h-full bg-muted/10 p-8" : "max-h-[50dvh]")} 

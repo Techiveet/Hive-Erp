@@ -12,8 +12,28 @@ class TaskComment extends Model
     protected $fillable = [
         'task_id',
         'user_id',
+        'parent_id',
         'content',
+        'attachments',
+        'is_deleted_for_everyone',
+        'hidden_for_user_ids',
     ];
+
+    protected $casts = [
+        'attachments' => 'array',
+        'hidden_for_user_ids' => 'array',
+        'is_deleted_for_everyone' => 'boolean',
+    ];
+
+    public function parent()
+    {
+        return $this->belongsTo(TaskComment::class, 'parent_id');
+    }
+
+    public function replies()
+    {
+        return $this->hasMany(TaskComment::class, 'parent_id')->with(['user', 'replies']);
+    }
 
     public function task()
     {

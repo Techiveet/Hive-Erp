@@ -8,6 +8,7 @@ use Modules\Subscription\Support\PaymentProviderManager;
 use Modules\Subscription\Support\TenantModuleCatalog;
 use Modules\Subscription\Support\TenantSubscriptionOrderService;
 use Modules\Subscription\Support\TenantSubscriptionService;
+use Modules\Subscription\Support\SubscriptionFeatureMap;
 use Modules\Tenancy\Models\Tenant;
 use Modules\Tenancy\Support\TenantLandingTemplateCatalog;
 
@@ -18,6 +19,7 @@ class TenantSubscriptionController extends Controller
         protected TenantSubscriptionService $subscriptions,
         protected PaymentProviderManager $payments,
         protected TenantLandingTemplateCatalog $landingTemplates,
+        protected SubscriptionFeatureMap $featureMap,
     ) {
     }
 
@@ -25,7 +27,12 @@ class TenantSubscriptionController extends Controller
     {
         return response()->json([
             'data' => [
-                'catalog' => TenantModuleCatalog::catalog(),
+                'catalog' => TenantModuleCatalog::catalogWithPricing(),
+                'feature_map' => [
+                    'modules' => $this->featureMap->modules(),
+                    'submodules' => $this->featureMap->submodules(),
+                    'features' => $this->featureMap->features(),
+                ],
                 'plan_defaults' => TenantModuleCatalog::planDefaults(),
                 'plan_pricing' => TenantModuleCatalog::planPricing(),
                 'business_types' => $this->landingTemplates->businessTypesPayload(),
@@ -63,7 +70,15 @@ class TenantSubscriptionController extends Controller
                 ],
                 'subscription' => collect($currentSubscription)->except('module_subscriptions')->all(),
                 'module_subscriptions' => $currentSubscription['module_subscriptions'],
-                'catalog' => TenantModuleCatalog::catalog(),
+                'feature_matrix' => $this->featureMap->matrixForCatalogModules(
+                    $currentSubscription['module_subscriptions']['catalog_modules'] ?? []
+                ),
+                'catalog' => TenantModuleCatalog::catalogWithPricing(),
+                'feature_map' => [
+                    'modules' => $this->featureMap->modules(),
+                    'submodules' => $this->featureMap->submodules(),
+                    'features' => $this->featureMap->features(),
+                ],
                 'plan_defaults' => TenantModuleCatalog::planDefaults(),
                 'plan_pricing' => TenantModuleCatalog::planPricing(),
                 'business_types' => $this->landingTemplates->businessTypesPayload(),
@@ -145,7 +160,15 @@ class TenantSubscriptionController extends Controller
                 ],
                 'subscription' => collect($currentSubscription)->except('module_subscriptions')->all(),
                 'module_subscriptions' => $currentSubscription['module_subscriptions'],
-                'catalog' => TenantModuleCatalog::catalog(),
+                'feature_matrix' => $this->featureMap->matrixForCatalogModules(
+                    $currentSubscription['module_subscriptions']['catalog_modules'] ?? []
+                ),
+                'catalog' => TenantModuleCatalog::catalogWithPricing(),
+                'feature_map' => [
+                    'modules' => $this->featureMap->modules(),
+                    'submodules' => $this->featureMap->submodules(),
+                    'features' => $this->featureMap->features(),
+                ],
                 'plan_defaults' => TenantModuleCatalog::planDefaults(),
                 'plan_pricing' => TenantModuleCatalog::planPricing(),
                 'business_types' => $this->landingTemplates->businessTypesPayload(),

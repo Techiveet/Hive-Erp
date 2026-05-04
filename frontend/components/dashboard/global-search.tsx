@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useTranslation } from "@/store/use-translation";
 import { useDebounce } from "@/hooks/use-debounce";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
 import { canAccessDashboardRoute } from "@/lib/route-permissions";
 import { getAccessToken, getBackendApiRoot, getTenantHeaders } from "@/lib/runtime-context";
 
@@ -28,6 +29,7 @@ export function GlobalSearch() {
   const { t } = useTranslation();
   const router = useRouter();
   const { hasAnyPermission, hasPermission } = usePermissions();
+  const { hasModule } = useTenantModuleAccess();
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -114,13 +116,13 @@ export function GlobalSearch() {
     return results
       .map((category) => ({
         ...category,
-        items: category.items.filter((item) => canAccessDashboardRoute(item.url, { hasPermission, hasAnyPermission })),
+        items: category.items.filter((item) => canAccessDashboardRoute(item.url, { hasPermission, hasAnyPermission, hasModule })),
       }))
       .filter((category) => category.items.length > 0);
-  }, [hasAnyPermission, hasPermission, results]);
+  }, [hasAnyPermission, hasModule, hasPermission, results]);
 
   const handleSelect = (url: string) => {
-    if (!canAccessDashboardRoute(url, { hasPermission, hasAnyPermission })) {
+    if (!canAccessDashboardRoute(url, { hasPermission, hasAnyPermission, hasModule })) {
       return;
     }
 
@@ -173,7 +175,7 @@ export function GlobalSearch() {
 
             {filteredResults.length === 0 && !isLoading ? (
               <div className="p-6 text-center text-sm text-muted-foreground">
-                No results found for "<span className="font-bold text-foreground">{query}</span>"
+                No results found for <span className="font-bold text-foreground">{query}</span>
               </div>
             ) : (
               filteredResults.map((category) => (

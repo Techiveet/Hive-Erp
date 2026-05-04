@@ -8,9 +8,87 @@ export type TenantCatalogModule = {
   tone: string;
   recommended_plans: string[];
   monthly_price_etb?: number;
+  billing_type?: "module" | "addon";
+  is_addon?: boolean;
   route_hints?: string[];
   included_in_plan?: boolean;
   status?: "active" | "inactive" | "pending";
+};
+
+export type TenantSubscriptionFeature = {
+  module_slug: string;
+  submodule_slug: string;
+  slug: string;
+  name: string;
+  feature_type: string;
+  route_name?: string | null;
+  route_uri?: string | null;
+  http_methods?: string[] | null;
+  permission?: string | null;
+  module_gate?: string | null;
+};
+
+export type TenantSubscriptionSubmodule = {
+  module_slug: string;
+  slug: string;
+  name: string;
+  subscribed: boolean;
+  status: "active" | "inactive" | "pending";
+  route_prefixes?: string[];
+  permissions?: string[];
+  features: TenantSubscriptionFeature[];
+  feature_count: number;
+};
+
+export type TenantSubscriptionFeatureMatrixModule = TenantCatalogModule & {
+  subscribed: boolean;
+  submodules: TenantSubscriptionSubmodule[];
+  submodule_count: number;
+  feature_count: number;
+};
+
+export type TenantSubscriptionFeatureMatrix = {
+  modules: TenantSubscriptionFeatureMatrixModule[];
+  module_count: number;
+  subscribed_module_count: number;
+  unsubscribed_module_count: number;
+  submodule_count: number;
+  feature_count: number;
+};
+
+export type SubscriptionAdminFeature = {
+  id: number;
+  subscription_module_id: number;
+  subscription_submodule_id?: number | null;
+  slug: string;
+  name: string;
+  feature_type: string;
+  route_name?: string | null;
+  route_uri?: string | null;
+  http_methods?: string[] | null;
+  permission?: string | null;
+  module_gate?: string | null;
+  monthly_price_etb?: number;
+};
+
+export type SubscriptionAdminSubmodule = {
+  id: number;
+  subscription_module_id: number;
+  slug: string;
+  name: string;
+  description?: string | null;
+  route_prefixes?: string[] | null;
+  permissions?: string[] | null;
+  monthly_price_etb?: number;
+  features?: SubscriptionAdminFeature[];
+};
+
+export type SubscriptionAdminModule = TenantCatalogModule & {
+  id: number;
+  backend_module?: string | null;
+  frontend_module?: string | null;
+  submodules?: SubscriptionAdminSubmodule[];
+  features?: SubscriptionAdminFeature[];
 };
 
 export type TenantCustomModuleInput = {
@@ -49,6 +127,8 @@ export type TenantPlanPricing = {
   description: string;
   monthly_price_etb: number;
   mail_storage_quota_mb: number;
+  is_disabled?: boolean;
+  is_free?: boolean;
 };
 
 export type TenantPaymentMethod = {
@@ -97,7 +177,7 @@ export type TenantWorkspaceSubscription = {
   id: string;
   tenant_id: string;
   plan: string;
-  status: "active" | "grace_period" | "expired" | "pending_activation";
+  status: "active" | "trial" | "grace_period" | "expired" | "inactive" | "cancelled" | "suspended" | "pending_activation";
   billing_cycle: string;
   renewal_mode: string;
   started_at?: string | null;
@@ -110,6 +190,31 @@ export type TenantWorkspaceSubscription = {
   needs_renewal?: boolean;
   term_days?: number;
   grace_period_days?: number;
+};
+
+export type SubscriptionAdminPlan = {
+  id: number;
+  slug: string;
+  name: string;
+  description?: string | null;
+  status: "active" | "inactive";
+  billing_cycle: string;
+  monthly_price_etb: number;
+  mail_storage_quota_mb: number;
+  trial_days?: number;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type SubscriptionAdminTenant = {
+  id: string;
+  name: string;
+  plan: string;
+  business_type?: string | null;
+  admin_email?: string | null;
+  is_active: boolean;
+  subscription: TenantWorkspaceSubscription & {
+    module_subscriptions: TenantResolvedModuleSubscriptions;
+  };
 };
 
 export type TenantSubscriptionOrder = {
@@ -168,6 +273,8 @@ export type TenantModuleAccessState = {
       included_in_plan: boolean;
       name: string;
       monthly_price_etb: number;
+      billing_type?: "module" | "addon";
+      is_addon?: boolean;
     }
   >;
 };

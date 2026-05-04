@@ -13,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { authenticatedDownload } from "@/lib/authenticated-download";
-import { getAuthHeaders, getBackendApiRoot, getAccessToken, getTenantId } from "@/lib/runtime-context";
+import { getAuthHeaders, getBackendApiRoot, getAccessToken } from "@/lib/runtime-context";
 
 export type Track = {
   id: string | number;
@@ -155,19 +155,25 @@ const normalizeTrackList = (tracks: Track[] | undefined): Track[] =>
     .map((track) => normalizeTrack(track))
     .filter((track): track is Track => Boolean(track));
 
-const playlistResponseToModel = (playlist: any): Playlist => {
-  const fileEntries = Array.isArray(playlist?.fileEntries)
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
+
+const playlistResponseToModel = (playlistValue: unknown): Playlist => {
+  const playlist = asRecord(playlistValue) ?? {};
+  const fileEntries = Array.isArray(playlist.fileEntries)
     ? playlist.fileEntries
-    : Array.isArray(playlist?.file_entries)
+    : Array.isArray(playlist.file_entries)
       ? playlist.file_entries
       : [];
+  const name = typeof playlist.name === "string" && playlist.name ? playlist.name : "Untitled Playlist";
+  const description = typeof playlist.description === "string" ? playlist.description : "";
 
   return {
     id: Number(playlist.id),
-    name: playlist.name || "Untitled Playlist",
-    description: playlist.description || "",
+    name,
+    description,
     trackIds: fileEntries
-      .map((entry: any) => Number(entry?.id))
+      .map((entry) => Number(asRecord(entry)?.id))
       .filter((id: number) => Number.isFinite(id)),
   };
 };
@@ -286,7 +292,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
 
   const fetchPlaylists = useCallback(async () => {
     const token = getAccessToken();
-    const tenantId = getTenantId();
 
     if (!token) {
       if (playlists.length > 0) {
@@ -301,7 +306,12 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       });
 
       if (!response.ok) {
-        throw new Error("Failed to load playlists.");
+        if (response.status === 402 || response.status === 403) {
+          setPlaylists([]);
+          return;
+        }
+
+        throw new Error(`Failed to load playlists. Status: ${response.status}`);
       }
 
       const payload = await response.json();
@@ -704,9 +714,9 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         await queryClient.invalidateQueries({ queryKey: ["files"] });
         await queryClient.invalidateQueries({ queryKey: ["folders"] });
         toast.success(nextFavorite ? "Added to favorites." : "Removed from favorites.");
-      } catch (error: any) {
+      } catch (error) {
         syncTrackFavorite(trackId, currentFavorite);
-        toast.error(error?.message || "Failed to update favorite status.");
+        toast.error(error instanceof Error ? error.message : "Failed to update favorite status.");
       }
     },
     [queryClient, syncTrackFavorite],
@@ -862,8 +872,8 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         },
       });
       toast.success(`Downloaded "${normalized.title}".`, { id: toastId });
-    } catch (error: any) {
-      toast.error(error?.message || "Download failed.", { id: toastId });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Download failed.", { id: toastId });
     }
   }, []);
 

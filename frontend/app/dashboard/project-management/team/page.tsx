@@ -11,7 +11,7 @@ import { projectApi } from "@/modules/projectmanagement/api";
 import { useProjectManagementRealtime } from "@/modules/projectmanagement/hooks/use-project-management-realtime";
 
 type TeamMember = {
-  userId: number;
+  userId: string;
   name: string;
   email: string;
   avatarPath: string | null;
@@ -28,7 +28,7 @@ export default function TeamPage() {
   });
 
   const members = React.useMemo(() => {
-    const grouped = new Map<number, TeamMember>();
+    const grouped = new Map<string, TeamMember>();
 
     for (const project of data?.data || []) {
       for (const membership of project.members || []) {

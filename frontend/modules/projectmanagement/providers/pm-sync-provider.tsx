@@ -3,9 +3,22 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { initEcho, getUserNotificationChannelName } from '@/lib/echo';
+import { initEcho, getUserNotificationChannelNames } from '@/lib/echo';
 import { getAccessToken } from '@/lib/runtime-context';
 import { useUser } from '@/hooks/use-user';
+
+type ProjectManagementNotificationPayload = {
+  category?: string;
+  title?: string;
+  body?: string;
+  url?: string;
+  data?: {
+    category?: string;
+    title?: string;
+    body?: string;
+    url?: string;
+  };
+};
 
 export function ProjectManagementSyncProvider() {
   const router = useRouter();
@@ -22,27 +35,30 @@ export function ProjectManagementSyncProvider() {
     }
 
     const echo = initEcho(token);
-    const channelName = getUserNotificationChannelName(user.id);
-    const channel = echo.private(channelName);
+    const channelNames = getUserNotificationChannelNames(user.id);
+    const channels = channelNames.map((channelName) => echo.private(channelName));
 
-    channel.notification((notification: any) => {
-      // Check if it's a Project Management notification
-      if (notification.category && notification.category.startsWith('pm_')) {
-        const { title, body, url } = notification;
+    channels.forEach((channel) => {
+      channel.notification((notification: ProjectManagementNotificationPayload) => {
+        const payload = notification.data ?? notification;
 
-        toast(title, {
-          description: body,
-          action: url ? {
+        if (!payload.category?.startsWith('pm_')) {
+          return;
+        }
+
+        toast(payload.title || 'Project update', {
+          description: payload.body,
+          action: payload.url ? {
             label: 'Open',
-            onClick: () => router.push(url),
+            onClick: () => router.push(payload.url as string),
           } : undefined,
-          duration: 5000,
+          duration: 6000,
         });
-      }
+      });
     });
 
     return () => {
-      echo.leave(channelName);
+      channelNames.forEach((channelName) => echo.leave(channelName));
     };
   }, [isLoaded, user, router]);
 

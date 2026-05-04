@@ -161,7 +161,7 @@ export function DashboardTopbar() {
         // Modules Group
         { target: '#tour-nav-modules', title: t('tour.modules_group_title', 'Feature Modules'), content: t('tour.modules_group_desc', 'Explore core operational modules like Inventory Logistics and Service Operations.'), placement: 'right' as const },
         { target: '#tour-nav-inventory', title: t('nav.inventory', 'Supply Chain Matrix'), content: t('tour.inventory_desc', 'Manage assets, products, and warehouse logistics with tenant-aware precision.'), placement: 'right' as const },
-        { target: '#tour-nav-nightclub', title: t('nav.nightclub', 'Service Operations'), content: t('tour.nightclub_desc', 'Real-time table management, reservations, and service orders for lounges.'), placement: 'right' as const },
+        { target: '#tour-nav-hospitality', title: t('nav.hospitality', 'Service Operations'), content: t('tour.hospitality_desc', 'Real-time table management, reservations, and service orders for lounges.'), placement: 'right' as const },
         
         // Apps & Tools Group
         { target: '#tour-nav-apps', title: t('tour.apps_group_title', 'Apps & Tools'), content: t('tour.apps_group_desc', 'Access utility applications like Document Processing and internal Secure Comms.'), placement: 'right' as const },

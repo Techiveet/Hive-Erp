@@ -15,6 +15,7 @@ import { getTenantId } from "@/lib/runtime-context";
 import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
 import { fetchCurrentTenantSubscriptions } from "@/modules/subscription/api";
 import { ModuleSubscriptionCheckoutDialog } from "@/modules/subscription/components/module-subscription-checkout-dialog";
+import type { TenantCatalogModule } from "@/modules/subscription/types";
 
 export default function StoragePage() {
   const { t } = useTranslation();
@@ -26,7 +27,7 @@ export default function StoragePage() {
   const canAccessStorage = hasAnyPermission(["view_storage", "manage_storage"]);
   const tenantId = getTenantId();
   const isTenantWorkspace = Boolean(tenantId);
-  const hasMediaLibrary = !isTenantWorkspace || hasModule('media_library') || hasModule('file_manager');
+  const hasStorageWorkspace = !isTenantWorkspace || hasModule('media_library') || hasModule('file_manager') || hasModule('video_player') || hasModule('audio_player');
 
   useEffect(() => {
     if (tenantId) {
@@ -43,11 +44,11 @@ export default function StoragePage() {
 
   const fileManagerModule =
     subscriptionData?.data?.module_subscriptions?.catalog_modules?.find(
-      (module: any) => module.slug === "file_manager"
+      (module: TenantCatalogModule) => module.slug === "file_manager"
     ) ?? null;
   const mediaLibraryModule =
     subscriptionData?.data?.module_subscriptions?.catalog_modules?.find(
-      (module: any) => module.slug === "media_library"
+      (module: TenantCatalogModule) => module.slug === "media_library"
     ) ?? null;
   // Prefer file_manager, fall back to media_library
   const storageModule = fileManagerModule ?? mediaLibraryModule;
@@ -68,7 +69,7 @@ export default function StoragePage() {
     );
   }
 
-  if (!hasMediaLibrary) {
+  if (!hasStorageWorkspace) {
     return (
       <>
         <div className="space-y-2">

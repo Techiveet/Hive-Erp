@@ -16,6 +16,7 @@ export const workflowModule: FrontendModuleDefinition = {
       fallbackLabel: "My Approvals",
       href: "/dashboard/workflow/approvals",
       icon: CheckCircle,
+      subscriptionSlug: "workflow_automation",
       placement: "primary",
       tourId: "tour-nav-approvals",
     },
@@ -25,6 +26,7 @@ export const workflowModule: FrontendModuleDefinition = {
       fallbackLabel: "Workflow Rules",
       href: "/dashboard/workflow/rules",
       icon: Zap,
+      subscriptionSlug: "workflow_automation",
       placement: "primary",
     },
     {
@@ -33,6 +35,7 @@ export const workflowModule: FrontendModuleDefinition = {
       fallbackLabel: "Approval Roles",
       href: "/dashboard/workflow/roles",
       icon: Shield,
+      subscriptionSlug: "workflow_automation",
       placement: "secondary",
     },
   ],

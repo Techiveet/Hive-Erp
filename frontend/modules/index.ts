@@ -2,7 +2,7 @@ import { coreModule } from "@/modules/core/module";
 import { identityModule } from "@/modules/identity/module";
 import { subscriptionModule } from "@/modules/subscription/module";
 import { tenancyModule } from "@/modules/tenancy/module";
-import { nightclubModule } from "@/modules/nightclub/module";
+import { hospitalityModule } from "@/modules/hospitality/module";
 import { inventoryModule } from "@/modules/inventory/module";
 import { warehouseModule } from "@/modules/warehouse/module";
 import { workflowModule } from "@/modules/workflow/module";
@@ -16,7 +16,7 @@ export const FEATURE_MODULES: FrontendModuleDefinition[] = [
   identityModule,
   subscriptionModule,
   tenancyModule,
-  nightclubModule,
+  hospitalityModule,
   inventoryModule,
   warehouseModule,
   workflowModule,

@@ -18,6 +18,8 @@ import { Project, TaskPriority } from "../types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { ProjectTrendChart } from "./ProjectTrendChart";
+import { useUser } from "@/hooks/use-user";
+import { Cpu } from "lucide-react";
 
 interface DashboardChartsProps {
   projects: Project[];
@@ -116,6 +118,18 @@ export function DashboardCharts({ projects }: DashboardChartsProps) {
     { name: "OVERDUE", value: timelineHealth.overdue, color: "hsl(var(--destructive))" },
   ].filter(d => d.value > 0);
 
+  const { user } = useUser();
+  const isSoftwareDev = user?.business_type?.toLowerCase()?.replace('-', ' ') === 'software development';
+
+  // Mock data for Issue Type Distribution (to be replaced by real data from API)
+  const issueTypeData = [
+    { name: "TASKS", value: 45, color: "hsl(var(--primary))" },
+    { name: "BUGS", value: 15, color: "hsl(var(--destructive))" },
+    { name: "FEATURES", value: 25, color: "hsl(var(--success))" },
+    { name: "REFACTOR", value: 10, color: "hsl(var(--warning))" },
+    { name: "DEBT", value: 5, color: "hsl(var(--muted-foreground))" },
+  ];
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -156,9 +170,9 @@ export function DashboardCharts({ projects }: DashboardChartsProps) {
                     dataKey="name" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} 
+                    tick={{ fontSize: 11, fill: "hsl(var(--foreground))", opacity: 0.8 }} 
                   />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(var(--foreground))", opacity: 0.8 }} />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: "hsl(var(--primary)/0.05)" }} />
                   <Bar
                     dataKey="count"
@@ -244,7 +258,7 @@ export function DashboardCharts({ projects }: DashboardChartsProps) {
                     type="category"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 11, fill: "hsl(var(--foreground))", opacity: 0.8 }}
                     width={80}
                   />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: "hsl(var(--primary)/0.05)" }} />
@@ -354,6 +368,65 @@ export function DashboardCharts({ projects }: DashboardChartsProps) {
             </CardContent>
           </Card>
         </motion.div>
+
+        {isSoftwareDev && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.6 }}
+            className="xl:col-span-2 lg:col-span-1"
+          >
+            <Card className="bg-primary/[0.02] backdrop-blur-md border-primary/10 h-[400px] rounded-[2rem] overflow-hidden group">
+              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Cpu className="w-24 h-24 text-primary" />
+              </div>
+              <CardHeader className="pt-8 px-8">
+                <CardTitle className="text-sm font-black uppercase tracking-[0.2em] text-primary/70">
+                  Engineering Issue Mix
+                </CardTitle>
+                <p className="text-[10px] font-bold text-muted-foreground/50 tracking-wider">TASK VS BUG DISTRIBUTION</p>
+              </CardHeader>
+              <CardContent className="h-[300px] w-full flex flex-col md:flex-row items-center justify-between gap-4 px-8">
+                <div className="w-full h-full md:w-1/2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={issueTypeData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={70}
+                        outerRadius={90}
+                        paddingAngle={5}
+                        dataKey="value"
+                        animationDuration={1500}
+                        stroke="none"
+                      >
+                        {issueTypeData.map((entry, index) => (
+                          <Cell
+                            key={`issue-type-cell-${index}`}
+                            fill={entry.color}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="w-full md:w-1/2 grid grid-cols-2 gap-3 pb-8">
+                  {issueTypeData.map((item) => (
+                    <div key={item.name} className="flex flex-col gap-1 p-3 rounded-2xl bg-background/40 border border-border/50">
+                      <span className="text-[9px] font-black tracking-widest text-muted-foreground/60">{item.name}</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-black tracking-tighter" style={{ color: item.color }}>{item.value}%</span>
+                        <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: item.color }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </div>
     </div>
   );

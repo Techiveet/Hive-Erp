@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-export type ModuleId = "core" | "identity" | "tenancy" | "subscription" | "nightclub" | "inventory" | "warehouse" | "workflow" | "projectmanagement";
+export type ModuleId = "core" | "identity" | "tenancy" | "subscription" | "hospitality" | "inventory" | "warehouse" | "workflow" | "projectmanagement";
 export type DashboardNavPlacement = "primary" | "secondary";
 
 export interface ModuleNavItem {
@@ -10,6 +10,7 @@ export interface ModuleNavItem {
   href: string;
   icon: LucideIcon;
   permissions?: string[];
+  subscriptionSlug?: string | string[];
   businessTypes?: string[];
   tourId?: string;
   placement: DashboardNavPlacement;

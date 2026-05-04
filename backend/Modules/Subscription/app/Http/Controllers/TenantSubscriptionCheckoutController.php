@@ -27,7 +27,7 @@ class TenantSubscriptionCheckoutController extends Controller
 
         return response()->json([
             'data' => [
-                'catalog' => TenantModuleCatalog::catalog(),
+                'catalog' => TenantModuleCatalog::catalogWithPricing(),
                 'plan_defaults' => array_intersect_key(TenantModuleCatalog::planDefaults(), $activePlanPricing),
                 'plan_pricing' => $activePlanPricing,
                 'business_types' => $this->landingTemplates->businessTypesPayload(),

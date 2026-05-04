@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Workflow\Http\Controllers\WorkflowController;
 use Modules\Workflow\Http\Controllers\WorkflowApprovalController;
 
-Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
+Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout', 'tenant_module:workflow_automation'])->prefix('v1')->group(function () {
     Route::apiResource('workflows', WorkflowController::class)->names('workflow');
 
     Route::get('workflow-approvals', [WorkflowApprovalController::class, 'index']);

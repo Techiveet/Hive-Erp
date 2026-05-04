@@ -102,6 +102,26 @@ final class AccessControlCatalog
     }
 
     /**
+     * @deprecated Use hospitalityPermissions().
+     *
+     * @return array<int, string>
+     */
+    public static function nightclubPermissions(): array
+    {
+        return self::hospitalityPermissions();
+    }
+
+    /**
+     * @deprecated Use hospitalityRoles().
+     *
+     * @return array<string, array<int, string>>
+     */
+    public static function nightclubRoles(): array
+    {
+        return self::hospitalityRoles();
+    }
+
+    /**
      * @return array<int, string>
      */
     public static function tenantPermissions(): array
@@ -143,7 +163,7 @@ final class AccessControlCatalog
                 'view_inventory_reports', 'export_inventory_reports',
                 'manage_fleet',
             ],
-            self::nightclubPermissions(),
+            self::hospitalityPermissions(),
         ));
     }
 
@@ -183,50 +203,70 @@ final class AccessControlCatalog
                 'view_users', 'view_storage',
                 'view_chat', 'manage_chat',
             ],
-        ] + self::nightclubRoles();
+        ] + self::hospitalityRoles();
     }
 
     /**
      * @return array<int, string>
      */
-    public static function nightclubPermissions(): array
+    public static function hospitalityPermissions(): array
     {
         return [
-            'view_nightclub_tables', 'create_nightclub_tables', 'edit_nightclub_tables', 'delete_nightclub_tables',
-            'view_nightclub_reservations', 'create_nightclub_reservations', 'edit_nightclub_reservations',
-            'delete_nightclub_reservations', 'confirm_nightclub_reservations', 'complete_nightclub_reservations',
-            'assign_nightclub_staff',
-            'view_nightclub_service_orders', 'create_nightclub_service_orders', 'edit_nightclub_service_orders', 'close_nightclub_service_orders',
+            'view_hospitality_tables', 'create_hospitality_tables', 'edit_hospitality_tables', 'delete_hospitality_tables',
+            'view_hospitality_reservations', 'create_hospitality_reservations', 'edit_hospitality_reservations',
+            'delete_hospitality_reservations', 'confirm_hospitality_reservations', 'complete_hospitality_reservations',
+            'view_hospitality_service_orders', 'create_hospitality_service_orders', 'edit_hospitality_service_orders', 'close_hospitality_service_orders',
+            'view_hospitality_menu', 'create_hospitality_menu', 'edit_hospitality_menu', 'delete_hospitality_menu',
+            'view_hospitality_events', 'create_hospitality_events', 'edit_hospitality_events', 'delete_hospitality_events',
+            'view_hospitality_waitlist', 'create_hospitality_waitlist', 'edit_hospitality_waitlist', 'delete_hospitality_waitlist',
+            'view_hospitality_customers', 'create_hospitality_customers', 'edit_hospitality_customers', 'delete_hospitality_customers',
+            'view_hospitality_shifts', 'create_hospitality_shifts', 'edit_hospitality_shifts', 'delete_hospitality_shifts',
+            'view_hospitality_feedback', 'create_hospitality_feedback', 'edit_hospitality_feedback', 'delete_hospitality_feedback',
+            'view_hospitality_billing', 'create_hospitality_billing',
         ];
     }
 
     /**
      * @return array<string, array<int, string>>
      */
-    public static function nightclubRoles(): array
+    public static function hospitalityRoles(): array
     {
         return [
-            'Club Manager' => self::nightclubPermissions(),
-            'Waiter' => [
-                'view_nightclub_tables',
-                'view_nightclub_reservations',
-                'complete_nightclub_reservations',
-                'view_nightclub_service_orders',
-                'create_nightclub_service_orders',
-                'close_nightclub_service_orders',
+            'Hospitality Manager' => self::hospitalityPermissions(),
+            'Hospitality Host' => [
+                'view_hospitality_tables',
+                'view_hospitality_reservations',
+                'create_hospitality_reservations',
+                'edit_hospitality_reservations',
+                'confirm_hospitality_reservations',
+                'complete_hospitality_reservations',
+                'view_hospitality_service_orders',
+                'create_hospitality_service_orders',
+                'view_hospitality_customers',
+                'create_hospitality_customers',
+                'view_hospitality_waitlist',
+                'create_hospitality_waitlist',
+                'edit_hospitality_waitlist',
+                'view_hospitality_feedback',
+                'create_hospitality_feedback',
+                'view_hospitality_billing',
+                'create_hospitality_billing',
             ],
-            'Bouncer' => [
-                'view_nightclub_tables',
-                'view_nightclub_reservations',
-                'confirm_nightclub_reservations',
+            'Hospitality Waiter' => [
+                'view_hospitality_tables',
+                'view_hospitality_reservations',
+                'view_hospitality_service_orders',
+                'create_hospitality_service_orders',
+                'edit_hospitality_service_orders',
+                'close_hospitality_service_orders',
+                'view_hospitality_menu',
+                'view_hospitality_billing',
+                'create_hospitality_billing',
             ],
-            'Hostess' => [
-                'view_nightclub_tables',
-                'view_nightclub_reservations',
-                'create_nightclub_reservations',
-                'confirm_nightclub_reservations',
-                'complete_nightclub_reservations',
-                'view_nightclub_service_orders',
+            'Hospitality Chef' => [
+                'view_hospitality_service_orders',
+                'edit_hospitality_service_orders',
+                'view_hospitality_menu',
             ],
         ];
     }

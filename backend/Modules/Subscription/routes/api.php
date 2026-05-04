@@ -4,6 +4,7 @@ use App\Http\Middleware\InitializeTenantContext;
 use Illuminate\Support\Facades\Route;
 use Modules\Subscription\Http\Controllers\TenantSubscriptionCheckoutController;
 use Modules\Subscription\Http\Controllers\TenantSubscriptionController;
+use Modules\Subscription\Http\Controllers\SubscriptionAdminController;
 
 $centralDomains = collect(array_merge(
     config('tenancy.central_domains', []),
@@ -38,10 +39,31 @@ foreach ($centralDomains as $domain) {
             Route::prefix('subscriptions')->group(function () {
                 Route::get('/catalog', [TenantSubscriptionController::class, 'catalog'])
                     ->middleware('permission:view_tenants|manage_tenants,sanctum');
+                Route::get('/admin', [SubscriptionAdminController::class, 'index'])
+                    ->middleware('permission:view_tenants|manage_tenants,sanctum');
+                Route::put('/admin/plans', [SubscriptionAdminController::class, 'updatePlans'])
+                    ->middleware('permission:manage_tenants|provision_tenants,sanctum');
+                Route::put('/admin/pricing', [SubscriptionAdminController::class, 'updatePricing'])
+                    ->middleware('permission:manage_tenants|provision_tenants,sanctum');
+                Route::put('/admin/tenants/{tenantId}', [SubscriptionAdminController::class, 'assignTenant'])
+                    ->middleware('permission:manage_tenants|provision_tenants,sanctum');
             });
         });
     });
 }
+
+Route::prefix('v1')->middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
+    Route::prefix('subscriptions')->group(function () {
+        Route::get('/admin', [SubscriptionAdminController::class, 'index'])
+            ->middleware('permission:view_tenants|manage_tenants,sanctum');
+        Route::put('/admin/plans', [SubscriptionAdminController::class, 'updatePlans'])
+            ->middleware('permission:manage_tenants|provision_tenants,sanctum');
+        Route::put('/admin/pricing', [SubscriptionAdminController::class, 'updatePricing'])
+            ->middleware('permission:manage_tenants|provision_tenants,sanctum');
+        Route::put('/admin/tenants/{tenantId}', [SubscriptionAdminController::class, 'assignTenant'])
+            ->middleware('permission:manage_tenants|provision_tenants,sanctum');
+    });
+});
 
 Route::middleware([
     InitializeTenantContext::class,

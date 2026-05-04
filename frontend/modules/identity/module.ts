@@ -15,6 +15,7 @@ export const identityModule: FrontendModuleDefinition = {
       href: "/dashboard/security",
       icon: Shield,
       permissions: ["manage_users", "view_users", "manage_roles", "view_roles", "view_permissions"],
+      subscriptionSlug: "security_management",
       tourId: "tour-nav-security",
       placement: "primary",
     },

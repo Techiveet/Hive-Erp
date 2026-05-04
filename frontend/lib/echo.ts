@@ -24,6 +24,16 @@ export const getUserNotificationChannelName = (userId: number | string) => {
   return `${getTenantChannelPrefix()}App.Models.User.${userId}`;
 };
 
+export const getUserNotificationChannelNames = (userId: number | string) => {
+  const prefix = getTenantChannelPrefix();
+
+  return [
+    `${prefix}App.Models.User.${userId}`,
+    `${prefix}Modules.Identity.Models.User.${userId}`,
+    `${prefix}user.${userId}`,
+  ];
+};
+
 export const getChatPresenceChannelName = () => {
   return `${getTenantChannelPrefix()}chat.presence`;
 };

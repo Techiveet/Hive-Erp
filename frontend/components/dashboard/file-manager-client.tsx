@@ -940,15 +940,16 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   const { playTrack, syncFavoriteStatus, currentTrack } = useGlobalAudio();
   const { hasAnyPermission, hasPermission } = usePermissions();
   const { hasModule } = useTenantModuleAccess();
+  const tenantId = getTenantId();
+  const isTenantWorkspace = Boolean(tenantId);
   
   const canRead = access?.canRead ?? hasAnyPermission(["view_storage", "manage_storage"]);
   const canManage = access?.canManage ?? hasPermission("manage_storage");
-  const hasVideoPlayer = hasModule("video_audio_player");
+  const hasVideoPlayer = !isTenantWorkspace || hasModule("video_player");
+  const hasAudioPlayer = !isTenantWorkspace || hasModule("audio_player");
   const hasImageEditor = hasModule("image_editor");
 
-  const [checkoutModuleSlug, setCheckoutModuleSlug] = React.useState<"image_editor" | "video_player" | null>(null);
-  const tenantId = getTenantId();
-  const isTenantWorkspace = Boolean(tenantId);
+  const [checkoutModuleSlug, setCheckoutModuleSlug] = React.useState<"image_editor" | "video_player" | "audio_player" | null>(null);
 
   const { data: subscriptionData } = useQuery({
     queryKey: ["tenant-current-subscriptions", "file-manager"],
@@ -1739,6 +1740,21 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
     }
 
     if (mime.startsWith('audio/')) {
+      if (!hasAudioPlayer) {
+        return (
+          <div className="flex h-full min-h-[350px] w-full flex-col items-center justify-center rounded-2xl border border-border/50 bg-muted/10 p-8 text-center">
+            <LockKeyhole className="mb-4 h-12 w-12 text-muted-foreground" />
+            <p className="text-lg font-black text-foreground">Audio Player Subscription Required</p>
+            <p className="mt-2 max-w-md text-sm text-muted-foreground">
+              This tenant can store audio files, but playback and background queues require the `audio_player` module.
+            </p>
+            <Button onClick={() => setCheckoutModuleSlug("audio_player")} className="mt-6 rounded-xl px-6 font-semibold">
+              Unlock Audio Player
+            </Button>
+          </div>
+        );
+      }
+
       const audioFiles = fileItems.filter((f: any) => f.media_details?.mime_type?.startsWith('audio/'));
       const currentIndex = audioFiles.findIndex((f: any) => f.id === file.id);
       const handleNext = () => { if (currentIndex < audioFiles.length - 1) setSelectedFile(audioFiles[currentIndex + 1]); };
@@ -1776,7 +1792,10 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 w-full text-foreground min-h-[700px] lg:h-[calc(100vh-6rem)]">
+    <div className={cn(
+      "flex flex-col lg:flex-row gap-4 lg:gap-6 w-full text-foreground",
+      isPickerMode ? "h-full" : "min-h-[700px] lg:h-[calc(100vh-6rem)]"
+    )}>
       
       {/* 🚀 SIDEBAR (Responsive) */}
       <div className="w-full lg:w-64 shrink-0 flex flex-col gap-4 lg:gap-6 bg-card/40 border border-border/50 rounded-[2rem] p-4 lg:p-5 backdrop-blur-xl overflow-hidden">
@@ -2335,7 +2354,7 @@ export function FileManagerClient({ tenantName, isPickerMode, onFileSelect, acce
 
       {/* UPLOAD FILE MODAL */}
       <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-       <DialogContent className="sm:max-w-md rounded-3xl bg-background border-border/50 overflow-hidden flex flex-col max-h-[90vh] shadow-2xl !z-[1001]">
+       <DialogContent className="sm:max-w-md rounded-3xl bg-background border-border/50 overflow-hidden flex flex-col max-h-[90vh] shadow-2xl">
           <DialogHeader className="shrink-0 border-b border-border/50 pb-4"><DialogTitle className="flex items-center gap-2"><UploadCloud className="h-5 w-5 text-emerald-500" /> Upload File</DialogTitle></DialogHeader>
           <form id="upload-file-form" onSubmit={handleUploadFile} className="flex-1 overflow-y-auto scrollbar-thin">
             <div className="space-y-5 py-4 px-1">

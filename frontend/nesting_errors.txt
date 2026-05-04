@@ -1,0 +1,90 @@
+Error: Mismatched tag. Expected </motion.div> (opened at line 1302), got </div> at line 1308
+Error: Mismatched tag. Expected </div> (opened at line 1292), got </CardContent> at line 1310
+Error: Mismatched tag. Expected </CardContent> (opened at line 1285), got </Card> at line 1311
+Error: Mismatched tag. Expected </Card> (opened at line 1275), got </motion.div> at line 1312
+Error: Mismatched tag. Expected </div> (opened at line 1333), got </CardContent> at line 1345
+Error: Mismatched tag. Expected </CardContent> (opened at line 1326), got </Card> at line 1346
+Error: Mismatched tag. Expected </Card> (opened at line 1316), got </motion.div> at line 1347
+Error: Mismatched tag. Expected </div> (opened at line 1395), got </CardContent> at line 1409
+Error: Mismatched tag. Expected </CardContent> (opened at line 1388), got </Card> at line 1410
+Error: Mismatched tag. Expected </Card> (opened at line 1378), got </motion.div> at line 1411
+Error: Mismatched tag. Expected </motion.div> (opened at line 1377), got </div> at line 1412
+Error: Mismatched tag. Expected </motion.div> (opened at line 2123), got </div> at line 2132
+Error: Mismatched tag. Expected </div> (opened at line 2106), got </CardContent> at line 2141
+Error: Mismatched tag. Expected </div> (opened at line 2104), got </Card> at line 2142
+Error: Mismatched tag. Expected </CardContent> (opened at line 2103), got </motion.div> at line 2143
+Error: Mismatched tag. Expected </Card> (opened at line 2086), got </div> at line 2533
+Error: Unclosed tags at end of file:
+  <TaskPriority> opened at line 210
+  <string> opened at line 217
+  <string> opened at line 231
+  <string> opened at line 249
+  <string> opened at line 260
+  <string> opened at line 318
+  <HealthMetric> opened at line 331
+  <string> opened at line 369
+  <string> opened at line 375
+  <string> opened at line 401
+  <RiskMetric> opened at line 546
+  <EfficiencyMetric> opened at line 562
+  <ROIMetric> opened at line 587
+  <string> opened at line 588
+  <QualityMetric> opened at line 611
+  <FinancialTrajectoryMetric> opened at line 634
+  <VelocityTrendMetric> opened at line 668
+  <ComplexityEfficiencyMetric> opened at line 701
+  <BottleneckMetric> opened at line 719
+  <TagMetric> opened at line 742
+  <string> opened at line 743
+  <ProjectVelocityMetric> opened at line 792
+  <MemberRadarMetric> opened at line 822
+  <ScopeTrendMetric> opened at line 866
+  <ChecklistVelocityMetric> opened at line 916
+  <EnvironmentStabilityMetric> opened at line 933
+  <RoleContributionMetric> opened at line 948
+  <string> opened at line 949
+  <StrategicInsight> opened at line 996
+  <string> opened at line 1053
+  <div> opened at line 1169
+  <div> opened at line 1272
+  <motion.div> opened at line 1274
+  <motion.div> opened at line 1315
+  <div> opened at line 1686
+  <motion.div> opened at line 2085
+Error: Unclosed tags at end of file:
+  <TaskPriority> opened at line 210
+  <string> opened at line 217
+  <string> opened at line 231
+  <string> opened at line 249
+  <string> opened at line 260
+  <string> opened at line 318
+  <HealthMetric> opened at line 331
+  <string> opened at line 369
+  <string> opened at line 375
+  <string> opened at line 401
+  <RiskMetric> opened at line 546
+  <EfficiencyMetric> opened at line 562
+  <ROIMetric> opened at line 587
+  <string> opened at line 588
+  <QualityMetric> opened at line 611
+  <FinancialTrajectoryMetric> opened at line 634
+  <VelocityTrendMetric> opened at line 668
+  <ComplexityEfficiencyMetric> opened at line 701
+  <BottleneckMetric> opened at line 719
+  <TagMetric> opened at line 742
+  <string> opened at line 743
+  <ProjectVelocityMetric> opened at line 792
+  <MemberRadarMetric> opened at line 822
+  <ScopeTrendMetric> opened at line 866
+  <ChecklistVelocityMetric> opened at line 916
+  <EnvironmentStabilityMetric> opened at line 933
+  <RoleContributionMetric> opened at line 948
+  <string> opened at line 949
+  <StrategicInsight> opened at line 996
+  <string> opened at line 1053
+  <div> opened at line 1169
+  <div> opened at line 1272
+  <motion.div> opened at line 1274
+  <motion.div> opened at line 1315
+  <div> opened at line 1686
+  <motion.div> opened at line 2085

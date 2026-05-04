@@ -16,6 +16,7 @@ export const projectManagementModule: FrontendModuleDefinition = {
       fallbackLabel: "Overview",
       href: "/dashboard/project-management",
       icon: LayoutDashboard,
+      subscriptionSlug: "project_management",
       placement: "primary",
     },
     {
@@ -24,6 +25,7 @@ export const projectManagementModule: FrontendModuleDefinition = {
       fallbackLabel: "Projects",
       href: "/dashboard/project-management/projects",
       icon: Briefcase,
+      subscriptionSlug: "project_management",
       placement: "primary",
     },
     {
@@ -32,6 +34,7 @@ export const projectManagementModule: FrontendModuleDefinition = {
       fallbackLabel: "My Tasks",
       href: "/dashboard/project-management/my-tasks",
       icon: CheckSquare,
+      subscriptionSlug: "project_management",
       placement: "secondary",
     },
     {
@@ -40,6 +43,7 @@ export const projectManagementModule: FrontendModuleDefinition = {
       fallbackLabel: "Team",
       href: "/dashboard/project-management/team",
       icon: Users,
+      subscriptionSlug: "project_management",
       placement: "secondary",
     },
     {
@@ -48,6 +52,7 @@ export const projectManagementModule: FrontendModuleDefinition = {
       fallbackLabel: "Reports",
       href: "/dashboard/project-management/reports",
       icon: BarChart3,
+      subscriptionSlug: "project_management",
       placement: "secondary",
     },
   ],

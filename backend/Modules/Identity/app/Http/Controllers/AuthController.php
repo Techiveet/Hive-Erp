@@ -435,6 +435,7 @@ class AuthController extends Controller
     {
         /** @var \Modules\Tenancy\Models\Tenant|null $tenant */
         $tenant = function_exists('tenant') ? tenant() : null;
+        \Log::info('Auth Payload Tenant', ['id' => $tenant?->id, 'type' => $tenant?->business_type]);
 
         return [
             'id' => $user->id,
@@ -445,7 +446,7 @@ class AuthController extends Controller
             'central_control_override' => $user->hasCentralControlOverride(),
             'has_completed_welcome_tour' => (bool) $user->has_completed_welcome_tour,
             'two_factor_enabled' => $twoFactorEnabled ?? $user->two_factor_enabled,
-            'business_type' => $tenant?->business_type ?? null,
+            'business_type' => $tenant?->business_type ?? ($currentTenant !== 'central' ? \DB::table('tenants')->where('id', $currentTenant)->value('business_type') : null),
             'module_access' => $this->resolveModuleAccess($tenant),
         ];
     }

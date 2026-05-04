@@ -3,11 +3,10 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Notification;
 
-class ProjectManagementNotification extends Notification implements ShouldQueue
+class ProjectManagementNotification extends Notification
 {
     use Queueable;
 
@@ -24,8 +23,6 @@ class ProjectManagementNotification extends Notification implements ShouldQueue
     {
         $this->category = $category;
         $this->data = $data;
-        
-        $this->onConnection('redis')->onQueue('notifications');
     }
 
     /**
@@ -56,11 +53,11 @@ class ProjectManagementNotification extends Notification implements ShouldQueue
      */
     public function toBroadcast(object $notifiable): BroadcastMessage
     {
-        return new BroadcastMessage([
+        return new BroadcastMessage(array_merge([
             'id'         => $this->id,
             'type'       => static::class,
-            'data'       => $this->toArray($notifiable),
+            'category'   => $this->category,
             'created_at' => now()->toISOString(),
-        ]);
+        ], $this->data));
     }
 }

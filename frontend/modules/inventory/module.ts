@@ -23,6 +23,7 @@ export const inventoryModule: FrontendModuleDefinition = {
       href: "/dashboard/inventory",
       icon: LayoutDashboard,
       permissions: ["view_inventory", "manage_inventory"],
+      subscriptionSlug: "inventory_control",
       placement: "primary",
       tourId: "tour-nav-inventory",
     },
@@ -33,6 +34,7 @@ export const inventoryModule: FrontendModuleDefinition = {
       href: "/dashboard/inventory/catalog/categories",
       icon: Shapes,
       permissions: ["view_inventory", "manage_inventory"],
+      subscriptionSlug: "inventory_control",
       placement: "primary",
     },
     {
@@ -42,6 +44,7 @@ export const inventoryModule: FrontendModuleDefinition = {
       href: "/dashboard/inventory/catalog/tags",
       icon: Tags,
       permissions: ["view_inventory", "manage_inventory"],
+      subscriptionSlug: "inventory_control",
       placement: "primary",
     },
     {
@@ -51,6 +54,7 @@ export const inventoryModule: FrontendModuleDefinition = {
       href: "/dashboard/inventory/catalog/products",
       icon: PackageSearch,
       permissions: ["view_inventory", "manage_inventory"],
+      subscriptionSlug: "inventory_control",
       placement: "primary",
     },
     {
@@ -60,6 +64,7 @@ export const inventoryModule: FrontendModuleDefinition = {
       href: "/dashboard/inventory/catalog/suppliers",
       icon: Truck,
       permissions: ["view_inventory", "manage_inventory"],
+      subscriptionSlug: "inventory_control",
       placement: "primary",
     },
     {
@@ -69,6 +74,7 @@ export const inventoryModule: FrontendModuleDefinition = {
       href: "/dashboard/inventory/qa",
       icon: ClipboardCheck,
       permissions: ["view_inventory", "manage_inventory"],
+      subscriptionSlug: "inventory_control",
       businessTypes: ["water-bottling"],
       placement: "primary",
     },
@@ -79,6 +85,7 @@ export const inventoryModule: FrontendModuleDefinition = {
       href: "/dashboard/inventory/documents",
       icon: LayoutDashboard, // Will use a better icon if found, for now LayoutDashboard
       permissions: ["view_inventory", "manage_inventory"],
+      subscriptionSlug: "inventory_control",
       placement: "primary",
     },
   ],

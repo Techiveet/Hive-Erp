@@ -10,6 +10,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { isTenantSession } from "@/lib/runtime-context";
 import { logFrontendAction } from "@/modules/core/api";
 import { TenantSubscriptionsClient } from "@/modules/subscription/components/tenant-subscriptions-client";
+import { SubscriptionAdminClient } from "@/modules/subscription/components/subscription-admin-client";
 import { useTranslation } from "@/store/use-translation";
 
 export default function SubscriptionsPage() {
@@ -23,6 +24,7 @@ export default function SubscriptionsPage() {
     "manage_module_subscriptions",
     "view_module_subscriptions",
   ]);
+  const canManageCentralSubscriptions = hasAnyPermission(["manage_tenants", "provision_tenants"]);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -32,7 +34,7 @@ export default function SubscriptionsPage() {
 
     const isTenant = isTenantSession();
 
-    if (!isTenant || !canViewSubscriptions) {
+    if ((!isTenant && !canManageCentralSubscriptions) || (isTenant && !canViewSubscriptions)) {
       setAccessStatus("denied");
 
       if (!viewLogged.current) {
@@ -58,7 +60,7 @@ export default function SubscriptionsPage() {
         description: "Tenant operator accessed the module subscriptions workspace.",
       }).catch(() => {});
     }
-  }, [canViewSubscriptions, isLoaded, router]);
+  }, [canManageCentralSubscriptions, canViewSubscriptions, isLoaded, router]);
 
   if (accessStatus === "checking") {
     return <ModulePageSkeleton titleWidth="w-60" subtitleWidth="w-80" rows={5} cols={3} />;
@@ -91,7 +93,7 @@ export default function SubscriptionsPage() {
         <Breadcrumbs
           items={[
             { label: "Hive.OS", href: "/dashboard", icon: <Home className="h-4 w-4" /> },
-            { label: t("nav.subscriptions", "Module Subscriptions") },
+            { label: isTenantSession() ? t("nav.subscriptions", "Module Subscriptions") : "Subscription Admin" },
           ]}
         />
       </div>
@@ -107,7 +109,7 @@ export default function SubscriptionsPage() {
         </div>
       </div>
 
-      <TenantSubscriptionsClient />
+      {isTenantSession() ? <TenantSubscriptionsClient /> : <SubscriptionAdminClient />}
     </div>
   );
 }

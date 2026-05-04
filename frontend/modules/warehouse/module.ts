@@ -20,6 +20,7 @@ export const warehouseModule: FrontendModuleDefinition = {
       href: "/dashboard/warehouse/warehouses",
       icon: Warehouse,
       permissions: ["view_inventory", "manage_inventory"], // We will use inventory permissions for now or change them if there are specific warehouse permissions
+      subscriptionSlug: "warehouse_management",
       placement: "primary",
     },
     {
@@ -29,6 +30,7 @@ export const warehouseModule: FrontendModuleDefinition = {
       href: "/dashboard/warehouse/locations/shelves",
       icon: Rows3,
       permissions: ["view_inventory", "manage_inventory"],
+      subscriptionSlug: "warehouse_management",
       placement: "primary",
     },
     {
@@ -38,6 +40,7 @@ export const warehouseModule: FrontendModuleDefinition = {
       href: "/dashboard/warehouse/movements",
       icon: Grid3X3,
       permissions: ["view_inventory", "manage_inventory"],
+      subscriptionSlug: "warehouse_management",
       placement: "primary",
     },
   ],

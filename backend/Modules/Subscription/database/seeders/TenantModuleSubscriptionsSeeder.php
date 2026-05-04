@@ -142,13 +142,13 @@ class TenantModuleSubscriptionsSeeder extends Seeder
                         ...$defaults,
                         'inventory_control',
                         'advanced_analytics',
-                        'lounge_club_management',
+                        'hospitality',
                     ])),
                     'hotel' => array_values(array_unique([
                         ...$defaults,
                         'advanced_analytics',
                         'security_management',
-                        'lounge_club_management',
+                        'hospitality',
                     ])),
                     'clinic' => array_values(array_unique([
                         ...$defaults,

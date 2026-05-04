@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Tenancy\Support\TenantLandingTemplateCatalog;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TenantLandingTemplateSettingsController extends Controller
 {
@@ -44,6 +45,45 @@ class TenantLandingTemplateSettingsController extends Controller
             'data' => [
                 'business_types' => $businessTypes,
             ],
+        ]);
+    }
+
+    public function export(Request $request): StreamedResponse|JsonResponse
+    {
+        $businessTypes = $this->landingTemplates->businessTypesPayload();
+        $format = $request->get('format', 'csv');
+
+        if ($format === 'json') {
+            return response()->json([
+                'data' => $businessTypes,
+                'exported_at' => now()->toIso8601String(),
+                'total' => count($businessTypes),
+            ]);
+        }
+
+        $headers = ['#', 'Key', 'Label', 'Description', 'Icon'];
+        $rows = array_map(function ($type, $index) {
+            return [
+                $index + 1,
+                $type['key'] ?? '',
+                $type['label'] ?? '',
+                $type['description'] ?? '',
+                $type['icon'] ?? '',
+            ];
+        }, $businessTypes, array_keys($businessTypes));
+
+        $callback = function () use ($headers, $rows) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, $headers);
+            foreach ($rows as $row) {
+                fputcsv($handle, $row);
+            }
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="business-types-' . date('Y-m-d') . '.csv"',
         ]);
     }
 }

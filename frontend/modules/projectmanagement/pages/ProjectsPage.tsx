@@ -3,7 +3,8 @@
 import React from "react";
 import { ProjectList } from "../components/ProjectList";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowDownAZ, CheckCircle2, Filter, Plus, Search, TimerReset, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowDownAZ, CheckCircle2, Filter, LayoutGrid, List, Plus, Search, TimerReset, TrendingUp } from "lucide-react";
+import { GlobalResourceHeatmap } from "../components/GlobalResourceHeatmap";
 import { Input } from "@/components/ui/input";
 import { CreateProjectModal } from "../components/CreateProjectModal";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +30,7 @@ export default function ProjectsPage() {
   const [status, setStatus] = React.useState<ProjectStatusFilter>("all");
   const [priority, setPriority] = React.useState<ProjectPriorityFilter>("all");
   const [sortBy, setSortBy] = React.useState<ProjectSort>("newest");
+  const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
   useProjectManagementRealtime();
 
   const { data, isLoading } = useQuery({
@@ -75,7 +77,7 @@ export default function ProjectsPage() {
         </Button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-3 items-center bg-card/30 backdrop-blur-md p-2 rounded-2xl border border-white/5 shadow-inner">
+      <div className="flex flex-col md:flex-row gap-3 items-center bg-card p-2 rounded-[2rem] border border-border/40 shadow-xl shadow-black/5">
         <div className="relative w-full md:flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
           <Input 
@@ -85,7 +87,7 @@ export default function ProjectsPage() {
             className="h-11 pl-11 bg-transparent border-none focus-visible:ring-0 placeholder:text-muted-foreground/40 text-base"
           />
         </div>
-        <div className="flex items-center gap-2 p-1 bg-background/40 rounded-xl border border-white/5">
+        <div className="flex items-center gap-2 p-1 bg-muted/20 rounded-xl border border-border/40">
           <Select value={status} onValueChange={(value) => setStatus(value as ProjectStatusFilter)}>
             <SelectTrigger className="h-9 border-none bg-transparent hover:bg-white/5 focus:ring-0 w-32 md:w-36 transition-colors">
               <SelectValue placeholder="Status" />
@@ -124,6 +126,25 @@ export default function ProjectsPage() {
               <SelectItem value="name">Name</SelectItem>
             </SelectContent>
           </Select>
+          <div className="h-4 w-px bg-white/10" />
+          <div className="flex items-center p-1 bg-background/20 rounded-lg border border-white/5">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="icon"
+              className="h-7 w-7 rounded-md"
+              onClick={() => setViewMode("grid")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="icon"
+              className="h-7 w-7 rounded-md"
+              onClick={() => setViewMode("list")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -155,7 +176,9 @@ export default function ProjectsPage() {
         />
       </div>
 
-      <ProjectList projects={visibleProjects} isLoading={isLoading} />
+      <GlobalResourceHeatmap />
+
+      <ProjectList projects={visibleProjects} isLoading={isLoading} viewMode={viewMode} />
       <CreateProjectModal 
         open={isModalOpen} 
         onOpenChange={setIsModalOpen} 

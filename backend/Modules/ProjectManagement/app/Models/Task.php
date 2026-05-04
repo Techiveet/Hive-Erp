@@ -20,15 +20,27 @@ class Task extends Model
         'description',
         'priority',
         'due_date',
-        'assigned_to',
         'created_by',
         'order',
         'attachments',
+        'parent_task_id',
+        'tags',
+        'issue_type',
+        'story_points',
+        'environment',
+        'pr_url',
+        'pr_status',
+        'build_status',
+        'is_backlog',
+        'sprint_id',
+        'progress',
+        'effort',
     ];
 
     protected $casts = [
         'due_date' => 'date',
         'attachments' => 'array',
+        'tags' => 'array',
     ];
 
     public function project()
@@ -41,9 +53,9 @@ class Task extends Model
         return $this->belongsTo(Column::class);
     }
 
-    public function assignee()
+    public function assignees()
     {
-        return $this->belongsTo(User::class, 'assigned_to');
+        return $this->belongsToMany(User::class, 'pm_task_assignees');
     }
 
     public function creator()
@@ -58,7 +70,7 @@ class Task extends Model
 
     public function comments()
     {
-        return $this->hasMany(TaskComment::class)->latest();
+        return $this->hasMany(TaskComment::class)->whereNull('parent_id')->with(['user', 'replies'])->latest();
     }
 
     public function attachments()
@@ -69,5 +81,20 @@ class Task extends Model
     public function timeLogs()
     {
         return $this->hasMany(TaskTimeLog::class);
+    }
+
+    public function parentTask()
+    {
+        return $this->belongsTo(Task::class, 'parent_task_id');
+    }
+
+    public function subTasks()
+    {
+        return $this->hasMany(Task::class, 'parent_task_id');
+    }
+
+    public function sprint()
+    {
+        return $this->belongsTo(Sprint::class);
     }
 }

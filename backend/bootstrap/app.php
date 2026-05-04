@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active_status' => \App\Http\Middleware\EnsureActiveStatus::class,
             'dynamic_timeout' => \Modules\Core\Http\Middleware\EnforceDynamicSessionTimeout::class,
             'tenant_module' => \Modules\Subscription\Http\Middleware\EnsureTenantModuleEnabled::class,
+            'tenant_feature' => \Modules\Subscription\Http\Middleware\EnsureTenantSubscriptionAccess::class,
             'business_type' => \Modules\Tenancy\Http\Middleware\RequireBusinessType::class,
         ]);
 
@@ -35,9 +36,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \App\Http\Middleware\InitializeTenantContext::class,
             \App\Http\Middleware\HandleQueryToken::class,
+            \Modules\Subscription\Http\Middleware\EnsureTenantSubscriptionAccess::class,
         ]);
 
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
+    })
+    ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule) {
+        $schedule->command('pm:check-overdue')->hourly();
+        $schedule->command('pm:check-overdue-projects')->hourly();
     })->create();

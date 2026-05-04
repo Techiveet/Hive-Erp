@@ -24,7 +24,16 @@ class Project extends Model
         'client_stakeholder',
         'tags',
         'attachments',
+        'budget',
+        'currency',
+        'hourly_rate',
+        'estimated_hours',
+        'estimated_revenue',
         'created_by',
+        'is_template',
+        'template_settings',
+        'repository_url',
+        'tech_stack',
     ];
 
     protected $casts = [
@@ -32,9 +41,39 @@ class Project extends Model
         'end_date' => 'date',
         'tags' => 'array',
         'attachments' => 'array',
+        'is_template' => 'boolean',
+        'template_settings' => 'array',
+        'budget' => 'decimal:2',
+        'hourly_rate' => 'decimal:2',
+        'estimated_hours' => 'decimal:2',
+        'estimated_revenue' => 'decimal:2',
+        'tech_stack' => 'array',
     ];
 
-    protected $appends = ['progress', 'tasks_count', 'completed_tasks_count'];
+    protected $appends = ['progress', 'tasks_count', 'completed_tasks_count', 'health'];
+
+    public function getHealthAttribute()
+    {
+        $total = $this->tasks()->count();
+        if ($total === 0) {
+            return 'green'; // No tasks yet
+        }
+
+        $overdueCount = $this->tasks()
+            ->where('due_date', '<', now())
+            ->whereHas('column', fn ($q) => $q->where('is_done', false))
+            ->count();
+
+        if ($overdueCount > ($total * 0.2)) {
+            return 'red'; // More than 20% tasks overdue
+        }
+
+        if ($overdueCount > 0) {
+            return 'yellow'; // Some tasks overdue
+        }
+
+        return 'green';
+    }
 
     public function getProgressAttribute()
     {
@@ -72,9 +111,31 @@ class Project extends Model
         return $this->belongsTo(User::class, 'project_manager_id');
     }
 
+    public function managers()
+    {
+        return $this->belongsToMany(User::class, 'pm_project_members', 'project_id', 'user_id')
+            ->wherePivot('role', 'manager')
+            ->withTimestamps();
+    }
+
+    public function isManagerById($userId): bool
+    {
+        if (!$userId) return false;
+        
+        return (string) $this->project_manager_id === (string) $userId || 
+               $this->managers()->where('users.id', $userId)->exists();
+    }
+
     public function members()
     {
         return $this->hasMany(ProjectMember::class);
+    }
+
+    public function allMembers()
+    {
+        return $this->belongsToMany(User::class, 'pm_project_members', 'project_id', 'user_id')
+            ->withPivot('role')
+            ->withTimestamps();
     }
 
     public function boards()
@@ -85,5 +146,25 @@ class Project extends Model
     public function tasks()
     {
         return $this->hasMany(Task::class);
+    }
+
+    public function comments()
+    {
+        return $this->hasMany(ProjectComment::class)->whereNull('parent_id')->with(['user', 'replies'])->latest();
+    }
+
+    public function goals()
+    {
+        return $this->hasMany(ProjectGoal::class)->orderBy('order');
+    }
+
+    public function automations()
+    {
+        return $this->hasMany(ProjectAutomation::class);
+    }
+
+    public function sprints()
+    {
+        return $this->hasMany(Sprint::class)->latest();
     }
 }

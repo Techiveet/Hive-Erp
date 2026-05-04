@@ -27,6 +27,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return [
             'id',
             'plan',
+            'business_type',
         ];
     }
 

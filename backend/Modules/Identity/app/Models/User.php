@@ -262,6 +262,22 @@ class User extends Authenticatable
 
     public function getTwoFactorEnabledAttribute(): bool
     {
+        // Guard against MissingAttributeException in strict mode when the attribute
+        // was not included in a selective eager-load query.
+        if (! array_key_exists('two_factor_confirmed_at', $this->getAttributes())) {
+            return false;
+        }
+
         return !is_null($this->two_factor_confirmed_at);
+    }
+
+    public function projectMembers(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\Modules\ProjectManagement\Models\ProjectMember::class);
+    }
+
+    public function tasks(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(\Modules\ProjectManagement\Models\Task::class, 'pm_task_assignees');
     }
 }

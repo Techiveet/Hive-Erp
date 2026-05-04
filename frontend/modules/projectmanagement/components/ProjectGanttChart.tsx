@@ -60,6 +60,7 @@ type TimelineTask = Task & {
   isOverdue: boolean;
   isUnscheduled: boolean;
   health: "complete" | "overdue" | "at-risk" | "scheduled" | "unscheduled";
+  parent_task_id?: string | null;
 };
 
 const priorityColors: Record<TaskPriority, string> = {
@@ -143,6 +144,7 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({ project, t
         isOverdue: overdue,
         isUnscheduled: !dueDate,
         health: done ? "complete" : overdue ? "overdue" : atRisk ? "at-risk" : dueDate ? "scheduled" : "unscheduled",
+        parent_task_id: task.parent_task_id,
       };
     });
   }, [tasks, today]);
@@ -169,7 +171,8 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({ project, t
   const todayLeft = (todayOffset / totalDays) * chartWidth;
 
   const filteredTasks = timelineTasks.filter((task) => {
-    const matchesSearch = `${task.title} ${task.description || ""} ${task.assignee?.name || ""} ${task.column?.name || ""}`
+    const assigneeNames = (task.assignees ?? []).map((a) => a.name).join(" ");
+    const matchesSearch = `${task.title} ${task.description || ""} ${assigneeNames} ${task.column?.name || ""}`
       .toLowerCase()
       .includes(search.toLowerCase());
     const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter;
@@ -188,7 +191,7 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({ project, t
     for (const task of filteredTasks) {
       const key =
         groupMode === "assignee"
-          ? task.assignee?.name || "Unassigned"
+          ? (task.assignees?.[0]?.name || "Unassigned")
           : groupMode === "priority"
             ? `${task.priority[0].toUpperCase()}${task.priority.slice(1)} priority`
             : task.column?.name || "No status";
@@ -211,7 +214,7 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({ project, t
         task.title,
         task.column?.name || "",
         task.priority,
-        task.assignee?.name || "Unassigned",
+        (task.assignees ?? []).map((a) => a.name).join(", ") || "Unassigned",
         task.inferred_start ? format(task.inferred_start, "yyyy-MM-dd") : "",
         task.inferred_end ? format(task.inferred_end, "yyyy-MM-dd") : "",
         task.health,
@@ -227,9 +230,9 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({ project, t
   };
 
   return (
-    <div className="flex h-full min-h-[620px] flex-col overflow-hidden rounded-md border bg-card shadow-sm">
+    <div className="flex h-full min-h-[500px] sm:min-h-[620px] flex-col overflow-hidden rounded-xl border bg-card shadow-sm relative">
       <div className="border-b bg-muted/20 p-4">
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-bold">Project Schedule</h2>
@@ -241,31 +244,39 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({ project, t
               {format(rangeStart, "MMM d, yyyy")} - {format(rangeEnd, "MMM d, yyyy")} · {timelineTasks.length} tasks
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2" onClick={exportCsv} disabled={filteredTasks.length === 0}>
-              <Download className="h-4 w-4" />
-              Export
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <Button variant="outline" size="sm" className="h-9 gap-2 shrink-0 bg-background" onClick={exportCsv} disabled={filteredTasks.length === 0}>
+              <Download className="h-4 w-4 text-primary" />
+              <span className="hidden sm:inline">Export CSV</span>
+              <span className="sm:hidden">Export</span>
             </Button>
-            <Button variant="outline" size="icon-sm" onClick={() => setZoom("compact")} aria-label="Zoom out">
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon-sm" onClick={() => setZoom("wide")} aria-label="Zoom in">
-              <ZoomIn className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center rounded-lg border bg-background p-1 gap-1">
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={() => setZoom("compact")} aria-label="Zoom out">
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <div className="w-px h-4 bg-border mx-1" />
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={() => setZoom("comfortable")} aria-label="Default zoom">
+                <TimerReset className="h-4 w-4" />
+              </Button>
+              <div className="w-px h-4 bg-border mx-1" />
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={() => setZoom("wide")} aria-label="Zoom in">
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="mt-4 grid gap-3 grid-cols-2 lg:grid-cols-4">
           <Metric icon={CheckCircle2} label="Completion" value={`${completionRate}%`} progress={completionRate} />
           <Metric icon={CalendarClock} label="Scheduled" value={`${scheduledRate}%`} progress={scheduledRate} />
           <Metric icon={AlertTriangle} label="Overdue" value={overdueCount} tone={overdueCount > 0 ? "danger" : "good"} />
           <Metric icon={TimerReset} label="Unscheduled" value={unscheduledCount} tone={unscheduledCount > 0 ? "warning" : "good"} />
         </div>
 
-        <div className="mt-4 grid gap-2 lg:grid-cols-[minmax(220px,1fr)_170px_170px_170px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tasks, assignees, status..." className="pl-9" />
+        <div className="mt-4 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_180px_180px_180px]">
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tasks, assignees..." className="pl-9 bg-background border-border/50 focus:border-primary/50" />
           </div>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
             <SelectTrigger>
@@ -316,8 +327,68 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({ project, t
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-auto">
-          <div className="min-w-[980px]">
+        <div className="flex-1 overflow-auto relative custom-scrollbar">
+          <div className="min-w-[980px] relative">
+            {/* Dependency Lines Layer */}
+            <svg 
+              className="absolute top-0 left-[320px] pointer-events-none z-10" 
+              style={{ width: chartWidth, height: '100%', minHeight: '1000px' }}
+            >
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--primary))" opacity="0.5" />
+                </marker>
+              </defs>
+              {(() => {
+                let currentY = 80; // Start after header
+                const positions = new Map<string, { x: number, y: number }>();
+                
+                // First pass: calculate positions
+                groupedTasks.forEach(([_, groupTasks]) => {
+                  currentY += 33; // Group header
+                  groupTasks.forEach(task => {
+                    if (task.inferred_end) {
+                      const startOffset = Math.max(0, differenceInCalendarDays(task.inferred_start!, paddedStart));
+                      const endOffset = Math.max(startOffset + 1, differenceInCalendarDays(endOfDay(task.inferred_end), paddedStart));
+                      const x = (endOffset + 1) * zoomConfig[zoom].dayWidth;
+                      positions.set(task.id, { x, y: currentY + (zoomConfig[zoom].rowHeight / 2) });
+                    }
+                    currentY += zoomConfig[zoom].rowHeight;
+                  });
+                });
+
+                // Second pass: draw lines
+                const lines: React.ReactNode[] = [];
+                groupedTasks.forEach(([_, groupTasks]) => {
+                  groupTasks.forEach(task => {
+                    if (task.parent_task_id && positions.has(task.parent_task_id) && positions.has(task.id)) {
+                      const parentPos = positions.get(task.parent_task_id)!;
+                      const childPos = positions.get(task.id)!;
+                      
+                      // Calculate child start X
+                      const childStartOffset = Math.max(0, differenceInCalendarDays(task.inferred_start!, paddedStart));
+                      const childX = childStartOffset * zoomConfig[zoom].dayWidth;
+
+                      const d = `M ${parentPos.x} ${parentPos.y} L ${parentPos.x + 10} ${parentPos.y} L ${parentPos.x + 10} ${childPos.y} L ${childX} ${childPos.y}`;
+                      
+                      lines.push(
+                        <path 
+                          key={`dep-${task.parent_task_id}-${task.id}`}
+                          d={d}
+                          fill="none"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth="1.5"
+                          strokeDasharray="4 2"
+                          opacity="0.3"
+                          markerEnd="url(#arrowhead)"
+                        />
+                      );
+                    }
+                  });
+                });
+                return lines;
+              })()}
+            </svg>
             <div className="sticky top-0 z-20 grid grid-cols-[320px_1fr] border-b bg-card">
               <div className="border-r p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Work item</p>
@@ -455,10 +526,19 @@ function TimelineRow({
     >
       <div className="border-r p-3">
         <div className="flex items-start gap-3">
-          <Avatar className="mt-0.5 h-8 w-8 bg-muted">
-            <AvatarImage src={task.assignee?.avatar_path || undefined} />
-            <AvatarFallback className="text-[10px]">{initials(task.assignee?.name)}</AvatarFallback>
-          </Avatar>
+          <div className="mt-0.5 flex -space-x-2 shrink-0">
+            {(task.assignees ?? []).slice(0, 2).map((user) => (
+              <Avatar key={user.id} className="h-8 w-8 bg-muted border-2 border-card">
+                <AvatarImage src={user.avatar_path || undefined} />
+                <AvatarFallback className="text-[10px]">{initials(user.name)}</AvatarFallback>
+              </Avatar>
+            ))}
+            {(task.assignees?.length ?? 0) === 0 && (
+              <Avatar className="h-8 w-8 bg-muted">
+                <AvatarFallback className="text-[10px]">?</AvatarFallback>
+              </Avatar>
+            )}
+          </div>
           <div className="min-w-0 flex-1">
             <p className="line-clamp-1 text-sm font-semibold">{task.title}</p>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -467,7 +547,9 @@ function TimelineRow({
             </div>
             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
               <UserRound className="h-3 w-3" />
-              {task.assignee?.name || "Unassigned"}
+              {(task.assignees ?? []).length > 0
+                ? (task.assignees ?? []).map((a) => a.name.split(' ')[0]).join(', ')
+                : 'Unassigned'}
             </p>
           </div>
         </div>

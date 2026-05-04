@@ -33,11 +33,11 @@ class AccessControlCatalogTest extends TestCase
         }
     }
 
-    public function test_tenant_permissions_cover_the_nightclub_permission_set(): void
+    public function test_tenant_permissions_cover_the_hospitality_permission_set(): void
     {
         $tenantPermissions = AccessControlCatalog::tenantPermissions();
 
-        foreach (AccessControlCatalog::nightclubPermissions() as $permission) {
+        foreach (AccessControlCatalog::hospitalityPermissions() as $permission) {
             $this->assertContains($permission, $tenantPermissions);
         }
     }

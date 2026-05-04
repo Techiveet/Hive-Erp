@@ -9,11 +9,13 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
 import { Task } from "../types";
 import { format } from "date-fns";
-import { MoreHorizontal, Calendar, User as UserIcon } from "lucide-react";
+import { MoreHorizontal, Calendar, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GitStatusBadge } from "./GitStatusBadge";
+import { useUser } from "@/hooks/use-user";
+import { cn } from "@/lib/utils";
 
 interface ProjectListViewProps {
   tasks: Task[];
@@ -28,23 +30,27 @@ const priorityColors: Record<string, string> = {
 };
 
 export const ProjectListView: React.FC<ProjectListViewProps> = ({ tasks, onTaskClick }) => {
+  const { user } = useUser();
+  const isSoftwareDev = user?.business_type?.toLowerCase()?.replace('-', ' ') === 'software development';
+
   return (
-    <div className="bg-background border border-muted-foreground/10 rounded-xl overflow-hidden">
+    <div className="bg-card border border-border/40 rounded-[2rem] shadow-xl shadow-black/5 overflow-hidden animate-in fade-in duration-500">
       <Table>
-        <TableHeader className="bg-muted/30">
-          <TableRow>
-            <TableHead className="w-[40%] font-semibold">Task Name</TableHead>
-            <TableHead className="font-semibold">Status</TableHead>
-            <TableHead className="font-semibold">Priority</TableHead>
-            <TableHead className="font-semibold">Assignee</TableHead>
-            <TableHead className="font-semibold">Due Date</TableHead>
-            <TableHead className="text-right"></TableHead>
+        <TableHeader className="bg-muted/20 border-b border-border/40">
+          <TableRow className="hover:bg-transparent border-none">
+            <TableHead className="w-[40%] font-black uppercase tracking-widest text-[10px] h-14 px-6">Task Identity</TableHead>
+            <TableHead className="font-black uppercase tracking-widest text-[10px] h-14 px-6">Status</TableHead>
+            <TableHead className="font-black uppercase tracking-widest text-[10px] h-14 px-6">Priority</TableHead>
+            <TableHead className="font-black uppercase tracking-widest text-[10px] h-14 px-6">Assigned Team</TableHead>
+            {isSoftwareDev && <TableHead className="font-black uppercase tracking-widest text-[10px] h-14 px-6 text-center">Score</TableHead>}
+            <TableHead className="font-black uppercase tracking-widest text-[10px] h-14 px-6">Target Date</TableHead>
+            <TableHead className="text-right h-14 px-6"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {tasks.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+              <TableCell colSpan={isSoftwareDev ? 7 : 6} className="h-32 text-center text-muted-foreground">
                 No tasks found in this project.
               </TableCell>
             </TableRow>
@@ -52,46 +58,76 @@ export const ProjectListView: React.FC<ProjectListViewProps> = ({ tasks, onTaskC
             tasks.map((task) => (
               <TableRow 
                 key={task.id} 
-                className="group cursor-pointer hover:bg-muted/30 transition-colors"
+                className="group cursor-pointer hover:bg-primary/[0.02] transition-colors border-border/20"
                 onClick={() => onTaskClick?.(task)}
               >
-                <TableCell>
+                <TableCell className="px-6 py-4">
                   <div className="flex flex-col">
-                    <span className="font-medium text-foreground group-hover:text-primary transition-colors">
-                      {task.title}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground group-hover:text-primary transition-colors">
+                        {task.title}
+                      </span>
+                      {isSoftwareDev && (
+                        <GitStatusBadge 
+                          prUrl={task.pr_url} 
+                          prStatus={task.pr_status} 
+                          buildStatus={task.build_status} 
+                        />
+                      )}
+                    </div>
                     <span className="text-xs text-muted-foreground line-clamp-1">
-                      {task.description || "No description"}
+                      {task.description ? task.description.replace(/<[^>]*>/g, '').trim() : 'No description'}
                     </span>
                   </div>
                 </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="font-normal capitalize border-muted-foreground/20">
+                <TableCell className="px-6 py-4">
+                  <Badge variant="outline" className="font-bold text-[10px] uppercase tracking-widest bg-muted/50 border-border/40 text-muted-foreground">
                     {task.column?.name || 'Unknown'}
                   </Badge>
                 </TableCell>
-                <TableCell>
-                  <Badge className={`${priorityColors[task.priority]} border-none capitalize`}>
+                <TableCell className="px-6 py-4">
+                  <Badge className={cn("text-[10px] font-black uppercase tracking-widest px-2 py-0.5 border-none", priorityColors[task.priority])}>
                     {task.priority}
                   </Badge>
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={task.assignee?.avatar_path || undefined} />
-                      <AvatarFallback className="text-[10px]">
-                        {task.assignee?.name.charAt(0) || <UserIcon className="h-3 w-3" />}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm truncate max-w-[100px]">
-                      {task.assignee?.name || "Unassigned"}
-                    </span>
-                  </div>
+                <TableCell className="px-6 py-4">
+                  {(task.assignees?.length ?? 0) > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex -space-x-2">
+                        {(task.assignees ?? []).slice(0, 3).map((user) => (
+                          <Avatar key={user.id} className="h-7 w-7 border-2 border-card ring-1 ring-border/40">
+                            <AvatarImage src={user.avatar_path || undefined} />
+                            <AvatarFallback className="text-[10px] font-bold">
+                              {user.name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        ))}
+                      </div>
+                      {(task.assignees?.length ?? 0) === 1 ? (
+                        <span className="text-xs font-bold truncate max-w-[100px] text-muted-foreground">{task.assignees![0].name}</span>
+                      ) : (task.assignees?.length ?? 0) > 3 ? (
+                        <span className="text-[10px] font-black text-primary bg-primary/5 px-1.5 py-0.5 rounded-md border border-primary/10">+{(task.assignees?.length ?? 0) - 3}</span>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">Open</span>
+                  )}
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2 text-muted-foreground">
+                {isSoftwareDev && (
+                  <TableCell className="text-center">
+                    {task.story_points ? (
+                      <Badge variant="secondary" className="rounded-full h-5 px-2 text-[10px] font-bold">
+                        {task.story_points}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/40">-</span>
+                    )}
+                  </TableCell>
+                )}
+                <TableCell className="px-6 py-4">
+                  <div className="flex items-center gap-2 text-muted-foreground font-bold">
                     <Calendar className="h-3.5 w-3.5" />
-                    <span className="text-xs">
+                    <span className="text-[10px] uppercase tracking-widest">
                       {task.due_date ? format(new Date(task.due_date), 'MMM d, yyyy') : 'No date'}
                     </span>
                   </div>

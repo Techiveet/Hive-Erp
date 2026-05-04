@@ -26,7 +26,7 @@ export default function PublicBookingPage() {
   });
 
   useEffect(() => {
-    fetch(`${getBackendApiRoot()}/public/nightclub/available-tables`, { headers: publicHeaders() })
+    fetch(`${getBackendApiRoot()}/public/hospitality/available-tables`, { headers: publicHeaders() })
       .then(r => r.json())
       .then(d => setTables(Array.isArray(d) ? d : []))
       .catch(() => {})
@@ -43,7 +43,7 @@ export default function PublicBookingPage() {
     if (!form.customer_phone)     return toast.error("Phone number is required.");
     setSubmitting(true);
     try {
-      const res = await fetch(`${getBackendApiRoot()}/public/nightclub/reserve`, {
+      const res = await fetch(`${getBackendApiRoot()}/public/hospitality/reserve`, {
         method: "POST",
         headers: publicHeaders(),
         body: JSON.stringify({ ...form, table_id: +form.table_id }),

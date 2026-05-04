@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Layers, ChevronDown, ChevronRight, FileType, Mail, Boxes, Warehouse, MessageCircle, LayoutTemplate, RefreshCcw, ListTodo, CalendarCheck, CheckCircle, Plus, KanbanSquare, LayoutDashboard } from "lucide-react";
+import { Command, PanelLeftClose, PanelLeftOpen, LogOut, Search, X, Layers, ChevronDown, ChevronRight, FileType, Mail, Boxes, Warehouse, MessageCircle, LayoutTemplate, RefreshCcw, ListTodo, CalendarCheck, CheckCircle, Plus, KanbanSquare, LayoutDashboard, Utensils } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useChatAccess } from "@/hooks/use-chat-access";
@@ -13,6 +13,7 @@ import { useTranslation } from "@/store/use-translation";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { useBusinessType } from "@/hooks/use-business-type";
+import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
 import { cn } from "@/lib/utils";
 import { getAuthHeaders, getBackendApiRoot, getBackendStorageUrl, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
@@ -21,7 +22,7 @@ import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 const SecureSidebarLogo = ({ path, fallbackTitle, collapsed }: { path?: string, fallbackTitle?: string, collapsed: boolean }) => {
     const { t } = useTranslation();
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
-    
+
     useEffect(() => {
         if (!path) { setBlobUrl(null); return; }
         let isMounted = true;
@@ -39,17 +40,17 @@ const SecureSidebarLogo = ({ path, fallbackTitle, collapsed }: { path?: string, 
                     return;
                 }
                 if (!res.ok) throw new Error("Fetch blocked by server");
-                
+
                 const contentType = res.headers.get('content-type');
                 if (!contentType?.startsWith('image/')) throw new Error("Not an image");
 
                 const blob = await res.blob();
                 if (isMounted) setBlobUrl(URL.createObjectURL(blob));
-            } catch { 
-                if (isMounted) setBlobUrl(fullUrl); 
+            } catch {
+                if (isMounted) setBlobUrl(fullUrl);
             }
         };
-        
+
         fetchLogo();
         return () => { isMounted = false; };
     }, [path]);
@@ -59,7 +60,7 @@ const SecureSidebarLogo = ({ path, fallbackTitle, collapsed }: { path?: string, 
             <img src={blobUrl} alt="Brand Logo" className="h-full w-auto object-contain" />
         </div>
     );
-    
+
     return (
         <div className={cn("group flex items-center gap-3", collapsed ? "justify-center" : "")}>
             <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform group-hover:scale-110">
@@ -92,22 +93,25 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   const router = useRouter();
   const { resolvedTheme } = useTheme();
   const { hasAnyPermission } = usePermissions();
-  const { hasChatWorkspace } = useChatAccess();
+  const { hasModule } = useTenantModuleAccess();
+  const { hasChatWorkspace, hasMailboxModule } = useChatAccess();
   const { hasBusinessType } = useBusinessType();
   const { t } = useTranslation();
-  
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isMounted, setIsMounted] = useState(false);
   const [isTenantNode, setIsTenantNode] = useState(false);
-  
+
   const [isModulesOpen, setIsModulesOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isWarehouseOpen, setIsWarehouseOpen] = useState(false);
+  const [isHospitalityOpen, setIsHospitalityOpen] = useState(false);
   const [isProjectManagementOpen, setIsProjectManagementOpen] = useState(false);
   const [isWorkflowOpen, setIsWorkflowOpen] = useState(false);
   // 🚀 Apps dropdown state
   const [isAppsOpen, setIsAppsOpen] = useState(false);
-  const canAccessConverter = hasAnyPermission(["use_document_converter", "manage_storage"]);
+  const canAccessConverter = hasAnyPermission(["use_document_converter", "manage_storage"]) && (!isTenantNode || hasModule("document_converter"));
+  const canAccessMail = !isTenantNode || hasMailboxModule;
   const canAccessLandingTemplates = hasAnyPermission(["manage_tenants", "provision_tenants"]);
 
   useEffect(() => {
@@ -140,38 +144,48 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   };
 
   const hasAccess = (item: NavItem) => {
-    if (!isTenantNode && item.moduleId === "subscription") return false;
+    if (!isTenantNode && item.moduleId === "subscription") return hasAnyPermission(["manage_tenants", "provision_tenants"]);
     if (isTenantNode && item.href === '/dashboard/tenants') return false;
     if (item.businessTypes && item.businessTypes.length > 0 && !hasBusinessType(item.businessTypes)) return false;
+    if (isTenantNode && item.subscriptionSlug) {
+      const requiredModules = Array.isArray(item.subscriptionSlug) ? item.subscriptionSlug : [item.subscriptionSlug];
+      if (!requiredModules.some((slug) => hasModule(slug))) return false;
+    }
     if (!item.permissions || item.permissions.length === 0) return true;
     return hasAnyPermission(item.permissions);
   };
 
   const filteredNav = useMemo(() => {
     if (!isMounted) return [];
-    return DASHBOARD_NAV.filter(item => 
+    return DASHBOARD_NAV.filter(item =>
       hasAccess(item) && t(item.translationKey, item.fallbackLabel).toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery, t, hasAnyPermission, isTenantNode, isMounted]);
+  }, [searchQuery, t, hasAnyPermission, hasModule, isTenantNode, isMounted]);
 
   const filteredSecondary = useMemo(() => {
     if (!isMounted) return [];
-    return DASHBOARD_SECONDARY.filter((item) => 
+    return DASHBOARD_SECONDARY.filter((item) =>
       hasAccess(item) && t(item.translationKey, item.fallbackLabel).toLowerCase().includes(searchQuery.toLowerCase())
       && item.moduleId !== "projectmanagement" && item.moduleId !== "workflow"
     );
-  }, [searchQuery, t, hasAnyPermission, isTenantNode, isMounted]);
+  }, [searchQuery, t, hasAnyPermission, hasModule, isTenantNode, isMounted]);
 
-  const projectManagementFromSecondary = DASHBOARD_SECONDARY.filter((item) => item.moduleId === "projectmanagement");
-  
+  const projectManagementFromSecondary = isMounted
+    ? DASHBOARD_SECONDARY.filter((item) =>
+      item.moduleId === "projectmanagement"
+      && hasAccess(item)
+      && t(item.translationKey, item.fallbackLabel).toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    : [];
+
   const moduleNavItems = [
-    ...filteredNav.filter((item) => item.moduleId === "inventory" || item.moduleId === "nightclub" || item.moduleId === "warehouse" || item.moduleId === "workflow" || item.moduleId === "projectmanagement"),
+    ...filteredNav.filter((item) => item.moduleId === "inventory" || item.moduleId === "hospitality" || item.moduleId === "warehouse" || item.moduleId === "workflow" || item.moduleId === "projectmanagement"),
     ...projectManagementFromSecondary,
     ...filteredSecondary.filter((item) => item.moduleId === "workflow" || item.moduleId === "projectmanagement")
   ];
-  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "nightclub" && item.moduleId !== "warehouse" && item.moduleId !== "workflow" && item.moduleId !== "projectmanagement" && item.href !== "/dashboard/landing-templates");
+  const standardNavItems = filteredNav.filter((item) => item.moduleId !== "inventory" && item.moduleId !== "hospitality" && item.moduleId !== "warehouse" && item.moduleId !== "workflow" && item.moduleId !== "projectmanagement" && item.href !== "/dashboard/landing-templates");
   const inventoryModuleItems = moduleNavItems.filter((item) => item.moduleId === "inventory");
-  const nightclubModuleItems = moduleNavItems.filter((item) => item.moduleId === "nightclub");
+  const hospitalityModuleItems = moduleNavItems.filter((item) => item.moduleId === "hospitality");
   const warehouseModuleItems = moduleNavItems.filter((item) => item.moduleId === "warehouse");
   const projectManagementModuleItems = moduleNavItems.filter((item) => item.moduleId === "projectmanagement");
   const workflowModuleItems = moduleNavItems.filter((item) => item.moduleId === "workflow");
@@ -185,8 +199,9 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
       setIsModulesOpen(true);
       setIsWarehouseOpen(true);
     }
-    if (pathname.startsWith("/dashboard/nightclub")) {
+    if (pathname.startsWith("/dashboard/hospitality")) {
       setIsModulesOpen(true);
+      setIsHospitalityOpen(true);
     }
     if (pathname.startsWith("/dashboard/project-management")) {
       setIsModulesOpen(true);
@@ -208,7 +223,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
     const displayLogo = collapsed ? sidebarIconUrl : logoUrl;
 
     return (
-      <div id="tour-sidebar-brand" className="mb-2 shrink-0"> 
+      <div id="tour-sidebar-brand" className="mb-2 shrink-0">
           <div className={cn("relative flex items-center gap-3 px-1 py-1", collapsed ? "justify-center" : "justify-between")}>
             <Link href="/dashboard" className={cn("group flex items-center gap-3 min-w-0 flex-1", collapsed ? "justify-center" : "")}>
               <SecureSidebarLogo path={displayLogo} fallbackTitle={brandSettings?.app_title} collapsed={collapsed} />
@@ -237,7 +252,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
       {!collapsed && (
         <div id="tour-sidebar-search" className="px-1 mt-3 relative group shrink-0">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-          <input 
+          <input
             type="text"
             placeholder={t('topbar.search_menu', 'Search menu...')}
             value={searchQuery}
@@ -251,7 +266,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
           )}
         </div>
       )}
-      
+
       <nav id="tour-sidebar-nav" className="mt-3 flex-1 space-y-1 overflow-y-auto min-h-0 py-1 no-scrollbar">
         {searchQuery ? (
           filteredNav.map((item) => {
@@ -261,9 +276,9 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
 
             return (
               <Link key={item.href} id={item.tourId} href={item.href} title={collapsed ? label : undefined}
-                className={cn("group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] transition-all duration-200", 
-                  collapsed ? "justify-center px-0 py-2" : "", 
-                  active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "text-muted-foreground font-semibold hover:bg-muted/80 hover:text-foreground border border-transparent")} 
+                className={cn("group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] transition-all duration-200",
+                  collapsed ? "justify-center px-0 py-2" : "",
+                  active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "text-muted-foreground font-semibold hover:bg-muted/80 hover:text-foreground border border-transparent")}
               >
                 <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary-foreground" : "")} />
                 {!collapsed && <span className="truncate">{label}</span>}
@@ -279,9 +294,9 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
 
               return (
                 <Link key={item.href} id={item.tourId} href={item.href} title={collapsed ? label : undefined}
-                  className={cn("group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] transition-all duration-200", 
-                    collapsed ? "justify-center px-0 py-2" : "", 
-                    active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "text-muted-foreground font-semibold hover:bg-muted/80 hover:text-foreground border border-transparent")} 
+                  className={cn("group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] transition-all duration-200",
+                    collapsed ? "justify-center px-0 py-2" : "",
+                    active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "text-muted-foreground font-semibold hover:bg-muted/80 hover:text-foreground border border-transparent")}
                 >
                   <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary-foreground" : "")} />
                   {!collapsed && <span className="truncate">{label}</span>}
@@ -346,28 +361,46 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                       </div>
                     )}
 
-                    {nightclubModuleItems.map((item) => {
-                      const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
-                      const Icon = item.icon;
-                      const label = t(item.translationKey, item.fallbackLabel);
-
-                      return (
-                        <Link
-                          key={item.href}
-                          id={item.tourId}
-                          href={item.href}
-                          className={cn(
-                            "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
-                            active
-                              ? "bg-primary/10 text-primary font-bold"
-                              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
-                          )}
+                    {hospitalityModuleItems.length > 0 && (
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => setIsHospitalityOpen(!isHospitalityOpen)}
+                          className="group flex items-center justify-between rounded-xl px-2.5 py-1.5 text-[13px] font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground outline-none"
                         >
-                          <Icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{label}</span>
-                        </Link>
-                      );
-                    })}
+                          <div className="flex items-center gap-3">
+                            <Utensils className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{t("nav.hospitality", "Hospitality")}</span>
+                          </div>
+                          {isHospitalityOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
+                        </button>
+                        {isHospitalityOpen && (
+                          <div className="flex flex-col gap-1 pl-4">
+                            {hospitalityModuleItems.map((item) => {
+                              const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href || pathname.startsWith(item.href + "/");
+                              const Icon = item.icon;
+                              const label = t(item.translationKey, item.fallbackLabel);
+
+                              return (
+                                <Link
+                                  key={item.href}
+                                  id={item.tourId}
+                                  href={item.href}
+                                  className={cn(
+                                    "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                                    active
+                                      ? "bg-primary/10 text-primary font-bold"
+                                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                                  )}
+                                >
+                                  <Icon className="h-4 w-4 shrink-0" />
+                                  <span className="truncate">{label}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {warehouseModuleItems.length > 0 && (
                       <div className="flex flex-col gap-1">
@@ -413,7 +446,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                     {projectManagementModuleItems.length > 0 && (
                       <div className="flex flex-col gap-1">
                         <div className="group flex items-center justify-between rounded-xl px-2.5 py-1.5 text-[13px] font-semibold transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground">
-                          <Link 
+                          <Link
                             href="/dashboard/project-management"
                             className="flex items-center gap-3 flex-1 overflow-hidden"
                           >
@@ -430,7 +463,7 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                             {isProjectManagementOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
                           </button>
                         </div>
-                        
+
                         {isProjectManagementOpen && (
                           <div className="flex flex-col gap-1 pl-4 mb-2">
                             <Link
@@ -473,11 +506,11 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                             </Link>
 
                             <div className="pt-2 pb-1 pr-2">
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 className="w-full h-8 text-[11px] font-bold rounded-lg gap-1.5 shadow-sm shadow-primary/20"
                                 onClick={() => {
-                                  // This will trigger the global modal if implemented, 
+                                  // This will trigger the global modal if implemented,
                                   // but for now we just navigate to projects and let them click create
                                   router.push("/dashboard/project-management/projects?create=true");
                                 }}
@@ -571,9 +604,9 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
         )}
 
         {/* 🚀 THE NEW APPS DROPDOWN */}
-        {isMounted && (canAccessConverter || hasChatWorkspace || canAccessLandingTemplates) && !searchQuery && (
+        {isMounted && (canAccessConverter || canAccessMail || hasChatWorkspace || canAccessLandingTemplates) && !searchQuery && (
           <div className="mt-2 flex flex-col gap-1">
-            <button 
+            <button
               id="tour-nav-apps"
               onClick={() => setIsAppsOpen(!isAppsOpen)}
               className={cn(
@@ -594,55 +627,61 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
             {/* Sub-menu (Open state for Desktop) */}
             {!collapsed && isAppsOpen && (
               <div className="flex flex-col gap-1 pl-4 mt-1 animate-in slide-in-from-top-2 duration-200">
-                <Link 
-                  href="/dashboard/tools/converters"
-                  id="tour-nav-converters-hub"
-                  className={cn(
-                    "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
-                    pathname.startsWith('/dashboard/tools/converters') 
-                      ? "bg-primary/10 text-primary font-bold" 
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
-                  )}
-                >
-                  <RefreshCcw className="h-4 w-4 shrink-0" />
-                  <span className="truncate">Converters</span>
-                </Link>
-                <Link 
-                  href="/dashboard/tools/converter"
-                  id="tour-nav-converter"
-                  className={cn(
-                    "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
-                    pathname === '/dashboard/tools/converter'
-                      ? "bg-primary/10 text-primary font-bold" 
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
-                  )}
-                >
-                  <FileType className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{t('nav.tools_converter', 'HTML to PDF')}</span>
-                </Link>
-                
-<Link 
-                  href="/dashboard/mail"
-                  id="tour-nav-mail"
-                  className={cn(
-                    "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
-                    pathname.includes('/dashboard/mail') 
-                      ? "bg-primary/10 text-primary font-bold" 
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
-                  )}
-                >
-                  <Mail className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{t('nav.mail', 'Internal Mail')}</span>
-                </Link>
-                
+                {canAccessConverter && (
+                  <Link
+                    href="/dashboard/tools/converters"
+                    id="tour-nav-converters-hub"
+                    className={cn(
+                      "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                      pathname.startsWith('/dashboard/tools/converters')
+                        ? "bg-primary/10 text-primary font-bold"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                    )}
+                  >
+                    <RefreshCcw className="h-4 w-4 shrink-0" />
+                    <span className="truncate">Converters</span>
+                  </Link>
+                )}
+                {canAccessConverter && (
+                  <Link
+                    href="/dashboard/tools/converter"
+                    id="tour-nav-converter"
+                    className={cn(
+                      "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                      pathname === '/dashboard/tools/converter'
+                        ? "bg-primary/10 text-primary font-bold"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                    )}
+                  >
+                    <FileType className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{t('nav.tools_converter', 'HTML to PDF')}</span>
+                  </Link>
+                )}
+
+                {canAccessMail && (
+                  <Link
+                    href="/dashboard/mail"
+                    id="tour-nav-mail"
+                    className={cn(
+                      "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
+                      pathname.includes('/dashboard/mail')
+                        ? "bg-primary/10 text-primary font-bold"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
+                    )}
+                  >
+                    <Mail className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{t('nav.mail', 'Internal Mail')}</span>
+                  </Link>
+                )}
+
                 {hasChatWorkspace && (
-                  <Link 
+                  <Link
                     href="/dashboard/chat"
                     id="tour-nav-chat"
                     className={cn(
                       "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
-                      pathname.includes('/dashboard/chat') 
-                        ? "bg-primary/10 text-primary font-bold" 
+                      pathname.includes('/dashboard/chat')
+                        ? "bg-primary/10 text-primary font-bold"
                         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
                     )}
                   >
@@ -651,13 +690,13 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                   </Link>
                 )}
                 {canAccessLandingTemplates && !isTenantNode && (
-                  <Link 
+                  <Link
                     href="/dashboard/landing-templates"
                     id="tour-nav-landing-templates"
                     className={cn(
                       "group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] transition-all duration-200",
-                      pathname.includes('/dashboard/landing-templates') 
-                        ? "bg-primary/10 text-primary font-bold" 
+                      pathname.includes('/dashboard/landing-templates')
+                        ? "bg-primary/10 text-primary font-bold"
                         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground font-semibold"
                     )}
                   >
@@ -671,50 +710,50 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
             {/* Sub-menu (Collapsed mode shortcut) */}
             {collapsed && (
               <>
-               <Link 
+               {canAccessConverter && <Link
                   href="/dashboard/tools/converters"
                   title="Converters Hub"
                   className={cn(
                     "group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200 mt-1",
-                    pathname.startsWith('/dashboard/tools/converters') 
-                      ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
+                    pathname.startsWith('/dashboard/tools/converters')
+                      ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25"
                       : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
                   )}
                >
                  <RefreshCcw className="h-4 w-4 shrink-0" />
-               </Link>
-               <Link 
+               </Link>}
+               {canAccessConverter && <Link
                   href="/dashboard/tools/converter"
                   title="HTML to PDF"
                   className={cn(
                     "group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200 mt-1",
                     pathname === '/dashboard/tools/converter'
-                      ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
+                      ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25"
                       : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
                   )}
                >
                  <FileType className="h-4 w-4 shrink-0" />
-               </Link>
-<Link 
+               </Link>}
+                {canAccessMail && <Link
                    href="/dashboard/mail"
                    title="Internal Mail"
                    className={cn(
                      "group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200 mt-1",
-                     pathname.includes('/dashboard/mail') 
-                       ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
+                     pathname.includes('/dashboard/mail')
+                       ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25"
                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
                    )}
                 >
                   <Mail className="h-4 w-4 shrink-0" />
-                </Link>
+                </Link>}
                 {hasChatWorkspace && (
-                  <Link 
+                  <Link
                      href="/dashboard/chat"
                      title="Real-time Chat"
                      className={cn(
                        "group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200 mt-1",
-                       pathname.includes('/dashboard/chat') 
-                         ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
+                       pathname.includes('/dashboard/chat')
+                         ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25"
                          : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
                      )}
                   >
@@ -722,13 +761,13 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                   </Link>
                 )}
                 {canAccessLandingTemplates && !isTenantNode && (
-                  <Link 
+                  <Link
                     href="/dashboard/landing-templates"
                     title="Landing Templates"
                     className={cn(
                       "group flex items-center justify-center rounded-xl px-0 py-2.5 text-[13px] transition-all duration-200 mt-1",
-                      pathname.includes('/dashboard/landing-templates') 
-                        ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25" 
+                      pathname.includes('/dashboard/landing-templates')
+                        ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25"
                         : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-semibold"
                     )}
                   >
@@ -754,21 +793,21 @@ function SidebarInner({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
 
             return (
               <Link key={item.href} id={item.tourId} href={item.href} title={collapsed ? label : undefined}
-                className={cn("flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] transition-all duration-200", 
+                className={cn("flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] transition-all duration-200",
                   collapsed ? "justify-center px-0 py-2" : "",
-                  active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")} 
+                  active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-bold" : "font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground")}
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="truncate">{label}</span>}
               </Link>
             );
           })}
-          
+
           <button onClick={handleLogout} className={cn("w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] font-bold text-destructive transition-colors hover:bg-destructive/15", collapsed ? "justify-center px-0 py-2" : "")} title={collapsed ? t('nav.disconnect', 'Disconnect Node') : undefined}>
             <LogOut className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="truncate">{t('nav.disconnect', 'Disconnect Node')}</span>}
           </button>
-          
+
           <div className={cn("flex items-center rounded-xl border border-border/40 bg-background/50 px-2.5 py-1.5 mt-2", collapsed ? "justify-center flex-col gap-2" : "justify-between")}>
             {!collapsed && <div className="text-xs text-muted-foreground font-bold uppercase tracking-wider">{t('nav.theme', 'Theme')}</div>}
             <ThemeToggle />

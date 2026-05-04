@@ -5,7 +5,7 @@ use Modules\Warehouse\Http\Controllers\WarehouseLocationController;
 use Modules\Warehouse\Http\Controllers\WarehouseManagementController;
 use Modules\Warehouse\Http\Controllers\WarehouseStockController;
 
-Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout', 'tenant_module:inventory_control'])
+Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout', 'tenant_module:warehouse_management'])
     ->prefix('v1/warehouse')
     ->group(function () {
         Route::get('warehouses', [WarehouseManagementController::class, 'index'])

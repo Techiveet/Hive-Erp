@@ -3,6 +3,8 @@
 namespace Modules\Subscription\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Blade;
+use Modules\Subscription\Support\FeatureAccessService;
 use Modules\Subscription\Console\Commands\ReconcileTenantSubscriptionsCommand;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
@@ -36,6 +38,23 @@ class SubscriptionServiceProvider extends ModuleServiceProvider
         EventServiceProvider::class,
         RouteServiceProvider::class,
     ];
+
+    public function boot(): void
+    {
+        parent::boot();
+
+        Blade::if('subscribed', function (string $moduleSlug): bool {
+            $tenant = function_exists('tenant') ? tenant() : null;
+
+            return app(FeatureAccessService::class)->hasModule($tenant, $moduleSlug);
+        });
+
+        Blade::if('feature', function (string $featureSlug): bool {
+            $tenant = function_exists('tenant') ? tenant() : null;
+
+            return app(FeatureAccessService::class)->hasFeature($tenant, $featureSlug);
+        });
+    }
 
     /**
      * Define module schedules.

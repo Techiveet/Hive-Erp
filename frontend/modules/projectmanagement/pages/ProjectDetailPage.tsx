@@ -2,17 +2,20 @@
 
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   Calendar,
+  CalendarClock,
   CheckCircle2,
   ChevronLeft,
   Clock,
   FileText,
   Layout,
   List,
+  Loader2,
   MessageSquare,
   Paperclip,
   Pencil,
@@ -20,8 +23,14 @@ import {
   Send,
   Trash2,
   Users,
+  Coins,
+  BarChart3,
+  PieChart,
+  Zap,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -51,14 +60,23 @@ import { KanbanBoard } from "../components/KanbanBoard";
 import { ProjectGanttChart } from "../components/ProjectGanttChart";
 import { ProjectListView } from "../components/ProjectListView";
 import { TaskDetailSheet } from "../components/TaskDetailSheet";
+import { ProjectDiscussion } from "../components/ProjectDiscussion";
+import { ProjectCalendar } from "../components/ProjectCalendar";
+import { useUser } from "@/hooks/use-user";
 import { useProjectManagementRealtime } from "../hooks/use-project-management-realtime";
+import { CreateProjectModal } from "../components/CreateProjectModal";
+import { ResourceHeatmap } from "../components/ResourceHeatmap";
+import { ProjectAutomations } from "../components/ProjectAutomations";
+import { BacklogView } from "../components/BacklogView";
+import { FinancialReportView } from "../components/FinancialReportView";
+import { ProjectOverviewCharts } from "../components/ProjectOverviewCharts";
 import type { MemberRole, Project, ProjectStatus, Task } from "../types";
 
 interface ProjectDetailPageProps {
   id: string;
 }
 
-type DetailView = "overview" | "board" | "list" | "gantt";
+type DetailView = "overview" | "board" | "list" | "gantt" | "calendar" | "resources" | "automations" | "backlog" | "financials" | "insights";
 
 const statusColors: Record<string, string> = {
   planning: "bg-sky-500/10 text-sky-600",
@@ -75,16 +93,6 @@ const priorityColors: Record<string, string> = {
   urgent: "bg-rose-500/10 text-rose-600",
 };
 
-const defaultGoals = [
-  "Increase efficiency",
-  "Enhance customer satisfaction",
-  "Expand market reach",
-  "Improve profitability",
-  "Enhance product/service quality",
-  "Develop innovative solutions",
-  "Increase employee engagement",
-  "Enhance brand reputation",
-];
 
 function initials(name?: string | null) {
   return (name || "U")
@@ -104,14 +112,14 @@ function formatDate(value?: string | null) {
   return format(new Date(value), "dd,MMMM yyyy");
 }
 
-function Panel({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Panel({ title, action, children, id }: { title: string; action?: React.ReactNode; children: React.ReactNode; id?: string }) {
   return (
-    <section className="rounded-md border bg-card">
-      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-        <h2 className="border-l-2 border-sky-400 pl-2 text-sm font-bold">{title}</h2>
+    <section className="rounded-[2rem] border border-border/40 bg-card shadow-xl shadow-black/5 overflow-hidden" id={id}>
+      <div className="flex items-center justify-between gap-3 border-b border-border/40 px-6 py-4 bg-muted/20">
+        <h2 className="border-l-4 border-primary pl-3 text-sm font-black uppercase tracking-widest">{title}</h2>
         {action}
       </div>
-      <div className="p-4">{children}</div>
+      <div className="p-6">{children}</div>
     </section>
   );
 }
@@ -128,15 +136,14 @@ function ProjectOverview({
   onTaskClick: (task: Task) => void;
 }) {
   const queryClient = useQueryClient();
-  const [comment, setComment] = useState("");
-  const [activity, setActivity] = useState([
-    { id: 1, name: "You", body: "Commented on work process in this project.", date: "24,Dec 2023 - 14:34" },
-    { id: 2, name: project.project_manager?.name || project.creator?.name || "Project manager", body: "Shared an update for the current milestone.", date: "18,Dec 2023 - 12:16" },
-  ]);
   const [newGoal, setNewGoal] = useState("");
-  const [goals, setGoals] = useState(() => defaultGoals.map((label, index) => ({ id: index + 1, label, done: [0, 4, 5, 6].includes(index) })));
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<MemberRole>("member");
+
+  const { data: goals = [], refetch: refetchGoals } = useQuery({
+    queryKey: ["project-goals", project.id],
+    queryFn: () => projectApi.getProjectGoals(project.id),
+  });
 
   const { data: users = [] } = useQuery({
     queryKey: ["users-search", "project-detail"],
@@ -144,7 +151,7 @@ function ProjectOverview({
   });
 
   const addMemberMutation = useMutation({
-    mutationFn: () => projectApi.addMember(project.id, { user_id: parseInt(selectedUserId, 10), role: selectedRole }),
+    mutationFn: () => projectApi.addMember(project.id, { user_id: selectedUserId, role: selectedRole }),
     onSuccess: () => {
       toast.success("Member added");
       setSelectedUserId("");
@@ -155,7 +162,7 @@ function ProjectOverview({
   });
 
   const removeMemberMutation = useMutation({
-    mutationFn: (userId: number) => projectApi.removeMember(project.id, userId),
+    mutationFn: (userId: string) => projectApi.removeMember(project.id, userId),
     onSuccess: () => {
       toast.success("Member removed");
       queryClient.invalidateQueries({ queryKey: ["project", project.id] });
@@ -177,24 +184,40 @@ function ProjectOverview({
   const progress = project.progress || 0;
   const attachments = project.attachments || [];
 
+  const addGoalMutation = useMutation({
+    mutationFn: (title: string) => projectApi.addProjectGoal(project.id, { title }),
+    onSuccess: () => {
+      setNewGoal("");
+      refetchGoals();
+      toast.success("Goal added");
+    },
+    onError: (error: any) => toast.error(error.message || "Could not add goal"),
+  });
+
+  const toggleGoalMutation = useMutation({
+    mutationFn: ({ id, is_completed }: { id: number, is_completed: boolean }) => 
+      projectApi.updateProjectGoal(id, { is_completed }),
+    onSuccess: () => refetchGoals(),
+    onError: (error: any) => toast.error(error.message || "Could not update goal"),
+  });
+
+  const deleteGoalMutation = useMutation({
+    mutationFn: (id: number) => projectApi.deleteProjectGoal(id),
+    onSuccess: () => {
+      refetchGoals();
+      toast.success("Goal removed");
+    },
+    onError: (error: any) => toast.error(error.message || "Could not remove goal"),
+  });
+
   const addGoal = () => {
     if (!newGoal.trim()) return;
-    setGoals((items) => [...items, { id: Date.now(), label: newGoal.trim(), done: false }]);
-    setNewGoal("");
-  };
-
-  const addComment = () => {
-    if (!comment.trim()) return;
-    setActivity((items) => [
-      { id: Date.now(), name: "You", body: comment.trim(), date: format(new Date(), "dd,MMM yyyy - HH:mm") },
-      ...items,
-    ]);
-    setComment("");
+    addGoalMutation.mutate(newGoal.trim());
   };
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <div className="space-y-5">
+    <div className="flex flex-col xl:flex-row gap-5 max-w-full">
+      <div className="flex-1 min-w-0 space-y-5">
         <Panel
           title="Project Details"
           action={
@@ -205,13 +228,13 @@ function ProjectOverview({
           }
         >
           <div className="space-y-6">
-            <div className="flex items-start gap-3">
-              <span className="mt-2 h-2 w-2 rounded-full bg-sky-400" />
-              <div>
-                <h1 className="text-xl font-bold tracking-tight">{project.name}</h1>
-                <p className="mt-4 text-sm font-semibold">Project Description :</p>
-                <p className="mt-3 max-w-5xl text-sm leading-7 text-muted-foreground">{cleanText(project.description)}</p>
-              </div>
+            <div className="flex-1 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+              <h1 className="text-xl font-bold tracking-tight">{project.name}</h1>
+              <p className="mt-4 text-sm font-semibold">Project Description :</p>
+              <div 
+                className="mt-3 text-sm leading-7 text-muted-foreground prose prose-sm dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: project.description || "No description provided." }}
+              />
             </div>
 
             <div>
@@ -238,28 +261,41 @@ function ProjectOverview({
               </div>
             </div>
 
-            <div className="grid gap-4 border-t pt-5 md:grid-cols-6">
-              <div>
-                <p className="text-xs text-muted-foreground">Project Manager</p>
-                <div className="mt-1 flex items-center gap-2">
-                  <Avatar className="h-6 w-6 bg-muted">
-                    <AvatarImage src={project.project_manager?.avatar_path || undefined} />
-                    <AvatarFallback className="text-[10px]">{initials(project.project_manager?.name || project.creator?.name)}</AvatarFallback>
-                  </Avatar>
-                  <span className="text-sm font-bold">{project.project_manager?.name || project.creator?.name || "Unassigned"}</span>
+            <div className="grid gap-4 border-t pt-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Project Manager(s)</p>
+                <div className="flex flex-col gap-2">
+                  {project.members?.filter(m => m.role === 'manager').map(m => m.user).filter(Boolean).map((manager: any) => (
+                    <div key={manager.id} className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6 bg-muted">
+                        <AvatarImage src={manager.avatar_path || undefined} />
+                        <AvatarFallback className="text-[10px]">{initials(manager.name)}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-bold truncate">{manager.name}</span>
+                    </div>
+                  ))}
+                  {(!project.members?.some(m => m.role === 'manager')) && (
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6 bg-muted">
+                        <AvatarImage src={project.project_manager?.avatar_path || undefined} />
+                        <AvatarFallback className="text-[10px]">{initials(project.project_manager?.name || project.creator?.name)}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-bold truncate">{project.project_manager?.name || project.creator?.name || "Unassigned"}</span>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div>
+              <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Start Date</p>
-                <p className="mt-1 text-sm font-bold">{formatDate(project.start_date)}</p>
+                <p className="text-sm font-bold">{formatDate(project.start_date)}</p>
               </div>
-              <div>
+              <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">End Date</p>
-                <p className="mt-1 text-sm font-bold">{formatDate(project.end_date)}</p>
+                <p className="text-sm font-bold">{formatDate(project.end_date)}</p>
               </div>
-              <div>
+              <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Assigned To</p>
-                <div className="mt-1 flex -space-x-2">
+                <div className="flex -space-x-2">
                   {(project.members || []).slice(0, 4).map((member) => (
                     <Avatar key={member.id} className="h-7 w-7 border-2 border-card bg-muted">
                       <AvatarImage src={member.user?.avatar_path || undefined} />
@@ -268,13 +304,13 @@ function ProjectOverview({
                   ))}
                 </div>
               </div>
-              <div>
+              <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Status</p>
-                <Badge className={`${statusColors[project.status]} mt-1 border-none capitalize`}>{project.status.replace("_", " ")}</Badge>
+                <Badge className={`${statusColors[project.status]} border-none capitalize text-[10px] h-5`}>{project.status.replace("_", " ")}</Badge>
               </div>
-              <div>
+              <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Priority</p>
-                <Badge className={`${priorityColors[project.priority]} mt-1 border-none capitalize`}>{project.priority}</Badge>
+                <Badge className={`${priorityColors[project.priority]} border-none capitalize text-[10px] h-5`}>{project.priority}</Badge>
               </div>
             </div>
 
@@ -288,47 +324,95 @@ function ProjectOverview({
           </div>
         </Panel>
 
-        <Panel title="Project Gantt">
-          <div className="h-[720px]">
-            <ProjectGanttChart project={project} tasks={tasks} onTaskClick={onTaskClick} />
-          </div>
-        </Panel>
-
-        <Panel title="Project Discussions">
-          <div className="space-y-6">
-            <div className="space-y-5">
-              {activity.map((item) => (
-                <div key={item.id} className="grid grid-cols-[40px_1fr_auto] gap-4">
-                  <Avatar className="h-8 w-8 bg-muted">
-                    <AvatarFallback className="text-[10px]">{initials(item.name)}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm">
-                      <span className="font-bold">{item.name}</span> {item.body}
-                    </p>
-                    <p className="mt-2 text-sm text-muted-foreground">Project is moving forward. Keep updates concise and visible to the team.</p>
+        <div className="grid gap-5 md:grid-cols-2">
+          <Panel title="Project Goals">
+            <div className="space-y-4">
+              <div className="divide-y rounded-md border max-h-[300px] overflow-y-auto custom-scrollbar">
+                {goals.map((goal: any) => (
+                  <div key={goal.id} className="flex items-center justify-between gap-3 p-3 text-sm font-semibold group">
+                    <label className="flex items-center gap-3 cursor-pointer flex-1">
+                      <Checkbox 
+                        checked={goal.is_completed} 
+                        onCheckedChange={(checked) => {
+                          toggleGoalMutation.mutate({ id: goal.id, is_completed: checked === true });
+                        }} 
+                      />
+                      <span className={goal.is_completed ? "text-muted-foreground line-through decoration-primary/30" : ""}>
+                        {goal.title}
+                      </span>
+                    </label>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => deleteGoalMutation.mutate(goal.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <p className="hidden text-xs text-muted-foreground md:block">{item.date}</p>
+                ))}
+                {goals.length === 0 && (
+                  <div className="p-8 text-center text-xs text-muted-foreground italic bg-muted/5">
+                    No goals defined for this project yet.
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input 
+                  value={newGoal} 
+                  onChange={(event) => setNewGoal(event.target.value)} 
+                  onKeyDown={(e) => e.key === 'Enter' && addGoal()}
+                  placeholder="Add goal" 
+                  className="bg-muted/30"
+                />
+                <Button onClick={addGoal} size="sm" disabled={addGoalMutation.isPending || !newGoal.trim()}>
+                  {addGoalMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Add"}
+                </Button>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel title="Project Documents">
+            <div className="divide-y rounded-md border max-h-[350px] overflow-y-auto custom-scrollbar">
+              {attachments.length === 0 && (
+                <div className="p-4 text-sm text-muted-foreground italic">No documents attached yet.</div>
+              )}
+              {attachments.map((file, index) => (
+                <div key={`${file.path || file.name}-${index}`} className="grid grid-cols-[1fr_auto] items-center gap-3 p-3 hover:bg-muted/5 transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/50 border">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{file.name || "Project document"}</p>
+                      <p className="truncate text-[10px] text-muted-foreground uppercase tracking-widest">{file.path || "Attached file"}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button asChild variant="ghost" size="icon" className="h-8 w-8" aria-label="Open document">
+                      <Link href={file.url || "#"} target={file.url ? "_blank" : undefined}>
+                        <Paperclip className="h-4 w-4 text-sky-500" />
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => updateProjectMutation.mutate(attachments.filter((_, itemIndex) => itemIndex !== index))}
+                      aria-label="Remove document"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="flex items-center gap-2 border-t pt-4">
-              <Avatar className="h-8 w-8 bg-muted">
-                <AvatarFallback className="text-[10px]">Y</AvatarFallback>
-              </Avatar>
-              <Input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Post anything" />
-              <Button size="icon" onClick={addComment} aria-label="Post comment">
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </Panel>
-      </div>
+          </Panel>
+        </div>
 
-      <div className="space-y-5">
-        <Panel title="Project Team">
+        <Panel title="Project Team" id="project-team-section">
           <div className="space-y-4">
-            <div className="grid grid-cols-[1fr_120px_auto] gap-2">
+            <div className="flex flex-col sm:grid sm:grid-cols-[1fr_120px_auto] gap-2">
               <Select value={selectedUserId} onValueChange={setSelectedUserId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Add member" />
@@ -349,27 +433,34 @@ function ProjectOverview({
                   <SelectItem value="viewer">Viewer</SelectItem>
                 </SelectContent>
               </Select>
-              <Button size="icon" disabled={!selectedUserId || addMemberMutation.isPending} onClick={() => addMemberMutation.mutate()} aria-label="Add member">
-                <Plus className="h-4 w-4" />
+              <Button 
+                className="w-full sm:w-10 h-10 shrink-0 bg-sky-500 hover:bg-sky-600 text-white shadow-lg shadow-sky-500/20 rounded-xl" 
+                size="icon" 
+                disabled={!selectedUserId || addMemberMutation.isPending} 
+                onClick={() => addMemberMutation.mutate()} 
+                aria-label="Add member"
+              >
+                <Plus className="h-5 w-5" />
+                <span className="ml-2 sm:hidden text-xs font-bold uppercase tracking-wider">Add Member</span>
               </Button>
             </div>
-            <div className="divide-y rounded-md border">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {(project.members || []).map((member) => (
-                <div key={member.id} className="grid grid-cols-[1fr_auto] items-center gap-3 p-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8 bg-muted">
+                <div key={member.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow group">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar className="h-9 w-9 border shrink-0">
                       <AvatarImage src={member.user?.avatar_path || undefined} />
-                      <AvatarFallback className="text-[10px]">{initials(member.user?.name)}</AvatarFallback>
+                      <AvatarFallback className="text-xs">{initials(member.user?.name)}</AvatarFallback>
                     </Avatar>
-                    <div>
-                      <p className="text-sm font-semibold">{member.user?.name || "Unknown user"}</p>
-                      <Badge variant="secondary" className="mt-1 rounded-sm capitalize">{member.role}</Badge>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">{member.user?.name || "Unknown user"}</p>
+                      <Badge variant="secondary" className="mt-0.5 rounded-sm capitalize text-[10px] h-4">{member.role}</Badge>
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-destructive"
+                    className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => removeMemberMutation.mutate(member.user_id)}
                     aria-label="Remove member"
                   >
@@ -381,61 +472,93 @@ function ProjectOverview({
           </div>
         </Panel>
 
-        <Panel title="Project Goals">
-          <div className="space-y-4">
-            <div className="divide-y rounded-md border">
-              {goals.map((goal) => (
-                <label key={goal.id} className="flex items-center gap-3 p-3 text-sm font-semibold">
-                  <Checkbox checked={goal.done} onCheckedChange={(checked) => {
-                    setGoals((items) => items.map((item) => item.id === goal.id ? { ...item, done: checked === true } : item));
-                  }} />
-                  {goal.label}
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input value={newGoal} onChange={(event) => setNewGoal(event.target.value)} placeholder="Add goal" />
-              <Button onClick={addGoal} size="sm">Add</Button>
-            </div>
-          </div>
-        </Panel>
-
-        <Panel title="Project Documents">
-          <div className="divide-y rounded-md border">
-            {attachments.length === 0 && (
-              <div className="p-4 text-sm text-muted-foreground">No documents attached yet.</div>
-            )}
-            {attachments.map((file, index) => (
-              <div key={`${file.path || file.name}-${index}`} className="grid grid-cols-[1fr_auto] items-center gap-3 p-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
+        <div className="grid gap-5 md:grid-cols-2">
+          <Panel title="Financial Summary">
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Coins className="h-4 w-4 text-primary" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total Budget</span>
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{file.name || "Project document"}</p>
-                    <p className="truncate text-xs text-muted-foreground">{file.path || "Attached file"}</p>
-                  </div>
+                  <p className="text-xl font-black text-primary">
+                    {project.currency || "USD"} {project.budget?.toLocaleString() || "0"}
+                  </p>
                 </div>
-                <div className="flex gap-1">
-                  <Button asChild variant="ghost" size="icon" aria-label="Open document">
-                    <Link href={file.url || "#"} target={file.url ? "_blank" : undefined}>
-                      <Paperclip className="h-4 w-4 text-sky-500" />
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive"
-                    onClick={() => updateProjectMutation.mutate(attachments.filter((_, itemIndex) => itemIndex !== index))}
-                    aria-label="Remove document"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-amber-500" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Est. Hours</span>
+                  </div>
+                  <p className="text-xl font-black text-amber-600">
+                    {project.estimated_hours || "0"}h
+                  </p>
                 </div>
               </div>
-            ))}
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+                  <span className="text-muted-foreground">Budget Utilization</span>
+                  <span className="text-foreground">24%</span>
+                </div>
+                <Progress value={24} className="h-2" />
+                <p className="text-[10px] text-muted-foreground italic text-right">* Calculated based on logged time vs. budget</p>
+              </div>
+
+              <div className="pt-4 border-t border-border/50">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-semibold text-muted-foreground">Hourly Rate:</span>
+                  <span className="font-bold text-foreground">{project.currency} {project.hourly_rate || 0}/hr</span>
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel title="Resource Workload">
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {(project.members || []).slice(0, 3).map((member, i) => (
+                  <div key={member.id} className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={member.user?.avatar_path || undefined} />
+                          <AvatarFallback className="text-[10px]">{initials(member.user?.name)}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs font-bold">{member.user?.name}</span>
+                      </div>
+                      <Badge variant="outline" className={cn(
+                        "text-[9px] font-black uppercase tracking-tighter",
+                        i === 0 ? "text-emerald-600 bg-emerald-50 border-emerald-200" :
+                        i === 1 ? "text-amber-600 bg-amber-50 border-amber-200" :
+                        "text-sky-600 bg-sky-50 border-sky-200"
+                      )}>
+                        {i === 0 ? "Optimal" : i === 1 ? "Busy" : "Low"}
+                      </Badge>
+                    </div>
+                    <Progress value={i === 0 ? 60 : i === 1 ? 85 : 30} className="h-1.5" />
+                  </div>
+                ))}
+                {(project.members || []).length === 0 && (
+                  <div className="py-8 text-center text-xs text-muted-foreground italic">No team members assigned.</div>
+                )}
+              </div>
+              <Button variant="ghost" size="sm" className="w-full h-8 text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary/5 border border-dashed border-primary/20">
+                View Full Workload Chart
+              </Button>
+            </div>
+          </Panel>
+        </div>
+
+        <Panel title="Project Gantt">
+          <div className="h-[500px] sm:h-[600px] relative overflow-hidden rounded-xl border-none">
+            <ProjectGanttChart project={project} tasks={tasks} onTaskClick={onTaskClick} />
           </div>
         </Panel>
+      </div>
+
+      <div className="w-full xl:w-[400px] shrink-0 space-y-5">
+        <ProjectDiscussion projectId={project.id} />
       </div>
     </div>
   );
@@ -443,15 +566,34 @@ function ProjectOverview({
 
 export default function ProjectDetailPage({ id }: ProjectDetailPageProps) {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const [view, setView] = useState<DetailView>("overview");
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
+  const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [projectEditTab, setProjectEditTab] = useState("general");
+  const { user } = useUser();
+  const isSoftwareDev = user?.business_type?.toLowerCase()?.replace('-', ' ') === 'software development';
   useProjectManagementRealtime({ projectId: id });
 
-  const { data: project, isLoading } = useQuery({
+  React.useEffect(() => {
+    const taskId = searchParams.get("taskId");
+    if (taskId) {
+      setSelectedTaskId(taskId);
+    }
+
+    const viewParam = searchParams.get("view");
+    if (viewParam && ["overview", "board", "list", "gantt", "calendar", "backlog"].includes(viewParam)) {
+      setView(viewParam as DetailView);
+    }
+  }, [searchParams]);
+
+  const { data: project, isLoading, error } = useQuery({
     queryKey: ["project", id],
     queryFn: () => projectApi.getProject(id),
+    retry: 1,
   });
 
   const moveTaskMutation = useMutation({
@@ -499,6 +641,11 @@ export default function ProjectDetailPage({ id }: ProjectDetailPageProps) {
     setSelectedTaskId(task.id);
   };
 
+  const handleDayClick = (day: Date) => {
+    setSelectedDate(day);
+    handleAddTask();
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -508,10 +655,50 @@ export default function ProjectDetailPage({ id }: ProjectDetailPageProps) {
     );
   }
 
-  if (!project) return <div>Project not found</div>;
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center p-10 text-center animate-in fade-in slide-in-from-bottom-4">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10 mb-6">
+          <AlertCircle className="h-10 w-10 text-destructive" />
+        </div>
+        <h2 className="text-2xl font-bold tracking-tight">Error Loading Project</h2>
+        <p className="mt-2 max-w-md text-muted-foreground">
+          {(error as any).message || "We couldn't retrieve the project details. This might be due to a network issue or the project might no longer exist."}
+        </p>
+        <div className="mt-8 flex gap-3">
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/project-management/projects">Back to Projects</Link>
+          </Button>
+          <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["project", id] })}>
+            Retry Loading
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="flex flex-col items-center justify-center p-10 text-center animate-in fade-in slide-in-from-bottom-4">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-6">
+          <Layout className="h-10 w-10 text-muted-foreground" />
+        </div>
+        <h2 className="text-2xl font-bold tracking-tight">Project Not Found</h2>
+        <p className="mt-2 max-w-md text-muted-foreground">
+          The project you are looking for does not exist or you don't have permission to view it.
+        </p>
+        <Button variant="outline" asChild className="mt-8">
+          <Link href="/dashboard/project-management/projects">Back to Projects</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  // Narrow `project` to `Project` (non-undefined) after the guard above
+  const definedProject: Project = project;
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-500">
+    <div className="flex flex-col gap-6 p-3 sm:p-4 md:p-6 lg:p-8 max-w-full overflow-x-hidden animate-in fade-in duration-500">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full">
@@ -524,8 +711,8 @@ export default function ProjectDetailPage({ id }: ProjectDetailPageProps) {
               <h1 className="text-2xl font-bold tracking-tight">Project Overview</h1>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Badge className={`${statusColors[project.status]} cursor-pointer border-none capitalize hover:opacity-80`}>
-                    {project.status.replace("_", " ")}
+                  <Badge className={`${statusColors[definedProject.status]} cursor-pointer border-none capitalize hover:opacity-80`}>
+                    {definedProject.status.replace("_", " ")}
                   </Badge>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-40">
@@ -548,57 +735,95 @@ export default function ProjectDetailPage({ id }: ProjectDetailPageProps) {
               </DropdownMenu>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Projects <span className="mx-2">»</span> <span className="font-semibold text-foreground">{project.name}</span>
+              Projects <span className="mx-2">»</span> <span className="font-semibold text-foreground">{definedProject.name}</span>
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => setView("overview")}>
+          <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => {
+            setView("overview");
+            setTimeout(() => {
+              document.getElementById("project-team-section")?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          }}>
             <Users className="h-4 w-4" />
             Team
           </Button>
-          <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => setView("overview")}>
+          <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => {
+            setProjectEditTab("general");
+            setIsEditProjectOpen(true);
+          }}>
             <Pencil className="h-4 w-4" />
-            Details
-          </Button>
-          <Button size="sm" className="h-9 gap-2" onClick={() => handleAddTask()}>
-            <Plus className="h-4 w-4" />
-            Create Task
+            Edit Project
           </Button>
         </div>
       </div>
-
-      <div className="flex flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between">
-        <Tabs value={view} onValueChange={(value) => setView(value as DetailView)} className="w-auto">
-          <TabsList className="bg-muted/50">
-            <TabsTrigger value="overview" className="gap-2">
-              <MessageSquare className="h-3.5 w-3.5" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="board" className="gap-2">
-              <Layout className="h-3.5 w-3.5" />
-              Board
-            </TabsTrigger>
-            <TabsTrigger value="list" className="gap-2">
-              <List className="h-3.5 w-3.5" />
-              List
-            </TabsTrigger>
-            <TabsTrigger value="gantt" className="gap-2">
-              <Calendar className="h-3.5 w-3.5" />
-              Gantt
-            </TabsTrigger>
-          </TabsList>
+      <div className="bg-card/30 backdrop-blur-xl border border-border/40 shadow-2xl shadow-black/5 rounded-[2.5rem] p-1.5 flex items-center justify-between relative overflow-hidden group/tabs">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 opacity-0 group-hover/tabs:opacity-100 transition-opacity duration-700 pointer-events-none" />
+        <Tabs value={view} onValueChange={(value) => setView(value as DetailView)} className="flex-1 min-w-0 relative z-10">
+          <div className="relative group/scroller">
+            {/* Ultra-premium Fade Masks */}
+            <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-card/80 to-transparent z-20 pointer-events-none opacity-0 group-hover/scroller:opacity-100 transition-all duration-500" />
+            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-card/80 to-transparent z-20 pointer-events-none opacity-0 group-hover/scroller:opacity-100 transition-all duration-500" />
+            
+            <div className="overflow-x-auto custom-scrollbar-hide pb-0.5 px-2">
+              <TabsList className="bg-transparent h-14 gap-1.5 p-0 flex-nowrap w-max relative">
+                {[
+                  { id: 'overview', label: 'Overview', icon: MessageSquare },
+                  { id: 'board', label: 'Board', icon: Layout },
+                  { id: 'list', label: 'List', icon: List },
+                  { id: 'gantt', label: 'Gantt', icon: Calendar },
+                  { id: 'calendar', label: 'Calendar', icon: CalendarClock },
+                  { id: 'resources', label: 'Resources', icon: Users },
+                  { id: 'automations', label: 'Automations', icon: Zap },
+                  { id: 'backlog', label: 'Backlog', icon: BarChart3, badge: 'DEV', show: isSoftwareDev },
+                  { id: 'financials', label: 'Financials', icon: Coins },
+                  { id: 'insights', label: 'Insights', icon: PieChart },
+                ].filter(tab => tab.show !== false).map((tab) => (
+                  <TabsTrigger 
+                    key={tab.id}
+                    value={tab.id} 
+                    className="relative group gap-2.5 px-5 h-10 font-black uppercase tracking-[0.2em] text-[10px] rounded-2xl transition-all duration-500 data-[state=active]:text-primary hover:text-primary/70 border border-transparent hover:bg-primary/5"
+                  >
+                    {view === tab.id && (
+                      <motion.div
+                        layoutId="activeTabIndicator"
+                        className="absolute inset-0 bg-primary/10 rounded-2xl shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] border border-primary/20"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                    <tab.icon className={cn(
+                      "h-4 w-4 relative z-10 transition-all duration-500 group-hover:scale-125 group-hover:rotate-6",
+                      view === tab.id ? "text-primary scale-110" : "text-muted-foreground"
+                    )} />
+                    <span className="relative z-10">{tab.label}</span>
+                    {tab.badge && (
+                      <Badge variant="outline" className="relative z-10 text-[8px] font-black h-4 px-1.5 border-primary/30 text-primary bg-primary/10 animate-pulse">
+                        {tab.badge}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+          </div>
         </Tabs>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{allTasks.length} tasks</span>
-          <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
-          <span>{project.members?.length || 0} members</span>
+        <div className="hidden lg:flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-6 border-l border-border/40 ml-2">
+          <div className="flex items-center gap-1.5">
+            <div className="h-1 w-1 rounded-full bg-primary" />
+            <span>{allTasks.length} TASKS</span>
+          </div>
+          <span className="opacity-20">|</span>
+          <div className="flex items-center gap-1.5">
+            <div className="h-1 w-1 rounded-full bg-primary" />
+            <span>{definedProject.members?.length || 0} MEMBERS</span>
+          </div>
         </div>
       </div>
 
       {view === "overview" && (
-        <ProjectOverview project={project} tasks={allTasks} onAddTask={() => handleAddTask()} onTaskClick={handleTaskClick} />
+        <ProjectOverview project={definedProject} tasks={allTasks} onAddTask={() => handleAddTask()} onTaskClick={handleTaskClick} />
       )}
 
       {view === "board" && (
@@ -619,16 +844,65 @@ export default function ProjectDetailPage({ id }: ProjectDetailPageProps) {
 
       {view === "gantt" && (
         <div className="h-[calc(100vh-12rem)] min-h-[720px]">
-          <ProjectGanttChart project={project} tasks={allTasks} onTaskClick={handleTaskClick} />
+          <ProjectGanttChart project={definedProject} tasks={allTasks} onTaskClick={handleTaskClick} />
+        </div>
+      )}
+
+      {view === "calendar" && (
+        <div className="h-[calc(100vh-12rem)] min-h-[700px]">
+          <ProjectCalendar project={definedProject} tasks={allTasks} onTaskClick={handleTaskClick} onDayClick={handleDayClick} />
+        </div>
+      )}
+
+      {view === "resources" && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <ResourceHeatmap project={definedProject} tasks={allTasks} />
+        </div>
+      )}
+
+      {view === "automations" && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <ProjectAutomations project={definedProject} />
+        </div>
+      )}
+
+      {view === "backlog" && isSoftwareDev && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-[calc(100vh-16rem)]">
+          <BacklogView project={definedProject} tasks={allTasks} onTaskClick={handleTaskClick} />
+        </div>
+      )}
+
+      {view === "financials" && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-[calc(100vh-16rem)]">
+          <FinancialReportView 
+            projectId={id} 
+            onConfigureBudget={() => {
+              setProjectEditTab("financials");
+              setIsEditProjectOpen(true);
+            }} 
+          />
+        </div>
+      )}
+
+      {view === "insights" && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <ProjectOverviewCharts project={definedProject} tasks={allTasks} />
         </div>
       )}
 
       {selectedColumnId && (
         <CreateTaskModal
           isOpen={isCreateTaskOpen}
-          onClose={() => setIsCreateTaskOpen(false)}
+          onClose={() => {
+            setIsCreateTaskOpen(false);
+            setSelectedDate(undefined);
+          }}
           projectId={id}
           columnId={selectedColumnId}
+          projectMembers={definedProject.members?.map(m => m.user).filter((u): u is NonNullable<typeof u> => u != null) || []}
+          projectStartDate={definedProject.start_date ? new Date(definedProject.start_date) : undefined}
+          projectEndDate={definedProject.end_date ? new Date(definedProject.end_date) : undefined}
+          initialDueDate={selectedDate}
         />
       )}
 
@@ -638,6 +912,13 @@ export default function ProjectDetailPage({ id }: ProjectDetailPageProps) {
         onOpenChange={(open) => {
           if (!open) setSelectedTaskId(null);
         }}
+      />
+
+      <CreateProjectModal 
+        open={isEditProjectOpen} 
+        onOpenChange={setIsEditProjectOpen} 
+        project={definedProject} 
+        initialTab={projectEditTab}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useSystemSettings } from "@/components/providers/settings-provider";
 import { handleAuthFailureResponse } from "@/lib/auth-sync";
 import { getAccessToken, getBackendApiRoot, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
+import { canAccessDashboardRoute } from "@/lib/route-permissions";
 import { FullScreenPlaceholder } from "@/components/ui/loading-states";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -55,6 +56,24 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         if (response.ok) {
           const freshUser = await response.json();
           localStorage.setItem("hive_user", JSON.stringify(freshUser));
+          window.dispatchEvent(new Event("hive_security_cleared"));
+
+          if (
+            pathname.startsWith("/dashboard")
+            && pathname !== "/dashboard/subscription-required"
+            && !canAccessDashboardRoute(pathname, {
+              hasPermission: (permission) => (freshUser.permissions ?? []).includes(permission),
+              hasAnyPermission: (permissions) => permissions.some((permission) => (freshUser.permissions ?? []).includes(permission)),
+              hasModule: (slug) => Boolean(freshUser.module_access?.statuses?.[slug]?.active),
+            })
+          ) {
+            router.replace(`/dashboard/subscription-required?from=${encodeURIComponent(pathname)}`);
+            if (isMounted) {
+              setIsAuthorized(false);
+              setCheckingAuth(false);
+            }
+            return;
+          }
         }
 
         if (!isMounted) return;

@@ -8,7 +8,7 @@ The real feature ownership lives under `frontend/modules/*`.
 - `modules/core`: dashboard-adjacent operational features, settings, audit logs, shared API transport.
 - `modules/identity`: auth and access management entrypoints.
 - `modules/tenancy`: tenant-management entrypoints.
-- `modules/nightclub`: lounge and club operations (tables, reservations, service orders).
+- `modules/hospitality`: lounge and club operations (tables, reservations, service orders).
 - `modules/inventory`: inventory control, stock movements, and transaction ledger.
 
 ## Rules

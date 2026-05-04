@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { projectApi } from "@/modules/projectmanagement/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,13 @@ import { cn } from "@/lib/utils";
 
 export default function ProjectDashboard() {
   useProjectManagementRealtime();
+
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const { data: summary, isLoading: isSummaryLoading } = useQuery({
     queryKey: ["project-summary"],
@@ -62,13 +70,12 @@ export default function ProjectDashboard() {
     p.status !== 'completed' && 
     p.status !== 'archived' && 
     p.end_date && 
-    new Date(p.end_date) < new Date()
+    new Date(p.end_date) < now
   ).length;
 
   const atRiskProjects = allProjects.filter(p => {
     if (p.status === 'completed' || p.status === 'archived' || !p.end_date) return false;
     const dueDate = new Date(p.end_date);
-    const now = new Date();
     const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return diffDays >= 0 && diffDays <= 3 && (p.progress || 0) < 80;
   }).length;

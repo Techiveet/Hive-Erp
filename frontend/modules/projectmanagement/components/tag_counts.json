@@ -1,0 +1,212 @@
+{
+  "div": {
+    "open": 124,
+    "close": 106,
+    "selfClose": 16,
+    "balance": 2
+  },
+  "motion.div": {
+    "open": 35,
+    "close": 33,
+    "selfClose": 0,
+    "balance": 2
+  },
+  "Card": {
+    "open": 36,
+    "close": 36,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "CardHeader": {
+    "open": 35,
+    "close": 35,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "CardTitle": {
+    "open": 35,
+    "close": 35,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "CardDescription": {
+    "open": 24,
+    "close": 24,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "CardContent": {
+    "open": 35,
+    "close": 35,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "ResponsiveContainer": {
+    "open": 29,
+    "close": 29,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "LineChart": {
+    "open": 1,
+    "close": 1,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "BarChart": {
+    "open": 8,
+    "close": 8,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "AreaChart": {
+    "open": 6,
+    "close": 6,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "RadarChart": {
+    "open": 7,
+    "close": 7,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "ScatterChart": {
+    "open": 1,
+    "close": 1,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "ComposedChart": {
+    "open": 4,
+    "close": 4,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "XAxis": {
+    "open": 20,
+    "close": 0,
+    "selfClose": 20,
+    "balance": 0
+  },
+  "YAxis": {
+    "open": 15,
+    "close": 0,
+    "selfClose": 15,
+    "balance": 0
+  },
+  "ZAxis": {
+    "open": 1,
+    "close": 0,
+    "selfClose": 1,
+    "balance": 0
+  },
+  "Tooltip": {
+    "open": 27,
+    "close": 0,
+    "selfClose": 27,
+    "balance": 0
+  },
+  "Legend": {
+    "open": 6,
+    "close": 0,
+    "selfClose": 6,
+    "balance": 0
+  },
+  "CartesianGrid": {
+    "open": 17,
+    "close": 0,
+    "selfClose": 17,
+    "balance": 0
+  },
+  "Line": {
+    "open": 9,
+    "close": 0,
+    "selfClose": 9,
+    "balance": 0
+  },
+  "Bar": {
+    "open": 14,
+    "close": 3,
+    "selfClose": 11,
+    "balance": 0
+  },
+  "Area": {
+    "open": 13,
+    "close": 0,
+    "selfClose": 13,
+    "balance": 0
+  },
+  "Radar": {
+    "open": 7,
+    "close": 0,
+    "selfClose": 7,
+    "balance": 0
+  },
+  "Scatter": {
+    "open": 1,
+    "close": 1,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "Cell": {
+    "open": 6,
+    "close": 0,
+    "selfClose": 6,
+    "balance": 0
+  },
+  "PolarGrid": {
+    "open": 7,
+    "close": 0,
+    "selfClose": 7,
+    "balance": 0
+  },
+  "PolarAngleAxis": {
+    "open": 7,
+    "close": 0,
+    "selfClose": 7,
+    "balance": 0
+  },
+  "Badge": {
+    "open": 3,
+    "close": 3,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "Link": {
+    "open": 0,
+    "close": 0,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "Button": {
+    "open": 0,
+    "close": 0,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "Tabs": {
+    "open": 0,
+    "close": 0,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "TabsList": {
+    "open": 0,
+    "close": 0,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "TabsTrigger": {
+    "open": 0,
+    "close": 0,
+    "selfClose": 0,
+    "balance": 0
+  },
+  "TabsContent": {
+    "open": 0,
+    "close": 0,
+    "selfClose": 0,
+    "balance": 0
+  }
+}

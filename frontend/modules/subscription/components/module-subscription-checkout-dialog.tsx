@@ -48,6 +48,14 @@ type Props = {
   onOrderCreated?: (order: TenantSubscriptionOrder) => void;
 };
 
+type CheckoutError = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
+
 export function ModuleSubscriptionCheckoutDialog({
   open,
   onOpenChange,
@@ -175,7 +183,7 @@ export function ModuleSubscriptionCheckoutDialog({
       toast.success(mode === "renewal" ? "The tenant subscription has been renewed." : "The requested modules are active now.");
       onOpenChange(false);
     },
-    onError: (error: any) => {
+    onError: (error: CheckoutError) => {
       toast.error(error?.response?.data?.message || "Unable to start checkout right now.");
     },
   });
@@ -188,8 +196,8 @@ export function ModuleSubscriptionCheckoutDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg rounded-[2rem] border-border/60 bg-background/95 p-0 shadow-2xl backdrop-blur-xl">
-        <div className="border-b border-border/50 px-6 py-5">
+      <DialogContent className="flex max-h-[min(92vh,760px)] flex-col overflow-hidden rounded-[2rem] border-border/60 bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:max-w-lg">
+        <div className="shrink-0 border-b border-border/50 px-6 py-5">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl font-black tracking-tight">
               <LockKeyhole className="h-5 w-5 text-primary" /> {title}
@@ -200,7 +208,7 @@ export function ModuleSubscriptionCheckoutDialog({
           </DialogHeader>
         </div>
 
-        <div className="space-y-5 px-6 py-5">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
           <div className="space-y-3 rounded-[1.5rem] border border-border/60 bg-muted/20 p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
@@ -437,7 +445,7 @@ export function ModuleSubscriptionCheckoutDialog({
           )}
         </div>
 
-        <DialogFooter className="border-t border-border/50 px-6 py-4">
+        <DialogFooter className="shrink-0 border-t border-border/50 px-6 py-4">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Close
           </Button>

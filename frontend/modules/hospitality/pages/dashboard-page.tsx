@@ -10,11 +10,16 @@ import {
   ReceiptText,
   Sofa,
   Utensils,
+  TrendingUp,
+  Plus,
 } from "lucide-react";
+import { motion } from "framer-motion";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { fetchHospitalityOverview } from "@/modules/hospitality/api";
+import { cn } from "@/lib/utils";
 
 const cardStyles = [
   "from-sky-500/20 to-cyan-500/10 border-sky-500/30",
@@ -24,26 +29,64 @@ const cardStyles = [
 ];
 
 export default function HospitalityDashboardPage() {
-  const overviewQuery = useQuery({
+  const { data: overview, isLoading, isError } = useQuery({
     queryKey: ["hospitality", "overview"],
     queryFn: fetchHospitalityOverview,
   });
 
-  if (overviewQuery.isLoading) {
+  if (isLoading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center text-muted-foreground">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-        Loading hospitality dashboard...
+      <div className="space-y-8 p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-4 w-full max-w-2xl" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-40 rounded-full" />
+            <Skeleton className="h-10 w-40 rounded-full" />
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-32 rounded-3xl" />
+          ))}
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-6 w-32 rounded-full" />
+          </div>
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-16 rounded-2xl" />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
-  const overview = overviewQuery.data;
-
-  if (!overview) {
+  if (isError || !overview) {
     return (
-      <div className="rounded-3xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
-        Unable to load the hospitality dashboard right now.
+      <div className="flex flex-col items-center justify-center h-[60vh] space-y-4 text-center">
+        <div className="p-4 rounded-full bg-destructive/10 text-destructive">
+          <Utensils className="h-8 w-8 opacity-50" />
+        </div>
+        <div className="max-w-md space-y-2">
+          <h2 className="text-xl font-black tracking-tight">Dashboard Unavailable</h2>
+          <p className="text-sm text-muted-foreground">
+            We're having trouble loading the hospitality operations data. Please ensure your subscription is active and try again.
+          </p>
+        </div>
+        <Button 
+          variant="outline" 
+          className="rounded-full"
+          onClick={() => window.location.reload()}
+        >
+          Retry Connection
+        </Button>
       </div>
     );
   }
@@ -51,28 +94,28 @@ export default function HospitalityDashboardPage() {
   const summaryCards = [
     {
       label: "Active Tables",
-      value: `${overview.tables.active}/${overview.tables.total}`,
-      hint: `${overview.tables.available} available now`,
+      value: `${overview.tables?.active || 0}/${overview.tables?.total || 0}`,
+      hint: `${overview.tables?.available || 0} available now`,
       icon: Sofa,
       href: "/dashboard/hospitality/tables",
     },
     {
       label: "Pending Reservations",
-      value: String(overview.reservations.pending),
-      hint: `${overview.reservations.today_total} bookings today`,
+      value: String(overview.reservations?.pending || 0),
+      hint: `${overview.reservations?.today_total || 0} bookings today`,
       icon: CalendarCheck2,
       href: "/dashboard/hospitality/reservations",
     },
     {
       label: "Open Service Orders",
-      value: String(overview.orders.open),
-      hint: `${overview.orders.closed_today} closed today`,
+      value: String(overview.orders?.open || 0),
+      hint: `${overview.orders?.closed_today || 0} closed today`,
       icon: ReceiptText,
       href: "/dashboard/hospitality/service-orders",
     },
     {
       label: "Revenue Today",
-      value: `ETB ${overview.orders.revenue_today.toFixed(0)}`,
+      value: `ETB ${(overview.orders?.revenue_today || 0).toFixed(0)}`,
       hint: "Closed orders only",
       icon: CircleDollarSign,
       href: "/dashboard/inventory",
@@ -80,91 +123,162 @@ export default function HospitalityDashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[2rem] border border-border/40 bg-gradient-to-br from-indigo-500/10 via-violet-500/5 to-background p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-500">Hospitality Operations</p>
-            <h1 className="mt-2 flex items-center gap-3 text-3xl font-black tracking-tight">
-              <span className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-2 text-indigo-500">
-                <Utensils className="h-6 w-6" />
+    <div className="relative space-y-10 pb-20 overflow-hidden">
+      {/* Background Decorative Elements */}
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-violet-500/5 rounded-full blur-[100px] animate-breathe" />
+        <div className="absolute inset-0 tech-grid opacity-[0.03] dark:opacity-[0.07]" />
+      </div>
+
+      <motion.section 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-[2.5rem] border border-border/40 bg-gradient-to-br from-indigo-500/10 via-violet-500/5 to-background p-8"
+      >
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 text-xs font-black uppercase tracking-[0.2em]">
+              <TrendingUp className="h-3 w-3" />
+              Real-time Operations
+            </div>
+            <h1 className="flex items-center gap-4 text-4xl font-black tracking-tight">
+              <span className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-3 text-indigo-500 shadow-lg shadow-indigo-500/20">
+                <Utensils className="h-8 w-8" />
               </span>
               Hospitality Center
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Manage floor layout, reservations, service orders, menu, events, and customer operations from one cockpit.
+            <p className="max-w-2xl text-base text-muted-foreground font-medium leading-relaxed">
+              Manage floor layout, reservations, service orders, menu, events, and customer operations from one premium cockpit.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild className="rounded-full px-5">
+          <div className="flex flex-wrap gap-3">
+            <Button asChild size="lg" className="rounded-full px-8 shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
               <Link href="/dashboard/hospitality/reservations">
-                Reservation Queue
-                <ArrowRight className="ml-2 h-4 w-4" />
+                New Reservation
+                <Plus className="ml-2 h-5 w-5" />
               </Link>
             </Button>
-            <Button asChild variant="outline" className="rounded-full px-5">
-              <Link href="/dashboard/hospitality/service-orders">Service Orders</Link>
+            <Button asChild variant="outline" size="lg" className="rounded-full px-8 backdrop-blur-sm border-border/60 hover:bg-background/80">
+              <Link href="/dashboard/hospitality/tables">View Tables</Link>
             </Button>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card, index) => {
           const Icon = card.icon;
           return (
-            <Link
+            <motion.div
               key={card.label}
-              href={card.href}
-              className={`rounded-3xl border bg-gradient-to-br p-5 transition hover:-translate-y-1 hover:shadow-lg ${cardStyles[index]}`}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: index * 0.1 }}
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{card.label}</p>
-                  <h2 className="mt-2 text-3xl font-black tracking-tight">{card.value}</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">{card.hint}</p>
+              <Link
+                href={card.href}
+                className={cn(
+                  "group relative block overflow-hidden rounded-[2rem] border bg-gradient-to-br p-6 transition-all duration-300",
+                  "hover:-translate-y-2 hover:shadow-2xl",
+                  cardStyles[index]
+                )}
+              >
+                <div className="relative z-10 flex items-start justify-between">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70">{card.label}</p>
+                    <h2 className="text-4xl font-black tracking-tighter">{card.value}</h2>
+                    <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                      {card.hint}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-indigo-500/10 p-3 text-indigo-500 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110">
+                    <Icon className="h-6 w-6" />
+                  </div>
                 </div>
-                <Icon className="h-6 w-6 text-indigo-500" />
-              </div>
-            </Link>
+                <div className="absolute -bottom-6 -right-6 opacity-[0.03] transition-transform duration-500 group-hover:scale-125 group-hover:opacity-[0.06]">
+                  <Icon className="h-32 w-32" />
+                </div>
+              </Link>
+            </motion.div>
           );
         })}
       </section>
 
-      <section className="rounded-3xl border border-border/50 bg-card/50 p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-black tracking-tight">Upcoming Reservations</h2>
-          <Button asChild variant="ghost" className="rounded-full text-xs uppercase tracking-wider">
-            <Link href="/dashboard/hospitality/reservations">View Full Queue</Link>
+      <motion.section 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-[2.5rem] border border-border/40 bg-card/30 backdrop-blur-md p-8 shadow-sm"
+      >
+        <div className="mb-8 flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-black tracking-tight">Upcoming Reservations</h2>
+            <p className="text-sm text-muted-foreground font-medium">Scheduled bookings for the next 24 hours</p>
+          </div>
+          <Button asChild variant="ghost" className="rounded-full text-xs font-black uppercase tracking-widest text-primary hover:bg-primary/5">
+            <Link href="/dashboard/hospitality/reservations" className="flex items-center gap-2">
+              View Full Queue
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </Button>
         </div>
 
-        {overview.upcoming_reservations.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border/60 bg-background/50 p-8 text-center text-sm text-muted-foreground">
-            No upcoming reservations.
+        {!overview.upcoming_reservations || overview.upcoming_reservations.length === 0 ? (
+          <div className="rounded-[2rem] border border-dashed border-border/40 bg-background/40 py-16 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-muted/20 flex items-center justify-center mb-4">
+              <CalendarCheck2 className="h-6 w-6 text-muted-foreground/40" />
+            </div>
+            <p className="text-base font-bold text-muted-foreground/60">No upcoming reservations found</p>
+            <p className="text-sm text-muted-foreground/40 mt-1">New bookings will appear here automatically</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {overview.upcoming_reservations.map((reservation) => (
-              <div key={reservation.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/70 p-4">
-                <div className="min-w-[220px]">
-                  <p className="text-sm font-bold">{reservation.customer_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(reservation.reservation_time).toLocaleString()} - {reservation.guest_count} guests
-                  </p>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {overview.upcoming_reservations.map((reservation, i) => (
+              <motion.div 
+                key={reservation.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="group flex items-center justify-between gap-4 rounded-[1.5rem] border border-border/40 bg-background/50 p-5 transition-all hover:border-indigo-500/30 hover:bg-indigo-500/[0.02]"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-500">
+                    <span className="text-[10px] font-black uppercase">{new Date(reservation.reservation_time).toLocaleString('en-US', { month: 'short' })}</span>
+                    <span className="text-lg font-black leading-none">{new Date(reservation.reservation_time).getDate()}</span>
+                  </div>
+                  <div>
+                    <p className="text-base font-black tracking-tight">{reservation.customer_name}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold">
+                      <span>{new Date(reservation.reservation_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className="opacity-30">•</span>
+                      <span>{reservation.guest_count} Guests</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{reservation.reservation_code ?? `#${reservation.id}`}</Badge>
-                  <Badge variant={reservation.status === "confirmed" ? "default" : "outline"}>
+                <div className="flex items-center gap-3">
+                  <div className="hidden sm:flex flex-col items-end gap-1">
+                    <Badge variant="secondary" className="rounded-md font-mono text-[10px] bg-muted/50">
+                      {reservation.reservation_code ?? `#${reservation.id}`}
+                    </Badge>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{reservation.table?.name ?? "Table TBD"}</span>
+                  </div>
+                  <Badge 
+                    variant={reservation.status === "confirmed" ? "default" : "outline"}
+                    className={cn(
+                      "rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-widest",
+                      reservation.status === "confirmed" && "bg-emerald-500 hover:bg-emerald-600 border-none"
+                    )}
+                  >
                     {reservation.status}
                   </Badge>
-                  <span className="text-xs text-muted-foreground">{reservation.table?.name ?? "Table TBD"}</span>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}
-      </section>
+      </motion.section>
     </div>
   );
 }
+

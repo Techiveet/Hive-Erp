@@ -7,6 +7,7 @@ import {
   BadgeCheck, Check, Clock3, CreditCard, ExternalLink,
   HardDrive, Layers, Loader2, Mail, Rocket, ShieldCheck,
   Sparkles, Star, WandSparkles, Zap, ArrowRight, Crown,
+  Lock, ListChecks,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ import { syncUserSession } from "@/lib/auth-sync";
 import { logFrontendAction } from "@/modules/core/api";
 import {
   fetchCurrentTenantSubscriptions,
+  fetchPublicSubscriptionCatalog,
   syncCurrentTenantSubscriptionCheckout,
   updateCurrentTenantSubscriptions,
 } from "@/modules/subscription/api";
@@ -32,10 +34,14 @@ import type {
   TenantDirectTransferSettings,
   TenantModuleSubscriptionPayload,
   TenantPaymentProvider,
+  TenantPlanPricing,
   TenantResolvedModuleSubscriptions,
+  TenantSubscriptionFeatureMatrix,
+  TenantSubscriptionFeatureMatrixModule,
   TenantSubscriptionOrder,
   TenantWorkspaceSubscription,
 } from "@/modules/subscription/types";
+import { useTenantModuleAccess } from "@/hooks/use-tenant-module-access";
 import { useTranslation } from "@/store/use-translation";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -62,8 +68,8 @@ const PLAN_ORDER = ["larva", "startup", "business", "enterprise", "overlord"];
 const PLAN_MODULES_COUNT: Record<string, number> = {
   larva: 1,      // mailbox only
   startup: 4,    // mailbox + file_manager + image_editor + document_converter
-  business: 13,  // business defaults + lounge_club_management
-  enterprise: 17, // enterprise defaults + lounge_club_management
+  business: 13,  // business defaults + hospitality
+  enterprise: 17, // enterprise defaults + hospitality
   overlord: 18,  // all catalog modules
 };
 
@@ -96,8 +102,30 @@ const isOrderActive = (status: string | undefined) =>
 const formatSubscriptionStatus = (status: string | undefined) =>
   String(status || "active").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 
+type SubscriptionApiError = {
+  response?: {
+    data?: {
+      code?: string;
+      message?: string;
+      modules?: string[];
+    };
+  };
+};
+
 // ─── Plan Card ───────────────────────────────────────────────────────────────
-function PlanCard({ planKey, currentPlan }: { planKey: string; currentPlan: string }) {
+function PlanCard({
+  planKey,
+  currentPlan,
+  pricing,
+  includedModules,
+  addonModules,
+}: {
+  planKey: string;
+  currentPlan: string;
+  pricing?: TenantPlanPricing;
+  includedModules: TenantCatalogModule[];
+  addonModules: TenantCatalogModule[];
+}) {
   const meta = PLAN_META[planKey];
   if (!meta) return null;
   const PlanIcon = meta.icon;
@@ -105,6 +133,10 @@ function PlanCard({ planKey, currentPlan }: { planKey: string; currentPlan: stri
   const planIndex = PLAN_ORDER.indexOf(planKey);
   const currentIndex = PLAN_ORDER.indexOf(currentPlan);
   const isUpgrade = planIndex > currentIndex;
+  const storageLabel = pricing?.mail_storage_quota_mb ? formatBytes(pricing.mail_storage_quota_mb) : meta.storageLabel;
+  const planPrice = Number(pricing?.monthly_price_etb ?? 0);
+  const previewModules = includedModules.slice(0, 3);
+  const previewAddons = addonModules.slice(0, 2);
 
   return (
     <div className={cn(
@@ -133,21 +165,51 @@ function PlanCard({ planKey, currentPlan }: { planKey: string; currentPlan: stri
 
       <h3 className={cn("mt-3 text-xl font-black uppercase tracking-tight", meta.color)}>{meta.label}</h3>
       <p className="text-xs text-muted-foreground mt-0.5">{meta.tagline}</p>
+      <p className="mt-3 text-2xl font-black tracking-tight text-foreground">{formatMoney(planPrice)}</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">per month from included modules</p>
 
       <div className="mt-4 space-y-2">
         <div className="flex items-center gap-2 text-xs text-foreground/80">
           <HardDrive className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <span><strong>{meta.storageLabel}</strong> mailbox storage</span>
+          <span><strong>{storageLabel}</strong> mailbox storage</span>
         </div>
         <div className="flex items-center gap-2 text-xs text-foreground/80">
           <Layers className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <span><strong>{PLAN_MODULES_COUNT[planKey]}</strong> modules included</span>
+          <span><strong>{includedModules.length || PLAN_MODULES_COUNT[planKey]}</strong> major modules included</span>
         </div>
         <div className="flex items-center gap-2 text-xs text-foreground/80">
           <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <span>Secure internal mailbox</span>
         </div>
       </div>
+
+      {previewModules.length > 0 ? (
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {previewModules.map((module) => (
+            <Badge key={`${planKey}-${module.slug}`} variant="secondary" className="rounded-full text-[10px]">
+              {module.name}
+            </Badge>
+          ))}
+          {includedModules.length > previewModules.length ? (
+            <Badge variant="outline" className="rounded-full text-[10px]">
+              +{includedModules.length - previewModules.length} more
+            </Badge>
+          ) : null}
+        </div>
+      ) : null}
+
+      {previewAddons.length > 0 ? (
+        <div className="mt-3 rounded-xl border border-dashed border-border/60 bg-background/40 p-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Available Add-ons</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {previewAddons.map((module) => (
+              <Badge key={`${planKey}-addon-${module.slug}`} variant="outline" className="rounded-full text-[10px]">
+                {module.name}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {isUpgrade && (
         <Button size="sm" variant="outline" className={cn("mt-5 w-full rounded-xl text-xs font-bold gap-1.5 border-current/20 hover:bg-gradient-to-br hover:border-transparent transition-all", meta.color, `hover:${meta.bg}`)}>
@@ -196,11 +258,172 @@ function StorageQuotaPanel({ storageMb, usedBytes = 0 }: { storageMb: number; us
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
+function FeatureAccessMatrix({
+  matrix,
+  canManage,
+  onModuleRequest,
+}: {
+  matrix?: TenantSubscriptionFeatureMatrix;
+  canManage: boolean;
+  onModuleRequest: (module: TenantSubscriptionFeatureMatrixModule) => void;
+}) {
+  const modules = React.useMemo(() => matrix?.modules ?? [], [matrix?.modules]);
+  const groupedModules = React.useMemo(() => {
+    return modules.reduce<Record<string, TenantSubscriptionFeatureMatrixModule[]>>((groups, module) => {
+      const group = groups[module.category] ?? [];
+      group.push(module);
+      groups[module.category] = group;
+      return groups;
+    }, {});
+  }, [modules]);
+
+  if (modules.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h3 className="flex items-center gap-2 text-xl font-black tracking-tight text-foreground">
+            <ListChecks className="h-5 w-5 text-primary" /> Feature Access Matrix
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Every central module, submodule, route, page, and action discovered for this tenant workspace.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-widest">
+            {matrix?.subscribed_module_count ?? 0} subscribed
+          </Badge>
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-widest">
+            {matrix?.unsubscribed_module_count ?? 0} available
+          </Badge>
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-widest">
+            {matrix?.feature_count ?? 0} features
+          </Badge>
+        </div>
+      </div>
+
+      <div className="space-y-5">
+        {Object.entries(groupedModules).map(([category, categoryModules]) => (
+          <div key={category} className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-border/60" />
+              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">{category}</p>
+              <div className="h-px flex-1 bg-border/60" />
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              {categoryModules.map((module) => {
+                const isActive = module.status === "active";
+                const isPending = module.status === "pending";
+                const price = Number(module.monthly_price_etb ?? 0);
+
+                return (
+                  <article
+                    key={module.slug}
+                    className={cn(
+                      "rounded-[1.5rem] border p-4 shadow-sm transition-colors",
+                      isActive
+                        ? "border-emerald-300/50 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-950/15"
+                        : isPending
+                          ? "border-indigo-300/50 bg-indigo-50/50 dark:border-indigo-800/40 dark:bg-indigo-950/15"
+                          : "border-border/60 bg-card/45"
+                    )}
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-black text-foreground">{module.name}</h4>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "rounded-full px-2.5 py-0.5 text-[9px] uppercase tracking-widest",
+                              isActive
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : isPending
+                                  ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                                  : "border-amber-200 bg-amber-50 text-amber-700"
+                            )}
+                          >
+                            {isActive ? "Subscribed" : isPending ? "Payment Pending" : "Not Subscribed"}
+                          </Badge>
+                          {module.included_in_plan ? (
+                            <Badge variant="outline" className="rounded-full border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[9px] uppercase tracking-widest text-sky-700">
+                              Plan Included
+                            </Badge>
+                          ) : null}
+                          {module.is_addon ? (
+                            <Badge variant="outline" className="rounded-full border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[9px] uppercase tracking-widest text-amber-700">
+                              Add-on
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{module.description}</p>
+                      </div>
+                      {!isActive && !isPending ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={canManage ? "default" : "outline"}
+                          disabled={!canManage}
+                          onClick={() => onModuleRequest(module)}
+                          className="shrink-0 rounded-full gap-2"
+                        >
+                          <Lock className="h-4 w-4" />
+                          {price > 0 ? `Unlock ETB ${price.toFixed(0)}` : "Enable"}
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      {module.submodules.length === 0 ? (
+                        <p className="rounded-xl border border-dashed border-border/70 px-3 py-2 text-xs text-muted-foreground">
+                          No submodules were discovered for this module yet.
+                        </p>
+                      ) : (
+                        module.submodules.map((submodule) => (
+                          <div key={`${module.slug}-${submodule.slug}`} className="rounded-xl border border-border/60 bg-background/70 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-bold text-foreground">{submodule.name}</p>
+                              <Badge variant="secondary" className="rounded-full text-[10px]">
+                                {submodule.feature_count} feature{submodule.feature_count === 1 ? "" : "s"}
+                              </Badge>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {submodule.features.slice(0, 8).map((feature) => (
+                                <Badge key={feature.slug} variant="outline" className="max-w-full rounded-full px-2.5 py-1 text-[10px]">
+                                  <span className="truncate">{feature.name}</span>
+                                </Badge>
+                              ))}
+                              {submodule.features.length > 8 ? (
+                                <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[10px]">
+                                  +{submodule.features.length - 8} more
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function TenantSubscriptionsClient() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { hasAnyPermission } = usePermissions();
+  const { moduleAccess } = useTenantModuleAccess();
   const { t } = useTranslation();
 
   const canManage = hasAnyPermission(["manage_module_subscriptions"]);
@@ -216,21 +439,120 @@ export function TenantSubscriptionsClient() {
     queryFn: fetchCurrentTenantSubscriptions,
   });
 
+  const { data: publicCatalogData, isLoading: isPublicCatalogLoading } = useQuery({
+    queryKey: ["tenant-public-subscription-catalog"],
+    queryFn: fetchPublicSubscriptionCatalog,
+  });
+
   const tenant = data?.data?.tenant;
   const subscription: TenantWorkspaceSubscription | undefined = data?.data?.subscription;
   const subscriptions: TenantResolvedModuleSubscriptions | undefined = data?.data?.module_subscriptions;
-  const catalog = React.useMemo(() => subscriptions?.catalog_modules ?? data?.data?.catalog ?? EMPTY_CATALOG, [data, subscriptions]);
-  const planPricing = data?.data?.plan_pricing ?? {};
-  const paymentProvider: TenantPaymentProvider | undefined = data?.data?.payment_provider;
-  const directTransfer: TenantDirectTransferSettings | undefined = data?.data?.direct_transfer;
-  const paymentMethods = data?.data?.payment_methods ?? [];
+  const featureMatrix: TenantSubscriptionFeatureMatrix | undefined = data?.data?.feature_matrix;
+  const currentPlan = (tenant?.plan ?? subscription?.plan ?? moduleAccess?.plan ?? "business").toLowerCase();
+  const accessEnabledModules = React.useMemo(() => {
+    const activeModules = moduleAccess?.active_modules ?? [];
+    if (activeModules.length > 0) {
+      return activeModules;
+    }
+
+    return Object.entries(moduleAccess?.statuses ?? {})
+      .filter(([, status]) => status.active)
+      .map(([slug]) => slug);
+  }, [moduleAccess]);
+  const serverEnabledModules = React.useMemo(() => {
+    const enabled = subscriptions?.enabled_modules ?? [];
+    return enabled.length > 0 ? enabled : accessEnabledModules;
+  }, [accessEnabledModules, subscriptions?.enabled_modules]);
+  const rawCatalog = React.useMemo<TenantCatalogModule[]>(() => {
+    if ((subscriptions?.catalog_modules?.length ?? 0) > 0) {
+      return subscriptions?.catalog_modules ?? EMPTY_CATALOG;
+    }
+
+    if ((data?.data?.catalog?.length ?? 0) > 0) {
+      return data?.data?.catalog;
+    }
+
+    return publicCatalogData?.data?.catalog ?? EMPTY_CATALOG;
+  }, [data?.data?.catalog, publicCatalogData?.data?.catalog, subscriptions?.catalog_modules]);
+  const planDefaults = React.useMemo<Record<string, string[]>>(
+    () => data?.data?.plan_defaults ?? publicCatalogData?.data?.plan_defaults ?? {},
+    [data?.data?.plan_defaults, publicCatalogData?.data?.plan_defaults]
+  );
+  const catalog = React.useMemo(() => {
+    const includedModules = planDefaults[currentPlan] ?? [];
+
+    return rawCatalog.map((module) => {
+      const accessStatus = moduleAccess?.statuses?.[module.slug];
+      const isActive = serverEnabledModules.includes(module.slug) || accessStatus?.active === true || module.status === "active";
+      const isPending = module.status === "pending";
+
+      return {
+        ...module,
+        included_in_plan: module.included_in_plan ?? accessStatus?.included_in_plan ?? includedModules.includes(module.slug),
+        status: isActive ? "active" : (isPending ? "pending" : "inactive"),
+      } satisfies TenantCatalogModule;
+    });
+  }, [currentPlan, moduleAccess?.statuses, planDefaults, rawCatalog, serverEnabledModules]);
+  const effectiveFeatureMatrix = React.useMemo<TenantSubscriptionFeatureMatrix | undefined>(() => {
+    if ((featureMatrix?.modules?.length ?? 0) > 0) {
+      return featureMatrix;
+    }
+
+    if (catalog.length === 0) {
+      return undefined;
+    }
+
+    const modules = catalog.map((module) => ({
+      ...module,
+      subscribed: module.status === "active",
+      submodules: [],
+      submodule_count: 0,
+      feature_count: 0,
+    }));
+
+    return {
+      modules,
+      module_count: modules.length,
+      subscribed_module_count: modules.filter((module) => module.subscribed).length,
+      unsubscribed_module_count: modules.filter((module) => !module.subscribed).length,
+      submodule_count: 0,
+      feature_count: 0,
+    };
+  }, [catalog, featureMatrix]);
+  const planPricing = React.useMemo<Record<string, TenantPlanPricing>>(() => data?.data?.plan_pricing ?? publicCatalogData?.data?.plan_pricing ?? {}, [data?.data?.plan_pricing, publicCatalogData?.data?.plan_pricing]);
+  const paymentProvider: TenantPaymentProvider | undefined = data?.data?.payment_provider ?? publicCatalogData?.data?.payment_provider;
+  const directTransfer: TenantDirectTransferSettings | undefined = data?.data?.direct_transfer ?? publicCatalogData?.data?.direct_transfer;
+  const paymentMethods = data?.data?.payment_methods ?? publicCatalogData?.data?.payment_methods ?? [];
   const pendingOrders: TenantSubscriptionOrder[] = data?.data?.pending_orders ?? EMPTY_ORDERS;
-  const currentPlan = (tenant?.plan ?? "business").toLowerCase();
   const planMeta = PLAN_META[currentPlan] ?? PLAN_META.business;
   const PlanIcon = planMeta.icon;
 
-  const serverEnabledModules = subscriptions?.enabled_modules ?? EMPTY_STRING_LIST;
   const serverCustomModules = subscriptions?.custom_modules ?? EMPTY_CUSTOM_MODULES;
+  const selectedSummaryModules = React.useMemo(() => {
+    if ((subscriptions?.selected_modules?.length ?? 0) > 0) {
+      return subscriptions?.selected_modules;
+    }
+
+    const lookup = new Map(catalog.map((module) => [module.slug, module]));
+    return serverEnabledModules
+      .flatMap((slug) => {
+        const catalogModule = lookup.get(slug);
+
+        if (!catalogModule) {
+          return [];
+        }
+
+        return [{
+          slug: catalogModule.slug,
+          name: catalogModule.name,
+          description: catalogModule.description,
+          category: catalogModule.category,
+          tone: catalogModule.tone,
+          source: "catalog" as const,
+        }];
+      });
+  }, [catalog, serverEnabledModules, subscriptions?.selected_modules]);
+  const activeModuleCount = selectedSummaryModules?.length ?? serverEnabledModules.length;
   const renewalEstimate = React.useMemo(() => {
     const basePlanPrice = Number(planPricing?.[currentPlan]?.monthly_price_etb ?? 0);
     const activePaidAddons = catalog
@@ -241,10 +563,9 @@ export function TenantSubscriptionsClient() {
   }, [catalog, currentPlan, planPricing, serverEnabledModules]);
 
   React.useEffect(() => {
-    if (!subscriptions) return;
     setSelectedModules(prev => areStringListsEqual(prev, serverEnabledModules) ? prev : [...serverEnabledModules]);
     setCustomModules(prev => areCustomModulesEqual(prev, serverCustomModules) ? prev : cloneCustomModules(serverCustomModules));
-  }, [serverCustomModules, serverEnabledModules, subscriptions]);
+  }, [serverCustomModules, serverEnabledModules]);
 
   const initialSnapshot = React.useMemo(() => buildSnapshot(serverEnabledModules, serverCustomModules), [serverCustomModules, serverEnabledModules]);
   const currentSnapshot = React.useMemo(() => buildSnapshot(selectedModules, customModules), [customModules, selectedModules]);
@@ -259,7 +580,7 @@ export function TenantSubscriptionsClient() {
       toast.success(response?.message ?? "Module subscriptions updated.");
       await logFrontendAction({ module: "Module Subscriptions", action: "updated", description: "Tenant administrator updated workspace module subscriptions." }).catch(() => {});
     },
-    onError: (error: any) => {
+    onError: (error: SubscriptionApiError) => {
       const checkoutRequired = error?.response?.data?.code === "SUBSCRIPTION_CHECKOUT_REQUIRED";
       if (checkoutRequired) {
         const requiredModules = findCatalogModules(catalog, error?.response?.data?.modules ?? EMPTY_STRING_LIST);
@@ -285,7 +606,7 @@ export function TenantSubscriptionsClient() {
       else toast.info(order?.scope === "tenant_renewal" ? "Your renewal payment is being verified." : "Your payment is being verified. The modules will unlock shortly.");
       router.replace("/dashboard/subscriptions");
     },
-    onError: (error: any) => {
+    onError: (error: SubscriptionApiError) => {
       toast.error(error?.response?.data?.message || "We could not verify the checkout result yet.");
       router.replace("/dashboard/subscriptions");
     },
@@ -316,12 +637,25 @@ export function TenantSubscriptionsClient() {
     setCheckoutModules([module]);
   }, []);
 
+  const handleMatrixModuleRequest = React.useCallback((module: TenantSubscriptionFeatureMatrixModule) => {
+    if (selectedModules.includes(module.slug)) return;
+
+    if (module.included_in_plan || Number(module.monthly_price_etb ?? 0) <= 0) {
+      setSelectedModules((previous) => previous.includes(module.slug) ? previous : [...previous, module.slug]);
+      toast.info(`${module.name} is ready to enable. Save changes to apply it to this tenant.`);
+      return;
+    }
+
+    setCheckoutMode("upgrade");
+    setCheckoutModules([module]);
+  }, [selectedModules]);
+
   const handleRenewalRequest = React.useCallback(() => {
     setCheckoutMode("renewal");
     setCheckoutModules(findCatalogModules(catalog, subscriptions?.enabled_modules ?? EMPTY_STRING_LIST));
   }, [catalog, subscriptions?.enabled_modules]);
 
-  if (isLoading) {
+  if (isLoading || (catalog.length === 0 && isPublicCatalogLoading)) {
     return <ModulePageSkeleton titleWidth="w-56" subtitleWidth="w-80" rows={5} cols={3} />;
   }
 
@@ -367,7 +701,7 @@ export function TenantSubscriptionsClient() {
           <div className="flex flex-wrap gap-4">
             {[
               { icon: HardDrive, label: "Storage", value: planMeta.storageLabel },
-              { icon: Layers, label: "Modules", value: `${subscriptions?.module_count ?? 0} active` },
+              { icon: Layers, label: "Modules", value: `${activeModuleCount} active` },
               { icon: BadgeCheck, label: "Status", value: formatSubscriptionStatus(subscription?.status) },
             ].map(({ icon: Icon, label, value }) => (
               <div key={label} className="text-center min-w-[80px]">
@@ -385,7 +719,7 @@ export function TenantSubscriptionsClient() {
       {/* ─── 2. KPI STRIP ───────────────────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { icon: Layers, label: "Active Modules", value: subscriptions?.module_count ?? 0, sub: "Enabled in workspace", iconBg: "bg-primary/10", iconColor: "text-primary" },
+          { icon: Layers, label: "Active Modules", value: activeModuleCount, sub: "Enabled in workspace", iconBg: "bg-primary/10", iconColor: "text-primary" },
           { icon: Sparkles, label: "Current Plan", value: planMeta.label, sub: planMeta.tagline, iconBg: "bg-emerald-500/10", iconColor: "text-emerald-500" },
           { icon: ShieldCheck, label: "Access Mode", value: canManage ? "Editable" : "Read-only", sub: canManage ? "You can manage modules" : "Another operator required", iconBg: "bg-sky-500/10", iconColor: "text-sky-500" },
           { icon: Clock3, label: "Renews", value: subscription?.expires_at ? new Date(subscription.expires_at).toLocaleDateString() : "N/A", sub: subscription?.needs_renewal ? "Renewal recommended now" : "Next billing checkpoint", iconBg: "bg-amber-500/10", iconColor: "text-amber-500" },
@@ -445,9 +779,27 @@ export function TenantSubscriptionsClient() {
           </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {PLAN_ORDER.map(planKey => (
-            <PlanCard key={planKey} planKey={planKey} currentPlan={currentPlan} />
-          ))}
+          {PLAN_ORDER.map(planKey => {
+            const moduleLookup = new Map(catalog.map(module => [module.slug, module]));
+            const planModules = (planDefaults[planKey] ?? [])
+              .flatMap(slug => {
+                const catalogModule = moduleLookup.get(slug);
+                return catalogModule ? [catalogModule] : [];
+              });
+            const majorModules = planModules.filter(module => !module.is_addon);
+            const addonModules = catalog.filter(module => module.is_addon);
+
+            return (
+              <PlanCard
+                key={planKey}
+                planKey={planKey}
+                currentPlan={currentPlan}
+                pricing={planPricing[planKey]}
+                includedModules={majorModules}
+                addonModules={addonModules}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -578,9 +930,16 @@ export function TenantSubscriptionsClient() {
             disabled={!canManage}
             purchaseLockedModules={canManage}
             onLockedModuleRequest={handleLockedModuleRequest}
+            showCustomModules={false}
           />
         </div>
       </div>
+
+      <FeatureAccessMatrix
+        matrix={effectiveFeatureMatrix}
+        canManage={canManage}
+        onModuleRequest={handleMatrixModuleRequest}
+      />
 
       {/* ─── 7. ACTIVE SUMMARY ──────────────────────────────────────────── */}
       <div className="rounded-[2rem] border border-border/50 bg-card/40 p-6 shadow-sm backdrop-blur-md">
@@ -590,11 +949,11 @@ export function TenantSubscriptionsClient() {
             <p className="mt-1 text-sm text-muted-foreground">Everything your tenant can access right now across the workspace.</p>
           </div>
           <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-widest">
-            {subscriptions?.module_count ?? 0} modules
+            {activeModuleCount} modules
           </Badge>
         </div>
         <div className="rounded-[1.5rem] border border-border/50 bg-background/70 p-4">
-          <ModuleSubscriptionSummary modules={subscriptions?.selected_modules} maxVisible={12} emptyLabel="No modules are active for this tenant yet." />
+          <ModuleSubscriptionSummary modules={selectedSummaryModules} maxVisible={12} emptyLabel="No modules are active for this tenant yet." />
         </div>
         {subscriptions?.pending_modules?.length ? (
           <div className="mt-4 rounded-[1.5rem] border border-indigo-200 bg-indigo-50/70 dark:bg-indigo-950/30 dark:border-indigo-800/50 p-4 text-sm text-indigo-900 dark:text-indigo-300">

@@ -263,17 +263,17 @@ return [
                 'route_prefixes' => ['/dashboard/warehouse'],
             ],
         ],
-        'nightclub' => [
-            'name' => 'NightClub',
-            'backend_namespace' => 'Modules\\NightClub',
+        'hospitality' => [
+            'name' => 'Hospitality',
+            'backend_namespace' => 'Modules\\Hospitality',
             'backend_paths' => [
-                'Modules/NightClub/app',
-                'Modules/NightClub/routes',
+                'Modules/Hospitality/app',
+                'Modules/Hospitality/routes',
             ],
-            'frontend_namespace' => '@/modules/nightclub',
+            'frontend_namespace' => '@/modules/hospitality',
             'frontend_paths' => [
-                'modules/nightclub',
-                'app/dashboard/nightclub',
+                'modules/hospitality',
+                'app/dashboard/hospitality',
             ],
             'dependencies' => [
                 'inventory',
@@ -285,19 +285,19 @@ return [
                 'service orders',
             ],
             'public_api' => [
-                'http_prefixes' => ['/api/v1/nightclub', '/api/v1/public/nightclub'],
+                'http_prefixes' => ['/api/v1/hospitality', '/api/v1/public/hospitality'],
                 'events' => [],
                 'contracts' => [
                     'Modules\\Inventory\\Contracts\\InventoryIntegrationGateway',
                 ],
             ],
             'internal_namespaces' => [
-                'Modules\\NightClub\\Models',
+                'Modules\\Hospitality\\Models',
             ],
             'frontend_contract' => [
-                'module_id' => 'nightclub',
+                'module_id' => 'hospitality',
                 'version' => '2026-04',
-                'route_prefixes' => ['/dashboard/nightclub'],
+                'route_prefixes' => ['/dashboard/hospitality'],
             ],
         ],
         'mailbox' => [

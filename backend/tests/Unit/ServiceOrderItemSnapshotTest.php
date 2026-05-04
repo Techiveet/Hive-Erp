@@ -2,7 +2,7 @@
 
 namespace Tests\Unit;
 
-use Modules\NightClub\Models\ServiceOrderItem;
+use Modules\Hospitality\Models\ServiceOrderItem;
 use PHPUnit\Framework\TestCase;
 
 class ServiceOrderItemSnapshotTest extends TestCase
@@ -20,12 +20,12 @@ class ServiceOrderItemSnapshotTest extends TestCase
             'inventory_transaction_snapshot' => [
                 'id' => 19,
                 'item_id' => 5,
-                'type' => 'nightclub_service',
+                'type' => 'hospitality_service',
                 'direction' => 'out',
                 'quantity' => '1.000',
                 'balance_after' => '11.000',
-                'module_source' => 'lounge_club_management',
-                'reference_type' => 'nightclub_service_order_item',
+                'module_source' => 'hospitality',
+                'reference_type' => 'hospitality_service_order_item',
                 'reference_id' => '99',
             ],
         ]);
@@ -33,7 +33,7 @@ class ServiceOrderItemSnapshotTest extends TestCase
         $payload = $item->toArray();
 
         $this->assertSame('Signature Bottle', $payload['inventory_item']['name']);
-        $this->assertSame('nightclub_service', $payload['inventory_transaction']['type']);
+        $this->assertSame('hospitality_service', $payload['inventory_transaction']['type']);
         $this->assertArrayNotHasKey('inventory_item_snapshot', $payload);
         $this->assertArrayNotHasKey('inventory_transaction_snapshot', $payload);
     }

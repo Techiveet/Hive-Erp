@@ -16,6 +16,13 @@ class ProjectManagementServiceProvider extends ModuleServiceProvider
     public function boot(): void
     {
         parent::boot();
+        \Modules\ProjectManagement\Models\Task::observe(\Modules\ProjectManagement\Observers\TaskObserver::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \Modules\ProjectManagement\Console\CheckOverdueTasks::class,
+            ]);
+        }
     }
 
     public function register(): void

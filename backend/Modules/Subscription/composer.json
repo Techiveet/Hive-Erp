@@ -20,7 +20,10 @@
             "Modules\\Subscription\\": "app/",
             "Modules\\Subscription\\Database\\Factories\\": "database/factories/",
             "Modules\\Subscription\\Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "files": [
+            "app/Helpers/SubscriptionHelper.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

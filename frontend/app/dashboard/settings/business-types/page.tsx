@@ -323,8 +323,7 @@ export default function BusinessTypesPage() {
         columns={columns}
         data={businessTypes}
         totalEntries={totalEntries}
-        loading={isLoading}
-        loadingExtra={isFetching}
+        loading={isLoading || isFetching}
         pageIndex={page}
         pageSize={size}
         pageSizeOptions={[10, 25, 50, 100]}
