@@ -51,7 +51,7 @@ class TenantLandingTemplateSettingsController extends Controller
         ]);
     }
 
-    public function export(Request $request): StreamedResponse|JsonResponse
+    public function export(Request $request)
     {
         $businessTypes = $this->landingTemplates->businessTypesPayload();
         $type = $request->get('type', $request->get('format', 'csv'));
