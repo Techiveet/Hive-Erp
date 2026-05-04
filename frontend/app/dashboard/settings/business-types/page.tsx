@@ -265,6 +265,7 @@ export default function BusinessTypesPage() {
         exportEndpoint={exportUrl}
         resourceName="business-types"
         syncWithUrl={true}
+        getRowId={(row) => row.key}
       />
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
