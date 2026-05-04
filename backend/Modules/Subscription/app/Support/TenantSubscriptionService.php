@@ -9,6 +9,9 @@ use Modules\Tenancy\Models\Tenant;
 
 class TenantSubscriptionService
 {
+    public const ACCESS_STATUSES = ['active', 'trial', 'grace_period'];
+    public const MANUAL_STATUSES = ['trial', 'inactive', 'expired', 'cancelled', 'suspended', 'pending_activation'];
+
     public function ensureForTenant(Tenant $tenant, ?array $requestedPayload = null, ?string $updatedBy = null, bool $resetBillingWindow = false): TenantSubscription
     {
         $subscription = TenantSubscription::query()->firstOrNew([
@@ -53,10 +56,12 @@ class TenantSubscriptionService
             $subscription->grace_ends_at = $window['grace_ends_at'];
         }
 
-        $subscription->status = SubscriptionLifecycle::statusFor(
-            $subscription->expires_at,
-            $subscription->grace_ends_at
-        );
+        if (!in_array((string) $subscription->status, self::MANUAL_STATUSES, true)) {
+            $subscription->status = SubscriptionLifecycle::statusFor(
+                $subscription->expires_at,
+                $subscription->grace_ends_at
+            );
+        }
 
         $subscription->save();
 
@@ -97,6 +102,41 @@ class TenantSubscriptionService
         return $subscription->refresh();
     }
 
+    public function syncPlanDefaultsToTenants(array $planKeys, ?string $updatedBy = null): int
+    {
+        $normalizedPlans = collect($planKeys)
+            ->map(fn (string $plan) => strtolower(trim($plan)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($normalizedPlans === []) {
+            return 0;
+        }
+
+        $synced = 0;
+
+        Tenant::query()
+            ->whereIn('plan', $normalizedPlans)
+            ->chunk(100, function ($tenants) use (&$synced, $updatedBy) {
+                foreach ($tenants as $tenant) {
+                    $subscription = $this->ensureForTenant($tenant, null, $updatedBy);
+                    $subscription->module_subscriptions = TenantModuleCatalog::normalizeForStorage(
+                        null,
+                        $subscription->plan,
+                        $updatedBy,
+                        $tenant->business_type
+                    );
+                    $subscription->updated_by = $updatedBy;
+                    $subscription->save();
+                    $synced++;
+                }
+            });
+
+        return $synced;
+    }
+
     public function renew(Tenant $tenant, Carbon|string|null $paidAt = null, ?string $updatedBy = null): TenantSubscription
     {
         $subscription = $this->ensureForTenant($tenant, null, $updatedBy);
@@ -118,6 +158,10 @@ class TenantSubscriptionService
 
     public function refreshState(TenantSubscription $subscription, Carbon|string|null $at = null): TenantSubscription
     {
+        if (in_array((string) $subscription->status, self::MANUAL_STATUSES, true)) {
+            return $subscription;
+        }
+
         $moment = $at instanceof Carbon ? $at : Carbon::parse($at ?? now());
         $status = SubscriptionLifecycle::statusFor($subscription->expires_at, $subscription->grace_ends_at, $moment);
 
@@ -127,6 +171,34 @@ class TenantSubscriptionService
         }
 
         return $subscription;
+    }
+
+    public function assignPlan(Tenant $tenant, string $plan, ?array $payload = null, ?string $updatedBy = null, bool $resetBillingWindow = true): TenantSubscription
+    {
+        $tenant->plan = strtolower($plan);
+        $tenant->save();
+
+        return $this->ensureForTenant($tenant->refresh(), $payload, $updatedBy, $resetBillingWindow);
+    }
+
+    public function setStatus(Tenant $tenant, string $status, ?string $updatedBy = null): TenantSubscription
+    {
+        $subscription = $this->ensureForTenant($tenant, null, $updatedBy);
+        $subscription->status = $status;
+        $subscription->updated_by = $updatedBy;
+
+        if ($status === 'active' && (!$subscription->expires_at || $subscription->expires_at->isPast())) {
+            $window = SubscriptionLifecycle::startWindow($subscription->plan, now());
+            $subscription->started_at = $window['started_at'];
+            $subscription->renewal_window_starts_at = $window['renewal_window_starts_at'];
+            $subscription->expires_at = $window['expires_at'];
+            $subscription->grace_ends_at = $window['grace_ends_at'];
+            $subscription->last_renewed_at = $window['started_at'];
+        }
+
+        $subscription->save();
+
+        return $subscription->refresh();
     }
 
     public function currentForTenant(Tenant $tenant, array $pendingModules = []): array
@@ -179,7 +251,7 @@ class TenantSubscriptionService
     {
         $current = $this->currentForTenant($tenant);
         $modules = $current['module_subscriptions'];
-        $subscriptionAllowsAccess = in_array($current['status'], ['active', 'grace_period'], true);
+        $subscriptionAllowsAccess = in_array($current['status'], self::ACCESS_STATUSES, true);
 
         return [
             'plan' => $current['plan'],
@@ -203,6 +275,17 @@ class TenantSubscriptionService
 
     protected function preserveStoredPayload(?array $payload, ?string $plan = null, ?string $updatedBy = null, ?string $businessType = null): array
     {
+        $currentVersion = TenantModuleCatalog::VERSION;
+        $storedVersion = (int) ($payload['catalog_version'] ?? 0);
+        $enabledModules = $payload['enabled_modules'] ?? [];
+
+        $needsRefresh = $storedVersion < $currentVersion 
+            || !in_array('hospitality', $enabledModules, true);
+
+        if ($needsRefresh) {
+            return TenantModuleCatalog::normalizeForStorage(null, $plan, $updatedBy, null);
+        }
+
         $resolved = TenantModuleCatalog::resolve($payload, $plan, [], $businessType);
 
         return [
@@ -217,12 +300,15 @@ class TenantSubscriptionService
     private function buildSubscriptionSnapshot(Tenant $tenant, TenantSubscription $subscription, array $pendingModules = []): array
     {
         $summary = SubscriptionLifecycle::summary($subscription->expires_at, $subscription->grace_ends_at);
+        $status = in_array((string) $subscription->status, self::MANUAL_STATUSES, true)
+            ? (string) $subscription->status
+            : $summary['status'];
 
         return [
             'id' => $subscription->id,
             'tenant_id' => $tenant->id,
             'plan' => $subscription->plan,
-            'status' => $summary['status'],
+            'status' => $status,
             'billing_cycle' => $subscription->billing_cycle,
             'renewal_mode' => $subscription->renewal_mode,
             'started_at' => optional($subscription->started_at)->toIso8601String(),

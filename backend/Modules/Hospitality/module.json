@@ -1,0 +1,11 @@
+{
+    "name": "Hospitality",
+    "alias": "hospitality",
+    "description": "Hospitality management module for restaurants, lounges, bars, clubs, and event venues.",
+    "keywords": ["hospitality", "restaurant", "venue", "reservation", "pos"],
+    "priority": 0,
+    "providers": [
+        "Modules\\Hospitality\\Providers\\HospitalityServiceProvider"
+    ],
+    "files": []
+}

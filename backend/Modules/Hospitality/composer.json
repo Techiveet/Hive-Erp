@@ -1,0 +1,30 @@
+{
+    "name": "techiveet/hospitality",
+    "description": "Hospitality management module for restaurants, lounges, bars, clubs, and event venues.",
+    "authors": [
+        {
+            "name": "Techive Technology Solutions",
+            "email": "hello@techiveet.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Hospitality\\": "app/",
+            "Modules\\Hospitality\\Database\\Factories\\": "database/factories/",
+            "Modules\\Hospitality\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Hospitality\\Tests\\": "tests/"
+        }
+    }
+}

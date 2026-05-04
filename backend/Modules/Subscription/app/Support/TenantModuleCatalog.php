@@ -10,8 +10,11 @@ use Modules\Core\Models\Setting;
 
 class TenantModuleCatalog
 {
-    public const VERSION = 2;
+    public const VERSION = 3;
     public const PLAN_OVERRIDES_SETTING_KEY = 'subscription_plan_overrides';
+    public const PRICE_OVERRIDES_SETTING_KEY = 'subscription_feature_price_overrides';
+    public const BILLING_TYPE_MODULE = 'module';
+    public const BILLING_TYPE_ADDON = 'addon';
 
     public static function catalog(): array
     {
@@ -34,6 +37,16 @@ class TenantModuleCatalog
                 'tone' => 'violet',
                 'recommended_plans' => ['startup', 'business', 'enterprise', 'overlord'],
                 'monthly_price_etb' => 399,
+                'route_hints' => ['/dashboard/storage'],
+            ],
+            [
+                'slug' => 'audio_player',
+                'name' => 'Audio Player',
+                'description' => 'Play tenant audio files, playlists, background queues, favorites, and authenticated downloads from the shared audio engine.',
+                'category' => 'Creative Suite',
+                'tone' => 'pink',
+                'recommended_plans' => ['startup', 'business', 'enterprise', 'overlord'],
+                'monthly_price_etb' => 299,
                 'route_hints' => ['/dashboard/storage'],
             ],
             [
@@ -115,15 +128,25 @@ class TenantModuleCatalog
                 'route_hints' => ['/dashboard/inventory'],
             ],
             [
-                'slug' => 'lounge_club_management',
-                'name' => 'Lounge & Club Management',
-                'description' => 'Digitize VIP tables, reservations, floor operations, and service orders with direct inventory linkage.',
+                'slug' => 'warehouse_management',
+                'name' => 'Warehouse Management',
+                'description' => 'Manage warehouse locations, shelves, boxes, stock views, and movement history as a dedicated warehouse workspace.',
+                'category' => 'Business Apps',
+                'tone' => 'teal',
+                'recommended_plans' => ['business', 'enterprise', 'overlord'],
+                'business_types' => ['retail', 'restaurant', 'hotel', 'clinic', 'logistics', 'water-bottling', 'farm'],
+                'monthly_price_etb' => 499,
+                'route_hints' => ['/dashboard/warehouse'],
+            ],
+            [
+                'slug' => 'hospitality',
+                'name' => 'Hospitality Management',
+                'description' => 'Run tables, reservations, service orders, menu operations, events, and guest workflows from one hospitality cockpit.',
                 'category' => 'Hospitality',
                 'tone' => 'fuchsia',
                 'recommended_plans' => ['business', 'enterprise', 'overlord'],
-                'business_types' => ['restaurant', 'hotel'],
                 'monthly_price_etb' => 749,
-                'route_hints' => ['/dashboard/nightclub'],
+                'route_hints' => ['/dashboard/hospitality'],
             ],
             [
                 'slug' => 'fleet_management',
@@ -245,6 +268,7 @@ class TenantModuleCatalog
     public static function planPricing(): array
     {
         $pricing = self::basePlanPricing();
+        $priceOverrides = self::priceOverrides();
 
         foreach (self::planOverrides() as $planKey => $override) {
             if (!isset($pricing[$planKey]) || !is_array($override)) {
@@ -260,9 +284,12 @@ class TenantModuleCatalog
             ]);
         }
 
+        $defaults = self::planDefaults();
+
         foreach ($pricing as $planKey => $plan) {
+            $pricing[$planKey]['monthly_price_etb'] = self::planAmountForModules($defaults[$planKey] ?? [], $priceOverrides);
             $pricing[$planKey]['is_disabled'] = (bool) ($plan['is_disabled'] ?? false);
-            $pricing[$planKey]['is_free'] = (float) ($plan['monthly_price_etb'] ?? 0) <= 0;
+            $pricing[$planKey]['is_free'] = (float) ($pricing[$planKey]['monthly_price_etb'] ?? 0) <= 0;
         }
 
         return $pricing;
@@ -300,9 +327,26 @@ class TenantModuleCatalog
         ];
     }
 
-    public static function catalogMap(): array
+    public static function catalogWithPricing(?array $priceOverrides = null): array
     {
+        $overrides = self::normalizePriceOverrides($priceOverrides ?? self::priceOverrides());
+
         return collect(self::catalog())
+            ->map(function (array $module) use ($overrides) {
+                $billingType = self::billingTypeForModule($module['slug'], $overrides);
+                $module['monthly_price_etb'] = self::moduleAmount($module, $overrides);
+                $module['billing_type'] = $billingType;
+                $module['is_addon'] = $billingType === self::BILLING_TYPE_ADDON;
+
+                return $module;
+            })
+            ->values()
+            ->all();
+    }
+
+    public static function catalogMap(?array $priceOverrides = null): array
+    {
+        return collect(self::catalogWithPricing($priceOverrides))
             ->keyBy('slug')
             ->all();
     }
@@ -313,6 +357,38 @@ class TenantModuleCatalog
             ->pluck('slug')
             ->values()
             ->all();
+    }
+
+    public static function addonModuleSlugs(): array
+    {
+        return [
+            'image_editor',
+            'video_player',
+            'audio_player',
+            'media_library',
+            'advanced_analytics',
+            'api_access',
+            'api_docs',
+            'audit_logs',
+            'alerts_center',
+            'workflow_automation',
+            'fleet_management',
+        ];
+    }
+
+    public static function majorModuleSlugs(): array
+    {
+        return collect(self::slugs())
+            ->reject(fn (string $slug) => in_array($slug, self::addonModuleSlugs(), true))
+            ->values()
+            ->all();
+    }
+
+    public static function moduleBillingType(string $slug): string
+    {
+        return in_array($slug, self::addonModuleSlugs(), true)
+            ? self::BILLING_TYPE_ADDON
+            : self::BILLING_TYPE_MODULE;
     }
 
     public static function basePlanDefaults(): array
@@ -328,6 +404,7 @@ class TenantModuleCatalog
                 'mailbox',
                 'file_manager',
                 'image_editor',
+                'audio_player',
                 'document_converter',
             ],
 
@@ -337,6 +414,7 @@ class TenantModuleCatalog
                 'file_manager',
                 'image_editor',
                 'video_player',
+                'audio_player',
                 'media_library',
                 'document_converter',
                 'advanced_analytics',
@@ -345,7 +423,8 @@ class TenantModuleCatalog
                 'security_management',
                 'invoice_billing',
                 'inventory_control',
-                'lounge_club_management',
+                'warehouse_management',
+                'hospitality',
             ],
 
             // Enterprise: adds automation, APIs, fleet, and developer tools
@@ -354,6 +433,7 @@ class TenantModuleCatalog
                 'file_manager',
                 'image_editor',
                 'video_player',
+                'audio_player',
                 'media_library',
                 'document_converter',
                 'workflow_automation',
@@ -365,7 +445,8 @@ class TenantModuleCatalog
                 'security_management',
                 'invoice_billing',
                 'inventory_control',
-                'lounge_club_management',
+                'warehouse_management',
+                'hospitality',
                 'fleet_management',
             ],
 
@@ -427,30 +508,101 @@ class TenantModuleCatalog
         return is_array($decoded) ? $decoded : [];
     }
 
+    public static function priceOverrides(): array
+    {
+        try {
+            $raw = Setting::on(self::centralConnection())
+                ->where('key', self::PRICE_OVERRIDES_SETTING_KEY)
+                ->value('value');
+        } catch (\Throwable) {
+            $raw = null;
+        }
+
+        $decoded = json_decode((string) $raw, true);
+
+        return self::normalizePriceOverrides(is_array($decoded) ? $decoded : []);
+    }
+
+    public static function normalizePriceOverrides(array $payload): array
+    {
+        $allowedModules = self::slugs();
+        $normalized = [
+            'modules' => [],
+            'submodules' => [],
+            'features' => [],
+        ];
+
+        foreach (['modules', 'submodules', 'features'] as $scope) {
+            foreach (Arr::wrap($payload[$scope] ?? []) as $key => $value) {
+                if (!is_string($key) || !is_array($value)) {
+                    continue;
+                }
+
+                $key = trim($key);
+                if ($key === '') {
+                    continue;
+                }
+
+                if ($scope === 'modules' && !in_array($key, $allowedModules, true)) {
+                    continue;
+                }
+
+                if ($scope === 'submodules') {
+                    [$moduleSlug] = array_pad(explode(':', $key, 2), 2, null);
+                    if (!is_string($moduleSlug) || !in_array($moduleSlug, $allowedModules, true)) {
+                        continue;
+                    }
+                }
+
+                $normalized[$scope][$key] = [
+                    'monthly_price_etb' => max(0.0, (float) ($value['monthly_price_etb'] ?? 0)),
+                ];
+
+                if ($scope === 'modules') {
+                    $billingType = (string) ($value['billing_type'] ?? self::moduleBillingType($key));
+                    $normalized[$scope][$key]['billing_type'] = in_array($billingType, [self::BILLING_TYPE_MODULE, self::BILLING_TYPE_ADDON], true)
+                        ? $billingType
+                        : self::moduleBillingType($key);
+                    $normalized[$scope][$key]['is_addon'] = $normalized[$scope][$key]['billing_type'] === self::BILLING_TYPE_ADDON;
+                }
+            }
+        }
+
+        return $normalized;
+    }
+
     public static function normalizeRequestedModules(array $modules): array
     {
         return self::normalizeEnabledModules($modules);
     }
 
-    public static function modulePriceForPlan(string $slug, ?string $plan = null): float
+    public static function modulePriceForPlan(string $slug, ?string $plan = null, ?array $priceOverrides = null): float
     {
         if (in_array($slug, self::defaultsForPlan($plan), true)) {
             return 0.0;
         }
 
-        $catalogMap = self::catalogMap();
+        $catalogMap = self::catalogMap($priceOverrides);
 
         return (float) ($catalogMap[$slug]['monthly_price_etb'] ?? 0);
     }
 
-    public static function quoteForPlan(?string $plan, array $modules): array
+    public static function planAmountForModules(array $modules, ?array $priceOverrides = null): float
+    {
+        $catalogMap = self::catalogMap($priceOverrides);
+
+        return (float) collect(self::normalizeEnabledModules($modules))
+            ->sum(fn (string $slug) => (float) ($catalogMap[$slug]['monthly_price_etb'] ?? 0));
+    }
+
+    public static function quoteForPlan(?string $plan, array $modules, ?array $priceOverrides = null): array
     {
         $planKey = strtolower((string) $plan) ?: 'business';
         $pricing = self::planPricing();
         $planConfig = $pricing[$planKey] ?? $pricing['business'];
         $normalizedModules = self::normalizeEnabledModules($modules);
         $includedModules = self::defaultsForPlan($planKey);
-        $catalogMap = self::catalogMap();
+        $catalogMap = self::catalogMap($priceOverrides);
 
         $lineItems = [[
             'type' => 'plan',
@@ -493,20 +645,20 @@ class TenantModuleCatalog
         ];
     }
 
-    public static function quoteForUpgrade(?string $plan, array $modules): array
+    public static function quoteForUpgrade(?string $plan, array $modules, ?array $priceOverrides = null): array
     {
         $normalizedModules = self::normalizeEnabledModules($modules);
-        $catalogMap = self::catalogMap();
+        $catalogMap = self::catalogMap($priceOverrides);
 
         $lineItems = collect($normalizedModules)
             ->filter(fn (string $slug) => isset($catalogMap[$slug]))
-            ->map(function (string $slug) use ($catalogMap, $plan) {
+            ->map(function (string $slug) use ($catalogMap, $plan, $priceOverrides) {
                 return [
                     'type' => 'module',
                     'slug' => $slug,
                     'name' => $catalogMap[$slug]['name'],
                     'description' => $catalogMap[$slug]['description'],
-                    'amount_etb' => self::modulePriceForPlan($slug, $plan),
+                    'amount_etb' => self::modulePriceForPlan($slug, $plan, $priceOverrides),
                 ];
             })
             ->values()
@@ -593,6 +745,8 @@ class TenantModuleCatalog
                         'included_in_plan' => (bool) $module['included_in_plan'],
                         'name' => $module['name'],
                         'monthly_price_etb' => (float) $module['monthly_price_etb'],
+                        'billing_type' => $module['billing_type'] ?? self::moduleBillingType($module['slug']),
+                        'is_addon' => (bool) ($module['is_addon'] ?? false),
                     ],
                 ])
                 ->all(),
@@ -676,13 +830,7 @@ class TenantModuleCatalog
             ->values()
             ->all();
 
-        $catalogModules = collect(self::catalog())
-            ->filter(function (array $module) use ($businessType) {
-                if (!$businessType || !isset($module['business_types'])) {
-                    return true;
-                }
-                return empty($module['business_types']) || in_array($businessType, $module['business_types'], true);
-            })
+        $catalogModules = collect(self::catalogWithPricing())
             ->map(function (array $module) use ($state, $includedModules, $pending) {
                 $isActive = in_array($module['slug'], $state['enabled_modules'], true);
                 $isPending = !$isActive && $pending->contains($module['slug']);
@@ -706,6 +854,45 @@ class TenantModuleCatalog
     protected static function centralConnection(): string
     {
         return (string) config('tenancy.database.central_connection', 'central');
+    }
+
+    private static function priceForScope(array $overrides, string $scope, string $key, float $fallback): float
+    {
+        return (float) ($overrides[$scope][$key]['monthly_price_etb'] ?? $fallback);
+    }
+
+    private static function moduleAmount(array $module, array $overrides): float
+    {
+        $submoduleTotal = self::submoduleTotalForModule($module['slug'], $overrides);
+
+        if ($submoduleTotal > 0) {
+            return $submoduleTotal;
+        }
+
+        return self::priceForScope(
+            $overrides,
+            'modules',
+            $module['slug'],
+            (float) ($module['monthly_price_etb'] ?? 0)
+        );
+    }
+
+    private static function submoduleTotalForModule(string $moduleSlug, array $overrides): float
+    {
+        $prefix = "{$moduleSlug}:";
+
+        return (float) collect($overrides['submodules'] ?? [])
+            ->filter(fn ($value, string $key) => str_starts_with($key, $prefix))
+            ->sum(fn (array $value) => (float) ($value['monthly_price_etb'] ?? 0));
+    }
+
+    private static function billingTypeForModule(string $moduleSlug, array $overrides): string
+    {
+        $billingType = (string) ($overrides['modules'][$moduleSlug]['billing_type'] ?? self::moduleBillingType($moduleSlug));
+
+        return in_array($billingType, [self::BILLING_TYPE_MODULE, self::BILLING_TYPE_ADDON], true)
+            ? $billingType
+            : self::moduleBillingType($moduleSlug);
     }
 }
 
