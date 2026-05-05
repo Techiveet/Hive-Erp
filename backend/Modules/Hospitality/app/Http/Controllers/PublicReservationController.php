@@ -6,28 +6,27 @@ use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Modules\Hospitality\Models\Table;
+use Modules\Hospitality\Models\Location;
 use Modules\Hospitality\Models\Reservation;
 
 class PublicReservationController extends Controller
 {
     public function availableTables()
     {
-        $tables = Table::query()
+        $locations = Location::query()
             ->where('is_active', true)
             ->where('status', 'available')
             ->select('id', 'name', 'capacity', 'min_spend')
-            ->orderBy('zone')
             ->orderBy('name')
             ->get();
 
-        return response()->json($tables);
+        return response()->json($locations);
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'table_id' => 'required|exists:hospitality_tables,id',
+            'location_id' => 'required|exists:hospitality_locations,id',
             'customer_name' => 'required|string|max:120',
             'customer_phone' => 'required|string|max:50',
             'reservation_time' => 'required|date|after:now',
@@ -35,23 +34,23 @@ class PublicReservationController extends Controller
             'special_requests' => 'nullable|string|max:1000',
         ]);
 
-        $table = Table::query()->findOrFail((int) $validated['table_id']);
+        $location = Location::query()->findOrFail((int) $validated['location_id']);
 
-        if (!$table->is_active || $table->status !== 'available') {
+        if (!$location->is_active || $location->status !== 'available') {
             return response()->json([
-                'message' => 'This table is not currently open for booking.',
+                'message' => 'This location is not currently open for booking.',
             ], 422);
         }
 
-        if ((int) $validated['guest_count'] > (int) $table->capacity) {
+        if ((int) $validated['guest_count'] > (int) $location->capacity) {
             return response()->json([
-                'message' => "Guest count exceeds table capacity ({$table->capacity}).",
+                'message' => "Guest count exceeds capacity ({$location->capacity}).",
             ], 422);
         }
 
         $reservationTime = Carbon::parse((string) $validated['reservation_time']);
 
-        $conflict = Reservation::where('table_id', $validated['table_id'])
+        $conflict = Reservation::where('location_id', $validated['location_id'])
             ->whereIn('status', ['pending', 'confirmed'])
             ->whereBetween('reservation_time', [
                 $reservationTime->copy()->subHours(2),
@@ -61,13 +60,13 @@ class PublicReservationController extends Controller
 
         if ($conflict) {
             return response()->json([
-                'message' => 'This table is already reserved around that time. Please choose a different time or table.'
+                'message' => 'This location is already reserved around that time. Please choose a different time or location.'
             ], 422);
         }
 
         $validated['status'] = 'pending';
         $validated['source'] = 'web';
-        $validated['expected_spend'] = (float) $table->min_spend;
+        $validated['expected_spend'] = (float) $location->min_spend;
         $validated['reservation_code'] = $this->generateReservationCode();
 
         $reservation = Reservation::create($validated);

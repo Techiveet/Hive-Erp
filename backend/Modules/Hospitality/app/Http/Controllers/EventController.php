@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Modules\Hospitality\Models\Event;
-use Modules\Hospitality\Models\Table;
+use Modules\Hospitality\Models\Location;
 
 class EventController extends Controller
 {
@@ -14,7 +14,7 @@ class EventController extends Controller
     {
         $query = Event::query()
             ->with('organizer:id,name,email')
-            ->withCount('blockedTables')
+            ->withCount('blockedLocations')
             ->withCount('reservations');
 
         if ($request->filled('status')) {
@@ -60,7 +60,7 @@ class EventController extends Controller
     {
         return response()->json(
             Event::query()
-                ->with(['organizer:id,name,email', 'blockedTables:id,name,zone', 'reservations'])
+                ->with(['organizer:id,name,email', 'blockedLocations:id,name,zone', 'reservations'])
                 ->findOrFail($id)
         );
     }
@@ -91,7 +91,7 @@ class EventController extends Controller
     public function destroy($id)
     {
         $event = Event::findOrFail($id);
-        $event->blockedTables()->detach();
+        $event->blockedLocations()->detach();
         $event->delete();
         return response()->json(null, 204);
     }
@@ -100,17 +100,17 @@ class EventController extends Controller
     {
         $event = Event::findOrFail($id);
         $validated = $request->validate([
-            'table_ids' => ['required', 'array', 'min:1'],
-            'table_ids.*' => ['integer', 'exists:hospitality_tables,id'],
+            'location_ids' => ['required', 'array', 'min:1'],
+            'location_ids.*' => ['integer', 'exists:hospitality_locations,id'],
         ]);
 
-        $event->blockedTables()->syncWithoutDetaching($validated['table_ids']);
+        $event->blockedLocations()->syncWithoutDetaching($validated['location_ids']);
 
-        Table::whereIn('id', $validated['table_ids'])->update(['status' => 'reserved']);
+        Location::whereIn('id', $validated['location_ids'])->update(['status' => 'reserved']);
 
         return response()->json([
-            'message' => 'Tables blocked for event.',
-            'blocked_count' => $event->blockedTables()->count(),
+            'message' => 'Locations blocked for event.',
+            'blocked_count' => $event->blockedLocations()->count(),
         ]);
     }
 
@@ -118,26 +118,26 @@ class EventController extends Controller
     {
         $event = Event::findOrFail($id);
         $validated = $request->validate([
-            'table_ids' => ['required', 'array', 'min:1'],
-            'table_ids.*' => ['integer', 'exists:hospitality_tables,id'],
+            'location_ids' => ['required', 'array', 'min:1'],
+            'location_ids.*' => ['integer', 'exists:hospitality_locations,id'],
         ]);
 
-        $event->blockedTables()->detach($validated['table_ids']);
+        $event->blockedLocations()->detach($validated['location_ids']);
 
-        $availableIds = collect($validated['table_ids'])->filter(function ($tableId) {
-            return !Reservation::where('table_id', $tableId)
+        $availableIds = collect($validated['location_ids'])->filter(function ($locationId) {
+            return !Reservation::where('location_id', $locationId)
                 ->whereIn('status', ['pending', 'confirmed'])
                 ->exists()
-                && !Event::whereHas('blockedTables', fn ($q) => $q->where('table_id', $tableId))->exists();
+                && !Event::whereHas('blockedLocations', fn ($q) => $q->where('location_id', $locationId))->exists();
         });
 
         if ($availableIds->isNotEmpty()) {
-            Table::whereIn('id', $availableIds->all())->update(['status' => 'available']);
+            Location::whereIn('id', $availableIds->all())->update(['status' => 'available']);
         }
 
         return response()->json([
-            'message' => 'Tables unblocked.',
-            'blocked_count' => $event->blockedTables()->count(),
+            'message' => 'Locations unblocked.',
+            'blocked_count' => $event->blockedLocations()->count(),
         ]);
     }
 }

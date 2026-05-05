@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Modules\Hospitality\Models\WaitlistEntry;
-use Modules\Hospitality\Models\Table;
+use Modules\Hospitality\Models\Location;
 use Modules\Hospitality\Models\Reservation;
 
 class WaitlistController extends Controller
@@ -77,25 +77,25 @@ class WaitlistController extends Controller
     {
         $entry = WaitlistEntry::findOrFail($id);
         $validated = $request->validate([
-            'table_id' => ['required', 'exists:hospitality_tables,id'],
+            'location_id' => ['required', 'exists:hospitality_locations,id'],
         ]);
 
-        $table = Table::findOrFail((int) $validated['table_id']);
+        $location = Location::findOrFail((int) $validated['location_id']);
 
-        if (!$table->is_active || $table->status !== 'available') {
+        if (!$location->is_active || $location->status !== 'available') {
             return response()->json([
-                'message' => 'Table is not available for seating.',
+                'message' => 'Location is not available for seating.',
             ], 422);
         }
 
-        if ($entry->party_size > $table->capacity) {
+        if ($entry->party_size > $location->capacity) {
             return response()->json([
-                'message' => "Party size exceeds table capacity ({$table->capacity}).",
+                'message' => "Party size exceeds capacity ({$location->capacity}).",
             ], 422);
         }
 
         $reservation = Reservation::create([
-            'table_id' => $table->id,
+            'location_id' => $location->id,
             'customer_name' => $entry->customer_name,
             'customer_phone' => $entry->customer_phone,
             'reservation_time' => now(),
@@ -111,7 +111,7 @@ class WaitlistController extends Controller
             'reservation_id' => $reservation->id,
         ]);
 
-        $table->update(['status' => 'occupied']);
+        $location->update(['status' => 'occupied']);
 
         return response()->json([
             'waitlist' => $entry->fresh()->load('reservation:id,reservation_code'),
@@ -121,9 +121,9 @@ class WaitlistController extends Controller
 
     protected function estimateWait(int $partySize): int
     {
-        $activeTables = Table::where('is_active', true)->count();
-        $occupiedTables = Table::whereIn('status', ['occupied', 'reserved'])->count();
-        $utilization = $activeTables > 0 ? ($occupiedTables / $activeTables) : 0;
+        $activeLocations = Location::where('is_active', true)->count();
+        $occupiedLocations = Location::whereIn('status', ['occupied', 'reserved'])->count();
+        $utilization = $activeLocations > 0 ? ($occupiedLocations / $activeLocations) : 0;
 
         $baseMinutes = 15;
         $minutes = (int) ($baseMinutes + ($utilization * 45) + ($partySize * 3));

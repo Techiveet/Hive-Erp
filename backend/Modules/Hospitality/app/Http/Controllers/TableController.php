@@ -5,13 +5,13 @@ namespace Modules\Hospitality\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Modules\Hospitality\Models\Table;
+use Modules\Hospitality\Models\Location;
 
 class TableController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Table::query()
+        $query = Location::query()
             ->with('staff:id,name,email,avatar_path')
             ->withCount([
                 'reservations as upcoming_reservations_count' => fn ($builder) => $builder
@@ -32,16 +32,14 @@ class TableController extends Controller
 
             $query->where(function ($builder) use ($term): void {
                 $builder
-                    ->where('name', 'like', $term)
-                    ->orWhere('zone', 'like', $term)
+                    ->where('label', 'like', $term)
                     ->orWhere('table_type', 'like', $term);
             });
         }
 
         return response()->json(
             $query
-                ->orderBy('zone')
-                ->orderBy('name')
+                ->orderBy('label')
                 ->get()
         );
     }
@@ -49,31 +47,33 @@ class TableController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:80', 'unique:hospitality_tables,name'],
+            'label' => ['required', 'string', 'max:80'],
             'capacity' => ['required', 'integer', 'min:1', 'max:100'],
             'min_spend' => ['nullable', 'numeric', 'min:0'],
-            'status' => ['nullable', Rule::in(['available', 'reserved', 'occupied'])],
+            'status' => ['nullable', Rule::in(['available', 'reserved', 'occupied', 'dirty'])],
             'assigned_staff_id' => ['nullable', 'exists:users,id'],
-            'zone' => ['nullable', 'string', 'max:60'],
+            'zone_id' => ['nullable', 'exists:hospitality_zones,id'],
             'table_type' => ['nullable', 'string', 'max:60'],
             'is_active' => ['sometimes', 'boolean'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'grid_position' => ['nullable', 'array'],
+            'grid_position.x' => ['required_with:grid_position', 'integer'],
+            'grid_position.y' => ['required_with:grid_position', 'integer'],
         ]);
 
-        $validated['zone'] = $validated['zone'] ?? 'main';
         $validated['table_type'] = $validated['table_type'] ?? 'standard';
 
-        $table = Table::create($validated);
+        $location = Location::create($validated);
 
         return response()->json(
-            $table->load('staff:id,name,email,avatar_path'),
+            $location->load('staff:id,name,email,avatar_path'),
             201
         );
     }
 
     public function show($id)
     {
-        $table = Table::query()
+        $location = Location::query()
             ->with([
                 'staff:id,name,email,avatar_path',
                 'reservations' => fn ($builder) => $builder
@@ -82,37 +82,40 @@ class TableController extends Controller
             ])
             ->findOrFail($id);
 
-        return response()->json($table);
+        return response()->json($location);
     }
 
     public function update(Request $request, $id)
     {
-        $table = Table::findOrFail($id);
+        $location = Location::findOrFail($id);
         
         $validated = $request->validate([
-            'name' => ['sometimes', 'string', 'max:80', Rule::unique('hospitality_tables', 'name')->ignore($table->id)],
+            'label' => ['sometimes', 'string', 'max:80'],
             'capacity' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'min_spend' => ['sometimes', 'numeric', 'min:0'],
-            'status' => ['sometimes', Rule::in(['available', 'reserved', 'occupied'])],
+            'status' => ['sometimes', Rule::in(['available', 'reserved', 'occupied', 'dirty'])],
             'assigned_staff_id' => ['nullable', 'exists:users,id'],
-            'zone' => ['sometimes', 'string', 'max:60'],
+            'zone_id' => ['nullable', 'exists:hospitality_zones,id'],
             'table_type' => ['sometimes', 'string', 'max:60'],
             'is_active' => ['sometimes', 'boolean'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'grid_position' => ['nullable', 'array'],
+            'grid_position.x' => ['required_with:grid_position', 'integer'],
+            'grid_position.y' => ['required_with:grid_position', 'integer'],
         ]);
 
-        $table->update($validated);
+        $location->update($validated);
 
         return response()->json(
-            $table->fresh()->load('staff:id,name,email,avatar_path')
+            $location->fresh()->load('staff:id,name,email,avatar_path')
         );
     }
 
     public function destroy($id)
     {
-        $table = Table::findOrFail($id);
+        $location = Location::findOrFail($id);
 
-        $hasUpcomingReservations = $table
+        $hasUpcomingReservations = $location
             ->reservations()
             ->whereIn('status', ['pending', 'confirmed'])
             ->where('reservation_time', '>=', now())
@@ -120,11 +123,11 @@ class TableController extends Controller
 
         if ($hasUpcomingReservations) {
             return response()->json([
-                'message' => 'This table has upcoming reservations and cannot be deleted.',
+                'message' => 'This location has upcoming reservations and cannot be deleted.',
             ], 422);
         }
 
-        $table->delete();
+        $location->delete();
 
         return response()->json(null, 204);
     }

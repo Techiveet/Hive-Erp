@@ -32,6 +32,18 @@ Route::middleware([
         Route::get('overview', [HospitalityDashboardController::class, 'overview'])
             ->name('overview');
 
+        // Space & Staff Management
+        Route::prefix('space')->group(function () {
+            Route::get('zones', [\Modules\Hospitality\Http\Controllers\SpaceManagementController::class, 'getFloorPlan']);
+            Route::patch('locations/{id}/status', [\Modules\Hospitality\Http\Controllers\SpaceManagementController::class, 'updateLocationStatus']);
+        });
+
+        // Door & Promoter Management
+        Route::prefix('door')->group(function () {
+            Route::get('guest-list', [\Modules\Hospitality\Http\Controllers\DoorManagementController::class, 'getGuestList']);
+            Route::post('check-in/{id}', [\Modules\Hospitality\Http\Controllers\DoorManagementController::class, 'checkIn']);
+        });
+
         Route::get('tables', [TableController::class, 'index'])
             ->name('tables.index');
         Route::post('tables', [TableController::class, 'store'])

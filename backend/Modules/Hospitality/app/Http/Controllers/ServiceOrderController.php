@@ -22,7 +22,7 @@ class ServiceOrderController extends Controller
     {
         $query = ServiceOrder::query()
             ->with([
-                'table:id,name,zone,table_type',
+                'location:id,name,table_type',
                 'reservation:id,reservation_code,customer_name',
                 'servedBy:id,name,email',
                 'items',
@@ -32,8 +32,8 @@ class ServiceOrderController extends Controller
             $query->where('status', (string) $request->input('status'));
         }
 
-        if ($request->filled('table_id')) {
-            $query->where('table_id', (int) $request->input('table_id'));
+        if ($request->filled('location_id')) {
+            $query->where('location_id', (int) $request->input('location_id'));
         }
 
         if ($request->filled('reservation_id')) {
@@ -63,7 +63,7 @@ class ServiceOrderController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'table_id' => ['required', 'exists:hospitality_tables,id'],
+            'location_id' => ['required', 'exists:hospitality_locations,id'],
             'reservation_id' => ['nullable', 'exists:hospitality_reservations,id'],
             'status' => ['nullable', Rule::in(['pending', 'preparing', 'served', 'closed', 'cancelled'])],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -80,7 +80,7 @@ class ServiceOrderController extends Controller
         $order = DB::transaction(function () use ($validated, $inventorySnapshots) {
             $order = ServiceOrder::query()->create([
                 'order_number' => $this->generateOrderNumber(),
-                'table_id' => $validated['table_id'],
+                'location_id' => $validated['location_id'],
                 'reservation_id' => $validated['reservation_id'] ?? null,
                 'status' => $validated['status'] ?? 'pending',
                 'notes' => $validated['notes'] ?? null,
@@ -157,7 +157,7 @@ class ServiceOrderController extends Controller
         }
 
         $fallbackInventorySnapshots = $this->inventoryGateway->getItemSnapshots(
-            $order->items
+            collect($order->items)
                 ->filter(fn ($item): bool => (bool) $item->inventory_item_id && $item->inventory_item === null)
                 ->pluck('inventory_item_id')
                 ->all()
@@ -181,9 +181,9 @@ class ServiceOrderController extends Controller
                             'performed_by_id' => auth()->id(),
                             'notes' => "Nightclub order {$order->order_number} consumed {$item->quantity} unit(s) of {$item->item_name}.",
                             'metadata' => [
-                                'service_order_id' => $order->id,
-                                'service_order_item_id' => $item->id,
-                                'table_id' => $order->table_id,
+                                 'service_order_id' => $order->id,
+                                 'service_order_item_id' => $item->id,
+                                 'location_id' => $order->location_id,
                                 'reservation_id' => $order->reservation_id,
                             ],
                         ]
@@ -274,7 +274,7 @@ class ServiceOrderController extends Controller
     private function loadOrderResponse(ServiceOrder $order): ServiceOrder
     {
         $order->load([
-            'table:id,name,zone,table_type',
+            'location:id,name,table_type',
             'reservation:id,reservation_code,customer_name,status',
             'servedBy:id,name,email',
             'items',
@@ -285,12 +285,14 @@ class ServiceOrderController extends Controller
 
     private function hydrateLegacySnapshots(ServiceOrder $order): ServiceOrder
     {
-        $missingInventoryItemIds = $order->items
+        $items = collect($order->items);
+
+        $missingInventoryItemIds = $items
             ->filter(fn ($item): bool => (bool) $item->inventory_item_id && $item->inventory_item === null)
             ->pluck('inventory_item_id')
             ->all();
 
-        $missingTransactionIds = $order->items
+        $missingTransactionIds = $items
             ->filter(fn ($item): bool => (bool) $item->inventory_transaction_id && $item->inventory_transaction === null)
             ->pluck('inventory_transaction_id')
             ->all();

@@ -12,6 +12,8 @@ import {
   Utensils,
   TrendingUp,
   Plus,
+  Map as MapIcon,
+  Users,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -27,6 +29,21 @@ const cardStyles = [
   "from-violet-500/20 to-fuchsia-500/10 border-violet-500/30",
   "from-emerald-500/20 to-teal-500/10 border-emerald-500/30",
 ];
+
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie,
+} from "recharts";
+
+const COLORS = ["#6366f1", "#f59e0b", "#ec4899", "#10b981", "#8b5cf6"];
 
 export default function HospitalityDashboardPage() {
   const { data: overview, isLoading, isError } = useQuery({
@@ -53,17 +70,6 @@ export default function HospitalityDashboardPage() {
             <Skeleton key={i} className="h-32 rounded-3xl" />
           ))}
         </div>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-6 w-32 rounded-full" />
-          </div>
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-16 rounded-2xl" />
-            ))}
-          </div>
-        </div>
       </div>
     );
   }
@@ -77,7 +83,7 @@ export default function HospitalityDashboardPage() {
         <div className="max-w-md space-y-2">
           <h2 className="text-xl font-black tracking-tight">Dashboard Unavailable</h2>
           <p className="text-sm text-muted-foreground">
-            We're having trouble loading the hospitality operations data. Please ensure your subscription is active and try again.
+            We're having trouble loading the hospitality operations data. Please ensure your session is valid and try again.
           </p>
         </div>
         <Button 
@@ -91,9 +97,13 @@ export default function HospitalityDashboardPage() {
     );
   }
 
+  const isNightclub = overview.business_type === "nightclub";
+  const locationLabel = isNightclub ? "Sofa" : "Table";
+  const locationLabelPlural = isNightclub ? "Sofas" : "Tables";
+
   const summaryCards = [
     {
-      label: "Active Tables",
+      label: `Active ${locationLabelPlural}`,
       value: `${overview.tables?.active || 0}/${overview.tables?.total || 0}`,
       hint: `${overview.tables?.available || 0} available now`,
       icon: Sofa,
@@ -115,7 +125,7 @@ export default function HospitalityDashboardPage() {
     },
     {
       label: "Revenue Today",
-      value: `ETB ${(overview.orders?.revenue_today || 0).toFixed(0)}`,
+      value: `ETB ${(overview.orders?.revenue_today || 0).toLocaleString()}`,
       hint: "Closed orders only",
       icon: CircleDollarSign,
       href: "/dashboard/inventory",
@@ -140,7 +150,7 @@ export default function HospitalityDashboardPage() {
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 text-xs font-black uppercase tracking-[0.2em]">
               <TrendingUp className="h-3 w-3" />
-              Real-time Operations
+              {isNightclub ? "Nightclub Intelligence" : "Real-time Operations"}
             </div>
             <h1 className="flex items-center gap-4 text-4xl font-black tracking-tight">
               <span className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-3 text-indigo-500 shadow-lg shadow-indigo-500/20">
@@ -150,6 +160,7 @@ export default function HospitalityDashboardPage() {
             </h1>
             <p className="max-w-2xl text-base text-muted-foreground font-medium leading-relaxed">
               Manage floor layout, reservations, service orders, menu, events, and customer operations from one premium cockpit.
+              {isNightclub && " Optimized for lounge and VIP management."}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -160,7 +171,21 @@ export default function HospitalityDashboardPage() {
               </Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-full px-8 backdrop-blur-sm border-border/60 hover:bg-background/80">
-              <Link href="/dashboard/hospitality/tables">View Tables</Link>
+              <Link href="/dashboard/hospitality/space" className="flex items-center gap-2">
+                <MapIcon className="h-5 w-5" />
+                Space View
+              </Link>
+            </Button>
+            {isNightclub && (
+              <Button asChild variant="secondary" size="lg" className="rounded-full px-8 backdrop-blur-sm border-border/60">
+                <Link href="/dashboard/hospitality/door" className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Door Check-in
+                </Link>
+              </Button>
+            )}
+            <Button asChild variant="ghost" size="lg" className="rounded-full px-8 opacity-60 hover:opacity-100">
+              <Link href="/dashboard/hospitality/tables">View {locationLabelPlural}</Link>
             </Button>
           </div>
         </div>
@@ -205,6 +230,70 @@ export default function HospitalityDashboardPage() {
           );
         })}
       </section>
+
+      {isNightclub && overview.analytics && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <motion.section
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="rounded-[2.5rem] border border-border/40 bg-card/30 backdrop-blur-md p-8 shadow-sm"
+          >
+            <h3 className="mb-6 text-xl font-black tracking-tight flex items-center gap-2">
+              <div className="w-2 h-6 rounded-full bg-indigo-500" />
+              Guest Arrival Status
+            </h3>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={overview.analytics.guest_arrivals || []}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="count"
+                    nameKey="status"
+                    label={({ status, count }) => `${status}: ${count}`}
+                  >
+                    {(overview.analytics.guest_arrivals || []).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.section>
+
+          <motion.section
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="rounded-[2.5rem] border border-border/40 bg-card/30 backdrop-blur-md p-8 shadow-sm"
+          >
+            <h3 className="mb-6 text-xl font-black tracking-tight flex items-center gap-2">
+              <div className="w-2 h-6 rounded-full bg-amber-500" />
+              Top Promoters (Today)
+            </h3>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={overview.analytics.promoter_stats || []}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
+                  <XAxis dataKey="promoter.name" axisLine={false} tickLine={false} fontSize={12} fontWeight={600} />
+                  <YAxis axisLine={false} tickLine={false} fontSize={12} fontWeight={600} />
+                  <Tooltip 
+                    cursor={{ fill: 'currentColor', opacity: 0.05 }}
+                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Bar dataKey="total_guests_brought" fill="#6366f1" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.section>
+        </div>
+      )}
 
       <motion.section 
         initial={{ opacity: 0, y: 20 }}
@@ -261,7 +350,7 @@ export default function HospitalityDashboardPage() {
                     <Badge variant="secondary" className="rounded-md font-mono text-[10px] bg-muted/50">
                       {reservation.reservation_code ?? `#${reservation.id}`}
                     </Badge>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{reservation.table?.name ?? "Table TBD"}</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{reservation.location?.label ?? `${locationLabel} TBD`}</span>
                   </div>
                   <Badge 
                     variant={reservation.status === "confirmed" ? "default" : "outline"}

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+
 class ServiceOrder extends Model
 {
     use HasFactory;
@@ -16,7 +17,7 @@ class ServiceOrder extends Model
 
     protected $fillable = [
         'order_number',
-        'table_id',
+        'location_id',
         'reservation_id',
         'status',
         'notes',
@@ -28,9 +29,9 @@ class ServiceOrder extends Model
         'total_amount' => 'decimal:2',
     ];
 
-    public function table(): BelongsTo
+    public function location(): BelongsTo
     {
-        return $this->belongsTo(Table::class, 'table_id');
+        return $this->belongsTo(Location::class, 'location_id');
     }
 
     public function reservation(): BelongsTo

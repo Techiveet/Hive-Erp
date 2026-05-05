@@ -1,4 +1,4 @@
-import { LayoutDashboard, Sofa, CalendarCheck2, ReceiptText, Utensils } from "lucide-react";
+import { LayoutDashboard, Sofa, CalendarCheck2, ReceiptText, Utensils, Map as MapIcon, Users } from "lucide-react";
 import type { FrontendModuleDefinition } from "@/modules/types";
 
 export const hospitalityModule: FrontendModuleDefinition = {
@@ -11,6 +11,8 @@ export const hospitalityModule: FrontendModuleDefinition = {
     "/dashboard/hospitality/tables",
     "/dashboard/hospitality/reservations",
     "/dashboard/hospitality/service-orders",
+    "/dashboard/hospitality/space",
+    "/dashboard/hospitality/door",
   ],
   navItems: [
     {
@@ -21,6 +23,25 @@ export const hospitalityModule: FrontendModuleDefinition = {
       icon: LayoutDashboard,
       subscriptionSlug: "hospitality",
       tourId: "tour-nav-hospitality",
+      placement: "primary",
+    },
+    {
+      moduleId: "hospitality",
+      translationKey: "nav.hospitality_space",
+      fallbackLabel: "Space Management",
+      href: "/dashboard/hospitality/space",
+      icon: MapIcon,
+      subscriptionSlug: "hospitality",
+      placement: "primary",
+    },
+    {
+      moduleId: "hospitality",
+      translationKey: "nav.hospitality_door",
+      fallbackLabel: "Door & Guest List",
+      href: "/dashboard/hospitality/door",
+      icon: Users,
+      subscriptionSlug: "hospitality",
+      businessTypes: ["nightclub"],
       placement: "primary",
     },
     {

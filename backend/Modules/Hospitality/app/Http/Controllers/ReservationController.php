@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Modules\Hospitality\Models\Reservation;
-use Modules\Hospitality\Models\Table;
+use Modules\Hospitality\Models\Location;
 
 class ReservationController extends Controller
 {
@@ -16,7 +16,7 @@ class ReservationController extends Controller
     {
         $query = Reservation::query()
             ->with([
-                'table:id,name,zone,table_type,status',
+                'location:id,label,status,table_type',
                 'host:id,name,email',
             ]);
 
@@ -24,8 +24,8 @@ class ReservationController extends Controller
             $query->where('status', (string) $request->input('status'));
         }
 
-        if ($request->filled('table_id')) {
-            $query->where('table_id', (int) $request->input('table_id'));
+        if ($request->filled('location_id')) {
+            $query->where('location_id', (int) $request->input('location_id'));
         }
 
         if ($request->filled('date')) {
@@ -53,7 +53,7 @@ class ReservationController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'table_id' => ['required', 'exists:hospitality_tables,id'],
+            'location_id' => ['required', 'exists:hospitality_locations,id'],
             'customer_name' => ['required', 'string', 'max:120'],
             'customer_phone' => ['nullable', 'string', 'max:60'],
             'reservation_time' => ['required', 'date'],
@@ -66,19 +66,19 @@ class ReservationController extends Controller
             'metadata' => ['nullable', 'array'],
         ]);
 
-        $table = Table::findOrFail((int) $validated['table_id']);
+        $location = Location::findOrFail((int) $validated['location_id']);
 
-        if ($validated['guest_count'] > $table->capacity) {
+        if ($validated['guest_count'] > $location->capacity) {
             return response()->json([
-                'message' => "Guest count exceeds table capacity ({$table->capacity}).",
+                'message' => "Guest count exceeds location capacity ({$location->capacity}).",
             ], 422);
         }
 
         $reservationTime = Carbon::parse($validated['reservation_time']);
 
-        if ($this->hasSchedulingConflict($table->id, $reservationTime)) {
+        if ($this->hasSchedulingConflict($location->id, $reservationTime)) {
             return response()->json([
-                'message' => 'Table is already reserved around this time. Please choose another table or time.',
+                'message' => 'Location is already reserved around this time. Please choose another location or time.',
             ], 422);
         }
 
@@ -89,11 +89,11 @@ class ReservationController extends Controller
         $reservation = Reservation::create($validated);
 
         if (($reservation->status ?? 'pending') === 'confirmed') {
-            $table->update(['status' => 'reserved']);
+            $location->update(['status' => 'reserved']);
         }
 
         return response()->json(
-            $reservation->load(['table:id,name,zone,table_type,status', 'host:id,name,email']),
+            $reservation->load(['location:id,label,status,table_type', 'host:id,name,email']),
             201
         );
     }
@@ -103,7 +103,7 @@ class ReservationController extends Controller
         return response()->json(
             Reservation::query()
                 ->with([
-                    'table:id,name,zone,table_type,status',
+                    'location:id,label,status,table_type',
                     'host:id,name,email',
                     'serviceOrders.items',
                 ])
@@ -116,7 +116,7 @@ class ReservationController extends Controller
         $reservation = Reservation::findOrFail($id);
         
         $validated = $request->validate([
-            'table_id' => ['sometimes', 'exists:hospitality_tables,id'],
+            'location_id' => ['sometimes', 'exists:hospitality_locations,id'],
             'customer_name' => ['sometimes', 'string', 'max:120'],
             'customer_phone' => ['nullable', 'string', 'max:60'],
             'reservation_time' => ['sometimes', 'date'],
@@ -130,21 +130,21 @@ class ReservationController extends Controller
             'metadata' => ['nullable', 'array'],
         ]);
 
-        $tableId = (int) ($validated['table_id'] ?? $reservation->table_id);
+        $locationId = (int) ($validated['location_id'] ?? $reservation->location_id);
         $reservationTime = Carbon::parse($validated['reservation_time'] ?? $reservation->reservation_time);
         $guestCount = (int) ($validated['guest_count'] ?? $reservation->guest_count);
 
-        $table = Table::findOrFail($tableId);
+        $location = Location::findOrFail($locationId);
 
-        if ($guestCount > $table->capacity) {
+        if ($guestCount > $location->capacity) {
             return response()->json([
-                'message' => "Guest count exceeds table capacity ({$table->capacity}).",
+                'message' => "Guest count exceeds location capacity ({$location->capacity}).",
             ], 422);
         }
 
-        if ($this->hasSchedulingConflict($tableId, $reservationTime, $reservation->id)) {
+        if ($this->hasSchedulingConflict($locationId, $reservationTime, $reservation->id)) {
             return response()->json([
-                'message' => 'Table is already reserved around this time. Please choose another table or time.',
+                'message' => 'Location is already reserved around this time. Please choose another location or time.',
             ], 422);
         }
 
@@ -155,35 +155,35 @@ class ReservationController extends Controller
         $reservation->update($validated);
 
         return response()->json(
-            $reservation->fresh()->load(['table:id,name,zone,table_type,status', 'host:id,name,email'])
+            $reservation->fresh()->load(['location:id,label,status,table_type', 'host:id,name,email'])
         );
     }
 
     public function destroy($id)
     {
         $reservation = Reservation::findOrFail($id);
-        $tableId = $reservation->table_id;
+        $locationId = $reservation->location_id;
 
         $reservation->delete();
 
-        if ($tableId) {
+        if ($locationId) {
             $activeReservationExists = Reservation::query()
-                ->where('table_id', $tableId)
+                ->where('location_id', $locationId)
                 ->whereIn('status', ['pending', 'confirmed'])
                 ->exists();
 
             if (!$activeReservationExists) {
-                Table::query()->whereKey($tableId)->update(['status' => 'available']);
+                Location::query()->whereKey($locationId)->update(['status' => 'available']);
             }
         }
 
         return response()->json(null, 204);
     }
 
-    protected function hasSchedulingConflict(int $tableId, Carbon $reservationTime, ?int $ignoreReservationId = null): bool
+    protected function hasSchedulingConflict(int $locationId, Carbon $reservationTime, ?int $ignoreReservationId = null): bool
     {
         $query = Reservation::query()
-            ->where('table_id', $tableId)
+            ->where('location_id', $locationId)
             ->whereIn('status', ['pending', 'confirmed'])
             ->whereBetween('reservation_time', [
                 $reservationTime->copy()->subHours(2),
@@ -208,28 +208,28 @@ class ReservationController extends Controller
 
     protected function applyStatusEffects(Reservation $reservation, string $status): void
     {
-        $table = $reservation->table;
+        $location = $reservation->location;
 
         if ($status === 'confirmed') {
             $reservation->arrived_at = $reservation->arrived_at ?: now();
-            $table?->update(['status' => 'reserved']);
+            $location?->update(['status' => 'reserved']);
             return;
         }
 
         if ($status === 'completed') {
             $reservation->completed_at = now();
-            $table?->update(['status' => 'available']);
+            $location?->update(['status' => 'available']);
             return;
         }
 
         if ($status === 'cancelled') {
             $reservation->cancelled_at = now();
-            $table?->update(['status' => 'available']);
+            $location?->update(['status' => 'available']);
             return;
         }
 
         if ($status === 'pending') {
-            $table?->update(['status' => 'available']);
+            $location?->update(['status' => 'available']);
         }
     }
 }

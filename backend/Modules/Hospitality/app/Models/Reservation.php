@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+
 class Reservation extends Model
 {
     use HasFactory;
@@ -15,7 +16,7 @@ class Reservation extends Model
     protected $table = 'hospitality_reservations';
 
     protected $fillable = [
-        'table_id',
+        'location_id',
         'event_id',
         'customer_profile_id',
         'reservation_code',
@@ -47,9 +48,9 @@ class Reservation extends Model
         'metadata' => 'array',
     ];
 
-    public function table(): BelongsTo
+    public function location(): BelongsTo
     {
-        return $this->belongsTo(Table::class, 'table_id');
+        return $this->belongsTo(Location::class, 'location_id');
     }
 
     public function event(): BelongsTo

@@ -1,12 +1,12 @@
 import api from "@/modules/shared/api/http";
 import type {
+  HospitalityLocation,
+  HospitalityReservation,
+  HospitalityServiceOrder,
   HospitalityCustomer,
   HospitalityEvent,
   HospitalityMenuItem,
   HospitalityOverview,
-  HospitalityReservation,
-  HospitalityServiceOrder,
-  HospitalityTable,
 } from "@/modules/hospitality/types";
 
 type Paginated<T> = {
@@ -29,13 +29,13 @@ export const fetchHospitalityOverview = async () =>
   (await api.get<HospitalityOverview>("/hospitality/overview")).data;
 
 export const fetchHospitalityTables = async (params: Record<string, unknown> = {}) =>
-  unwrapList<HospitalityTable>((await api.get("/hospitality/tables", { params })).data);
+  unwrapList<HospitalityLocation>((await api.get("/hospitality/tables", { params })).data);
 
 export const createHospitalityTable = async (payload: Record<string, unknown>) =>
-  (await api.post<HospitalityTable>("/hospitality/tables", payload)).data;
+  (await api.post<HospitalityLocation>("/hospitality/tables", payload)).data;
 
 export const updateHospitalityTable = async (id: number, payload: Record<string, unknown>) =>
-  (await api.put<HospitalityTable>(`/hospitality/tables/${id}`, payload)).data;
+  (await api.put<HospitalityLocation>(`/hospitality/tables/${id}`, payload)).data;
 
 export const deleteHospitalityTable = async (id: number) =>
   (await api.delete(`/hospitality/tables/${id}`)).data;
@@ -81,3 +81,14 @@ export const splitHospitalityBill = async (orderId: number, payload: Record<stri
 
 export const fetchHospitalityBills = async (orderId: number) =>
   (await api.get(`/hospitality/service-orders/${orderId}/bills`)).data;
+export const fetchFloorPlan = async (params: Record<string, unknown> = {}) =>
+  (await api.get("/hospitality/space/floor-plan", { params })).data;
+
+export const updateLocationStatus = async (id: number, status: string) =>
+  (await api.patch(`/hospitality/space/locations/${id}/status`, { status })).data;
+
+export const fetchGuestList = async () =>
+  (await api.get("/hospitality/door/guest-list")).data;
+
+export const guestCheckIn = async (id: number, actual_arrived_count: number) =>
+  (await api.post(`/hospitality/door/check-in/${id}`, { actual_arrived_count })).data;

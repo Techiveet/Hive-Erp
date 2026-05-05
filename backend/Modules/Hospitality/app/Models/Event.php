@@ -44,13 +44,13 @@ class Event extends Model
         return $this->belongsTo(\Modules\Identity\Models\User::class, 'organizer_id');
     }
 
-    public function blockedTables(): BelongsToMany
+    public function blockedLocations(): BelongsToMany
     {
         return $this->belongsToMany(
-            Table::class,
-            'hospitality_event_tables',
+            Location::class,
+            'hospitality_event_locations',
             'event_id',
-            'table_id'
+            'location_id'
         )->withTimestamps();
     }
 
