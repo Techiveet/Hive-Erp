@@ -65,7 +65,7 @@ class TenantCreated extends Mailable implements ShouldQueue
 
     protected function resolveBrandLogoUrl(): string
     {
-        $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
+        $fallback = 'https://gulfingot.com/frontend/images/resources/logo1.png';
 
         // Fetch the string path from the settings cache
         $logoPath = cache()->remember(
