@@ -60,7 +60,7 @@ jobs:
 
             git fetch origin main
             git checkout main
-            git pull --ff-only origin main
+            git reset --hard origin/main
 
             echo "Starting deploy script..."
             NEXT_SKIP_BUILD_TYPECHECK=1 bash scripts/deploy-prod.sh
