@@ -64,7 +64,7 @@ trait ResolvesExportBranding
 
     protected function resolveExportLogo(?string $logoPath, bool $inlineLogo = false): string
     {
-        $fallback = 'https://gulfingot.com/frontend/images/resources/logo1.png';
+        $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
 
         if (empty($logoPath)) {
             return $fallback;

@@ -73,7 +73,7 @@ class UserUpdated extends Mailable implements ShouldQueue
     // 🚀 Added the resolver method
     protected function resolveBrandLogoUrl(): string
     {
-        $fallback = 'https://gulfingot.com/frontend/images/resources/logo1.png';
+        $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
 
         $logoPath = cache()->remember(
             'mail_brand_logo_dark_path',

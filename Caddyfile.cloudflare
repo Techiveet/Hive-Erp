@@ -1,4 +1,4 @@
-{$FRONTEND_DOMAIN:hive.gulfingot.com}, *.{$ROOT_DOMAIN:gulfingot.com} {
+{$FRONTEND_DOMAIN:hive.techiveet.com}, *.{$ROOT_DOMAIN:techiveet.com} {
 	tls {
 		dns cloudflare {env.CF_API_TOKEN}
 		resolvers 1.1.1.1 1.0.0.1
@@ -23,14 +23,14 @@
 	reverse_proxy frontend:3000
 }
 
-{$BACKEND_DOMAIN:hive-backend.gulfingot.com} {
+{$BACKEND_DOMAIN:hive-backend.techiveet.com} {
 	tls {
 		dns cloudflare {env.CF_API_TOKEN}
 		resolvers 1.1.1.1 1.0.0.1
 	}
 
 	@horizon path /horizon /horizon/*
-	redir @horizon https://{$HORIZON_DOMAIN:hive-queue.gulfingot.com}{uri} 308
+	redir @horizon https://{$HORIZON_DOMAIN:hive-queue.techiveet.com}{uri} 308
 
 	# Keep WebSocket upgrades working on the API domain for older clients.
 	handle_path /app/* {
@@ -42,7 +42,7 @@
 	}
 }
 
-{$REVERB_DOMAIN:hive-ws.gulfingot.com} {
+{$REVERB_DOMAIN:hive-ws.techiveet.com} {
 	tls {
 		dns cloudflare {env.CF_API_TOKEN}
 		resolvers 1.1.1.1 1.0.0.1
@@ -51,7 +51,7 @@
 	reverse_proxy reverb:9000
 }
 
-{$HORIZON_DOMAIN:hive-queue.gulfingot.com} {
+{$HORIZON_DOMAIN:hive-queue.techiveet.com} {
 	tls {
 		dns cloudflare {env.CF_API_TOKEN}
 		resolvers 1.1.1.1 1.0.0.1
@@ -61,7 +61,7 @@
 	reverse_proxy backend:8000
 }
 
-{$MEILISEARCH_DOMAIN:hive-search.gulfingot.com} {
+{$MEILISEARCH_DOMAIN:hive-search.techiveet.com} {
 	tls {
 		dns cloudflare {env.CF_API_TOKEN}
 		resolvers 1.1.1.1 1.0.0.1

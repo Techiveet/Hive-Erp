@@ -27,7 +27,7 @@ function seedTenant($tenantId, $businessType) {
     for ($i = 1; $i <= 5; $i++) {
         Location::updateOrCreate(
             ['tenant_id' => $tenantId, 'zone_id' => $mainZone->id, 'label' => ($businessType === 'nightclub' ? 'M-' : 'T-') . str_pad($i, 2, '0', STR_PAD_LEFT)],
-            ['capacity' => 4, 'status' => 'available', 'min_spend' => $businessType === 'nightclub' ? 100 : 0]
+            ['capacity' => 4, 'status' => 'available', 'min_spend' => $businessType === 'nightclub' ? 100.00 : null]
         );
     }
 
@@ -35,7 +35,7 @@ function seedTenant($tenantId, $businessType) {
     for ($i = 1; $i <= 3; $i++) {
         Location::updateOrCreate(
             ['tenant_id' => $tenantId, 'zone_id' => $vipZone->id, 'label' => ($businessType === 'nightclub' ? 'VIP-' : 'EXT-') . str_pad($i, 2, '0', STR_PAD_LEFT)],
-            ['capacity' => 6, 'status' => $i === 1 ? 'reserved' : 'available', 'min_spend' => $businessType === 'nightclub' ? 500 : 0]
+            ['capacity' => 6, 'status' => $i === 1 ? 'reserved' : 'available', 'min_spend' => $businessType === 'nightclub' ? 500.00 : null]
         );
     }
 
