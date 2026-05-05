@@ -228,7 +228,7 @@ ensure_required_files() {
 }
 
 ensure_runtime_env() {
-  ensure_env_value ROOT_DOMAIN "techiveet.com"
+  ensure_env_value ROOT_DOMAIN "gulfingot.com"
   ensure_env_value FRONTEND_DOMAIN "hive.$(get_env_value ROOT_DOMAIN)"
   ensure_env_value BACKEND_DOMAIN "hive-backend.$(get_env_value ROOT_DOMAIN)"
   ensure_env_value REVERB_DOMAIN "hive-ws.$(get_env_value ROOT_DOMAIN)"

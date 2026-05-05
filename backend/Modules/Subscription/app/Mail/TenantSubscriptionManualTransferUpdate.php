@@ -137,7 +137,7 @@ class TenantSubscriptionManualTransferUpdate extends Mailable implements ShouldQ
 
     protected function resolveBrandLogoUrl(): string
     {
-        $fallback = 'https://techiveet.com/frontend/images/resources/logo1.png';
+        $fallback = 'https://gulfingot.com/frontend/images/resources/logo1.png';
 
         $logoPath = cache()->remember(
             'mail_brand_logo_dark_path',

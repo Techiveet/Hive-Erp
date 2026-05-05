@@ -26,16 +26,20 @@ jobs:
           timeout: 60s
           command_timeout: 240m
           script: |
-            set -Eeuo pipefail
+            set -e
+            set -x
 
             echo "Connected to: $(hostname)"
             echo "Remote user: $(whoami)"
+            echo "Current directory: $(pwd)"
 
             PROJECT_DIR=""
 
+            echo "Searching for project directory..."
             for dir in /var/www/hive /var/www/Hive-Erp /var/www/hive-erp ~/projects/hive ~/projects/Hive-Erp; do
               if [ -f "${dir}/docker-compose.prod.yml" ]; then
                 PROJECT_DIR="${dir}"
+                echo "Found project directory: ${PROJECT_DIR}"
                 break
               fi
             done
@@ -58,4 +62,5 @@ jobs:
             git checkout main
             git pull --ff-only origin main
 
+            echo "Starting deploy script..."
             NEXT_SKIP_BUILD_TYPECHECK=1 bash scripts/deploy-prod.sh
