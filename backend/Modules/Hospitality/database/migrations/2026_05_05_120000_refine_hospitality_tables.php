@@ -14,7 +14,15 @@ return new class extends Migration
         // 1. Clean up hospitality_locations
         Schema::table('hospitality_locations', function (Blueprint $table) {
             if (Schema::hasColumn('hospitality_locations', 'tenant_id')) {
-                $table->dropForeign(['tenant_id']);
+                if (DB::getDriverName() === 'pgsql') {
+                    DB::statement('ALTER TABLE hospitality_locations DROP CONSTRAINT IF EXISTS hospitality_locations_tenant_id_foreign');
+                } else {
+                    try {
+                        $table->dropForeign(['tenant_id']);
+                    } catch (\Exception $e) {
+                        // Ignore if not exists
+                    }
+                }
                 $table->dropColumn('tenant_id');
             }
 
@@ -28,8 +36,8 @@ return new class extends Migration
                 DB::statement('ALTER TABLE hospitality_locations DROP CONSTRAINT IF EXISTS hospitality_tables_status_check');
                 DB::statement('ALTER TABLE hospitality_locations DROP CONSTRAINT IF EXISTS hospitality_locations_status_check');
                 
-                // Ensure column is varchar
-                DB::statement('ALTER TABLE hospitality_locations ALTER COLUMN status TYPE varchar(255)');
+                // Ensure column is varchar with proper casting
+                DB::statement('ALTER TABLE hospitality_locations ALTER COLUMN status TYPE varchar(255) USING status::varchar');
                 
                 // Add new check constraint
                 DB::statement("ALTER TABLE hospitality_locations ADD CONSTRAINT hospitality_locations_status_check CHECK (status IN ('available', 'reserved', 'occupied', 'dirty'))");
@@ -52,12 +60,14 @@ return new class extends Migration
             if (Schema::hasTable($tableName)) {
                 Schema::table($tableName, function (Blueprint $table) use ($tableName) {
                     if (Schema::hasColumn($tableName, 'tenant_id')) {
-                        // Drop foreign key if it exists
-                        // Standard naming: table_name_column_name_foreign
-                        try {
-                            $table->dropForeign([ 'tenant_id']);
-                        } catch (\Exception $e) {
-                            // If it doesn't have a foreign key but has the column, just log or ignore
+                        if (DB::getDriverName() === 'pgsql') {
+                            DB::statement("ALTER TABLE {$tableName} DROP CONSTRAINT IF EXISTS {$tableName}_tenant_id_foreign");
+                        } else {
+                            try {
+                                $table->dropForeign([ 'tenant_id']);
+                            } catch (\Exception $e) {
+                                // Ignore if not exists
+                            }
                         }
                         $table->dropColumn('tenant_id');
                     }

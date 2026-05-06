@@ -59,13 +59,13 @@ fail() {
 
   set +e
 
-  echo "Deployment step: ${failed_step}" >&2
-  if [ -n "${failed_compose_command}" ]; then
-    echo "Last Docker Compose command: ${failed_compose_command}" >&2
-  fi
-  echo "Deployment failed at line ${line}: ${cmd}" >&2
+  echo "--------------------------------------------------------------------------------" >&2
+  echo "DEPLOYMENT FAILED" >&2
+  echo "Step: ${failed_step}" >&2
+  echo "Command: ${cmd}" >&2
   echo "Exit code: ${code}" >&2
-  echo "Working directory: $(pwd)" >&2
+  echo "Line: ${line}" >&2
+  echo "--------------------------------------------------------------------------------" >&2
 
   echo "Docker disk usage:" >&2
   docker system df >&2 || true
@@ -461,8 +461,14 @@ DEPLOY_STEP="Linking Laravel storage"
 compose exec -T backend php artisan storage:link || true
 DEPLOY_STEP="Clearing Laravel caches"
 compose exec -T backend php artisan optimize:clear
+echo "Running central migrations..."
 DEPLOY_STEP="Running central migrations"
-compose exec -T backend php artisan migrate --force
+# Try to migrate. If it fails, try once more after a short delay (in case of transient DB locks)
+if ! compose exec -T backend php artisan migrate --force; then
+  echo "Migration failed, retrying in 5 seconds..." >&2
+  sleep 5
+  compose exec -T backend php artisan migrate --force
+fi
 DEPLOY_STEP="Running tenant migrations"
 compose exec -T backend php artisan tenants:migrate --force
 DEPLOY_STEP="Syncing system access"
