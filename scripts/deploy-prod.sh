@@ -463,11 +463,22 @@ DEPLOY_STEP="Clearing Laravel caches"
 compose exec -T backend php artisan optimize:clear
 echo "Running central migrations..."
 DEPLOY_STEP="Running central migrations"
-# Try to migrate. If it fails, try once more after a short delay (in case of transient DB locks)
-if ! compose exec -T backend php artisan migrate --force; then
-  echo "Migration failed, retrying in 5 seconds..." >&2
+# Try to migrate with full verbosity and capture output
+if ! compose exec -T backend php artisan migrate --force -vvv > /tmp/migrate-output.log 2>&1; then
+  echo "--------------------------------------------------------------------------------" >&2
+  echo "MIGRATION FAILED - CAPTURED OUTPUT:" >&2
+  cat /tmp/migrate-output.log >&2
+  echo "--------------------------------------------------------------------------------" >&2
+  
+  echo "Dumping database schema for troubleshooting..." >&2
+  compose exec -T db psql -U "$(get_env_value DB_USERNAME)" -d "$(get_env_value DB_DATABASE)" -c "\d hospitality_locations" >&2 || true
+  
+  echo "Retrying migration in 5 seconds..." >&2
   sleep 5
-  compose exec -T backend php artisan migrate --force
+  if ! compose exec -T backend php artisan migrate --force -vvv; then
+    echo "Migration failed again on retry." >&2
+    exit 1
+  fi
 fi
 DEPLOY_STEP="Running tenant migrations"
 compose exec -T backend php artisan tenants:migrate --force

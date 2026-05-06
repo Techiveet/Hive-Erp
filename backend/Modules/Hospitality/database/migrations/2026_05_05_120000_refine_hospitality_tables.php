@@ -32,9 +32,26 @@ return new class extends Migration
             
             // Fix status for Postgres
             if (DB::getDriverName() === 'pgsql') {
-                // Drop existing check constraints (legacy naming from hospitality_tables or current)
-                DB::statement('ALTER TABLE hospitality_locations DROP CONSTRAINT IF EXISTS hospitality_tables_status_check');
-                DB::statement('ALTER TABLE hospitality_locations DROP CONSTRAINT IF EXISTS hospitality_locations_status_check');
+                // Legally drop ALL check constraints on the status column by querying the schema
+                DB::statement("
+                    DO $$ 
+                    DECLARE 
+                        constr_name TEXT;
+                    BEGIN 
+                        FOR constr_name IN 
+                            SELECT tc.constraint_name 
+                            FROM information_schema.table_constraints AS tc 
+                            JOIN information_schema.constraint_column_usage AS ccu 
+                              ON ccu.constraint_name = tc.constraint_name 
+                              AND ccu.table_schema = tc.table_schema
+                            WHERE tc.constraint_type = 'CHECK' 
+                              AND tc.table_name = 'hospitality_locations' 
+                              AND ccu.column_name = 'status'
+                        LOOP 
+                            EXECUTE 'ALTER TABLE hospitality_locations DROP CONSTRAINT ' || constr_name; 
+                        END LOOP; 
+                    END $$;
+                ");
                 
                 // Ensure column is varchar with proper casting
                 DB::statement('ALTER TABLE hospitality_locations ALTER COLUMN status TYPE varchar(255) USING status::varchar');
