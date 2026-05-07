@@ -143,53 +143,6 @@ export default function RequestDemoPage() {
     }
   };
 
-      console.log("Submitting to: /api/v1/public/demo-requests");
-      console.log("Full URL will be: http://localhost:3000/api/v1/public/demo-requests");
-
-      // Use fetch with relative URL to leverage Next.js rewrites (CORS-free)
-      const response = await fetch("/api/v1/public/demo-requests", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Server error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("Demo request response:", data);
-      setSuccess(true);
-    } catch (err: any) {
-      console.error("Demo request error:", err);
-      console.error("Error code:", err.code);
-      console.error("Error message:", err.message);
-      console.error("Error response:", err.response);
-      
-      let message = "Failed to submit request. Please try again.";
-      
-      if (err.code === "ECONNREFUSED" || err.message === "Network Error") {
-        message = "Cannot connect to server. Please make sure the backend is running on port 8000.";
-      } else if (err.response?.data) {
-        if (typeof err.response.data === 'string') {
-          message = `Server error (not JSON response)`;
-        } else {
-          message = err.response.data.message || err.response.data.error || message;
-        }
-      } else if (err.message) {
-        message = err.message;
-      }
-      
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   if (success) {
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
