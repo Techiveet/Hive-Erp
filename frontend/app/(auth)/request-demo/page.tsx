@@ -92,13 +92,77 @@ export default function RequestDemoPage() {
         message: formData.message || undefined,
       };
 
-      console.log("Submitting demo request:", payload);
-      console.log("Submitting to:", `/public/demo-requests`);
-      console.log("API Base URL:", api.defaults.baseURL);
+      const url = "/api/v1/public/demo-requests";
+      console.log("Submitting to:", url);
+      console.log("Full URL:", `${window.location.origin}${url}`);
 
-      const response = await api.post("/public/demo-requests", payload);
+      // Use fetch with relative URL to leverage Next.js rewrites (CORS-free)
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
-      console.log("Demo request response:", response.data);
+      console.log("Response status:", response.status);
+      console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response text:", errorText);
+        let errorData = {};
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          // Not JSON
+        }
+        throw new Error((errorData as any).message || `Server error: ${response.status} - ${errorText.substring(0, 100)}`);
+      }
+
+      const data = await response.json();
+      console.log("Demo request response:", data);
+      setSuccess(true);
+    } catch (err: any) {
+      console.error("Demo request error:", err);
+      console.error("Error type:", err?.constructor?.name);
+      console.error("Error message:", err?.message);
+      
+      let message = "Failed to submit request. Please try again.";
+      
+      if (err?.message?.includes("Failed to fetch") || err?.message?.includes("NetworkError")) {
+        message = "Cannot connect to server. Please make sure:\n1. Next.js is running on port 3000\n2. Backend is running in Docker on port 8085\n3. Restart Next.js after config changes (Ctrl+C, then npm run dev)";
+      } else if (err?.message) {
+        message = err.message;
+      }
+      
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+      console.log("Submitting to: /api/v1/public/demo-requests");
+      console.log("Full URL will be: http://localhost:3000/api/v1/public/demo-requests");
+
+      // Use fetch with relative URL to leverage Next.js rewrites (CORS-free)
+      const response = await fetch("/api/v1/public/demo-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Server error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Demo request response:", data);
       setSuccess(true);
     } catch (err: any) {
       console.error("Demo request error:", err);
