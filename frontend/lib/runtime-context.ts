@@ -68,7 +68,13 @@ const extractConfiguredHost = (value: string | null | undefined): string | null 
 };
 
 export const getCentralHosts = (): string[] => {
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'gulfingot.com';
+  
   const configuredHosts = [
+    rootDomain,
+    `hive.${rootDomain}`,
+    `hive-backend.${rootDomain}`,
+    `hive-queue.${rootDomain}`,
     extractConfiguredHost(process.env.NEXT_PUBLIC_APP_URL),
     extractConfiguredHost(process.env.NEXT_PUBLIC_API_URL),
     ...(process.env.NEXT_PUBLIC_CENTRAL_DOMAINS?.split(",") ?? []).map((value) => normalizeHost(value)),
@@ -110,12 +116,19 @@ export const getTenantId = (): string | null => {
     return context;
   }
 
-  const host = window.location.hostname;
+  const host = window.location.hostname.toLowerCase();
+  
+  // 1. Handle localhost subdomains
   if (host.endsWith(".localhost")) {
     return host.split(".")[0] || null;
   }
 
+  // 2. Handle production subdomains
   if (isTenantHost(host)) {
+    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'gulfingot.com';
+    if (host.endsWith(`.${rootDomain}`)) {
+      return host.replace(`.${rootDomain}`, '');
+    }
     return normalizeHost(host);
   }
 
