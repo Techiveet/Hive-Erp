@@ -641,6 +641,11 @@ export default function TenantSignupPage() {
         </Link>
         <div className="flex items-center gap-4">
           <span className="text-xs text-muted-foreground hidden sm:block">Already have a workspace?</span>
+          <Link href="/request-demo">
+            <Button variant="ghost" size="sm" className="rounded-full font-bold text-xs gap-1.5">
+              Request Demo <ChevronRight className="h-3 w-3" />
+            </Button>
+          </Link>
           <Link href="/sign-in">
             <Button variant="outline" size="sm" className="rounded-full font-bold text-xs gap-1.5">
               Sign In <ChevronRight className="h-3 w-3" />

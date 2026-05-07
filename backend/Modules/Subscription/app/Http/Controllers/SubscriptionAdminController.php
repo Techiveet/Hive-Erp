@@ -177,6 +177,12 @@ class SubscriptionAdminController extends Controller
         ]);
 
         $tenant = Tenant::query()->findOrFail($tenantId);
+        \Log::info('Assigning tenant subscription', [
+            'tenant_id' => $tenant->id,
+            'payload' => $request->all(),
+            'validated' => $validated,
+        ]);
+
         $subscription = $this->subscriptions->assignPlan(
             $tenant,
             $validated['plan'],

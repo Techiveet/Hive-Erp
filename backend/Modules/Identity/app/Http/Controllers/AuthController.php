@@ -457,6 +457,7 @@ class AuthController extends Controller
             return [
                 'plan' => 'central',
                 'subscription_status' => 'active',
+                'bypass_checks' => true,
                 'active_modules' => TenantModuleCatalog::slugs(),
                 'statuses' => collect(TenantModuleCatalog::catalog())
                     ->mapWithKeys(fn (array $module) => [

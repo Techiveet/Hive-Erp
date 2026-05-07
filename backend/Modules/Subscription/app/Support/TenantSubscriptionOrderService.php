@@ -553,6 +553,11 @@ class TenantSubscriptionOrderService
             $order->tenant_id = $tenant->id;
             $order->tenant_domain = $tenant->primaryDomain()?->domain ?? $order->tenant_domain;
             $order->subscription_id = TenantSubscription::query()->where('tenant_id', $tenant->id)->value('id');
+
+            // Seed demo data for trial plans
+            if (strtolower((string) $order->plan) === 'larva') {
+                $this->seedDemoDataForTenant($tenant);
+            }
         } elseif ($order->scope === 'tenant_upgrade') {
             $tenant = Tenant::query()->with('domains')->findOrFail($order->tenant_id);
             $requestedModules = TenantModuleCatalog::normalizeRequestedModules(
@@ -622,6 +627,29 @@ class TenantSubscriptionOrderService
         } catch (\Throwable $exception) {
             Log::warning('Direct transfer reviewer notification failed: ' . $exception->getMessage(), [
                 'order_id' => $order->id,
+            ]);
+        }
+    }
+
+    protected function seedDemoDataForTenant(Tenant $tenant): void
+    {
+        try {
+            // Switch to tenant context
+            $tenant->makeCurrent();
+
+            // Run the demo data seeder
+            $seeder = new \Modules\Subscription\Database\Seeders\DemoDataSeeder();
+            $seeder->setCommand($this->command);
+            $seeder->run();
+
+            // Restore central context
+            \Modules\Tenancy\Tenancy::centralize();
+
+            $this->command?->info("Demo data seeded for trial tenant: {$tenant->id}");
+        } catch (\Throwable $exception) {
+            Log::warning('Demo data seeding failed: ' . $exception->getMessage(), [
+                'tenant_id' => $tenant->id,
+                'exception' => $exception,
             ]);
         }
     }

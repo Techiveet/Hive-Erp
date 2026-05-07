@@ -678,6 +678,7 @@ class TenantModuleCatalog
             $prefix => ['sometimes', 'array'],
             "{$prefix}.enabled_modules" => ['sometimes', 'array'],
             "{$prefix}.enabled_modules.*" => ['string', Rule::in(self::slugs())],
+            "{$prefix}.bypass_checks" => ['sometimes', 'boolean'],
             "{$prefix}.custom_modules" => ['sometimes', 'array'],
             "{$prefix}.custom_modules.*.name" => ['required', 'string', 'max:80'],
             "{$prefix}.custom_modules.*.slug" => ['nullable', 'string', 'max:80'],
@@ -707,6 +708,7 @@ class TenantModuleCatalog
         return self::decorate([
             'enabled_modules' => $enabledModules,
             'custom_modules' => $customModules,
+            'bypass_checks' => (bool) ($payload['bypass_checks'] ?? false),
             'catalog_version' => (int) ($payload['catalog_version'] ?? self::VERSION),
             'updated_at' => $payload['updated_at'] ?? null,
             'updated_by' => $payload['updated_by'] ?? null,
@@ -720,6 +722,7 @@ class TenantModuleCatalog
         return [
             'enabled_modules' => $resolved['enabled_modules'],
             'custom_modules' => $resolved['custom_modules'],
+            'bypass_checks' => $resolved['bypass_checks'],
             'catalog_version' => self::VERSION,
             'updated_at' => now()->toIso8601String(),
             'updated_by' => $updatedBy,
@@ -728,7 +731,13 @@ class TenantModuleCatalog
 
     public static function isModuleActive(?array $payload, string $slug, ?string $plan = null): bool
     {
-        return in_array($slug, self::resolve($payload, $plan)['enabled_modules'], true);
+        $resolved = self::resolve($payload, $plan);
+        
+        if ($resolved['bypass_checks'] ?? false) {
+            return true;
+        }
+
+        return in_array($slug, $resolved['enabled_modules'], true);
     }
 
     public static function buildModuleAccess(?array $payload, ?string $plan = null): array
@@ -738,10 +747,11 @@ class TenantModuleCatalog
         return [
             'plan' => strtolower((string) $plan) ?: 'business',
             'active_modules' => $resolved['enabled_modules'],
+            'bypass_checks' => (bool) ($resolved['bypass_checks'] ?? false),
             'statuses' => collect($resolved['catalog_modules'])
                 ->mapWithKeys(fn (array $module) => [
                     $module['slug'] => [
-                        'active' => $module['status'] === 'active',
+                        'active' => ($resolved['bypass_checks'] ?? false) || $module['status'] === 'active',
                         'included_in_plan' => (bool) $module['included_in_plan'],
                         'name' => $module['name'],
                         'monthly_price_etb' => (float) $module['monthly_price_etb'],

@@ -27,6 +27,7 @@ class SubscriptionServiceProvider extends ModuleServiceProvider
      */
     protected array $commands = [
         ReconcileTenantSubscriptionsCommand::class,
+        \Modules\Subscription\Console\Commands\SendTrialExpirationNotifications::class,
     ];
 
     /**
@@ -42,6 +43,9 @@ class SubscriptionServiceProvider extends ModuleServiceProvider
     public function boot(): void
     {
         parent::boot();
+
+        // Register views for Mailables
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'subscription');
 
         Blade::if('subscribed', function (string $moduleSlug): bool {
             $tenant = function_exists('tenant') ? tenant() : null;
@@ -64,6 +68,7 @@ class SubscriptionServiceProvider extends ModuleServiceProvider
     protected function configureSchedules(Schedule $schedule): void
     {
         $schedule->command('subscriptions:reconcile')->hourly();
+        $schedule->command('subscription:trial-expiration-notify')->dailyAt('08:00');
     }
 }
 
