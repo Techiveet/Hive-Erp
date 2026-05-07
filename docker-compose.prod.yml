@@ -61,10 +61,12 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${DB_HOST_PORT:-5432}:5432"
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ${DB_DATABASE:-hive}
       POSTGRES_USER: ${DB_USERNAME:-hive}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - ./storage/db-data:/var/lib/postgresql/data
     expose:

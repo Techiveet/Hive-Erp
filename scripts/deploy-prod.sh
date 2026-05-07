@@ -92,9 +92,16 @@ trap 'fail "$?" "$LINENO" "$BASH_COMMAND"' ERR
 get_env_value() {
   local key="$1"
   local line
+  local value
 
   line="$(grep -E "^${key}=" .env | tail -n 1 || true)"
-  printf '%s' "${line#*=}"
+  value="${line#*=}"
+  # Strip leading/trailing quotes if present
+  value="${value%\"}"
+  value="${value#\"}"
+  value="${value%\'}"
+  value="${value#\'}"
+  printf '%s' "${value}"
 }
 
 set_env_value() {
@@ -443,6 +450,19 @@ DEPLOY_STEP="Waiting for redis"
 wait_for_service redis
 DEPLOY_STEP="Waiting for database"
 wait_for_service db
+
+echo "Synchronizing database password..."
+DEPLOY_STEP="Synchronizing database password"
+# This ensures that even if the volume was created with a different password, 
+# it matches the current .env file. We use the 'db' container's own internal 
+# auth to run this as the user.
+DB_USER="$(get_env_value DB_USERNAME)"
+DB_PASS="$(get_env_value DB_PASSWORD)"
+if [ -n "${DB_USER}" ] && [ -n "${DB_PASS}" ]; then
+  # We try to set the password. If it fails, it might be because the user doesn't exist yet (not initialized)
+  # or some other issue, so we continue and let the migration step handle the final failure.
+  compose exec -T db psql -U "${DB_USER}" -d postgres -c "ALTER USER \"${DB_USER}\" WITH PASSWORD '${DB_PASS}';" >/dev/null 2>&1 || true
+fi
 DEPLOY_STEP="Waiting for meilisearch"
 wait_for_service meilisearch
 DEPLOY_STEP="Waiting for ffmpeg"
