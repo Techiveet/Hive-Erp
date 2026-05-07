@@ -200,3 +200,16 @@ Broadcast::channel('tenant.{tenant_id}.project-management.project.{project_id}',
         })
         ->exists();
 }, ['guards' => ['sanctum']]);
+
+Broadcast::channel('subscription.admin', function ($user) {
+    if (! $user) {
+        return false;
+    }
+
+    // Only allow super admins or users with manage_tenants permission
+    return $user->hasAnyPermission([
+        'manage_tenants',
+        'manage_payment_settings',
+        'manage_general_settings',
+    ]) || $user->is_super_admin ?? false;
+}, ['guards' => ['sanctum']]);

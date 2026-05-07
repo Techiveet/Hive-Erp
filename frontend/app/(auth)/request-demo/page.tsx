@@ -80,15 +80,31 @@ export default function RequestDemoPage() {
     setError("");
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // In production, this would send an email to sales team
-      console.log("Demo request submitted:", formData);
-      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/public/demo-requests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          email: formData.email,
+          phone: formData.phone || undefined,
+          company: formData.company,
+          company_size: formData.companySize || undefined,
+          interests: formData.interests,
+          message: formData.message || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit request');
+      }
+
       setSuccess(true);
-    } catch (err) {
-      setError("Failed to submit request. Please try again.");
+    } catch (err: any) {
+      setError(err.message || "Failed to submit request. Please try again.");
     } finally {
       setLoading(false);
     }

@@ -35,6 +35,10 @@ foreach ($centralDomains as $domain) {
             Route::match(['get', 'post'], '/orders/{token}/notify', [TenantSubscriptionCheckoutController::class, 'publicNotify']);
         });
 
+        Route::prefix('public/demo-requests')->group(function () {
+            Route::post('/', [Modules\Subscription\Http\Controllers\DemoRequestController::class, 'store']);
+        });
+
         Route::middleware(['auth:sanctum', 'active_status', 'dynamic_timeout'])->group(function () {
             Route::prefix('subscriptions')->group(function () {
                 Route::get('/catalog', [TenantSubscriptionController::class, 'catalog'])

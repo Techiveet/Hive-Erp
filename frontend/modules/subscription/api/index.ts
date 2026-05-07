@@ -14,4 +14,8 @@ export const updateSubscriptionAdminPlans = async (data: unknown) => (await api.
 export const updateSubscriptionAdminPricing = async (data: unknown) => (await api.put("/subscriptions/admin/pricing", data)).data;
 export const assignTenantSubscription = async (tenantId: string, data: unknown) => (await api.put(`/subscriptions/admin/tenants/${tenantId}`, data)).data;
 
+// Demo Request API functions
+export const fetchDemoRequests = async (status?: string) => (await api.get("/public/demo-requests", { params: status ? { status } : {} })).data;
+export const updateDemoRequest = async (id: number, data: { status?: string; notes?: string }) => (await api.put(`/demo-requests/${id}`, data)).data;
+
 export default api;
