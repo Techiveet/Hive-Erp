@@ -1,3 +1,29 @@
+(security) {
+	header {
+		# Enable HSTS
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+		# Prevent clickjacking
+		X-Frame-Options "SAMEORIGIN"
+
+		# Prevent MIME sniffing
+		X-Content-Type-Options "nosniff"
+
+		# Referrer policy
+		Referrer-Policy "strict-origin-when-cross-origin"
+
+		# Permissions policy
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+
+		# Content Security Policy (Optimized for Next.js & Laravel)
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://* blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://* wss://*; frame-ancestors 'self'; upgrade-insecure-requests;"
+
+		# Remove identifying headers
+		-X-Powered-By
+		-Server
+	}
+}
+
 {
 	on_demand_tls {
 		ask http://backend:8000/api/internal/caddy/allow-domain
@@ -5,26 +31,31 @@
 }
 
 {$FRONTEND_DOMAIN} {
+	import security
 	encode zstd gzip
 	reverse_proxy frontend:3000
 }
 
 {$BACKEND_DOMAIN} {
+	import security
 	encode zstd gzip
 	reverse_proxy backend:8000
 }
 
 {$REVERB_DOMAIN} {
+	import security
 	encode zstd gzip
 	reverse_proxy reverb:9000
 }
 
 {$HORIZON_DOMAIN} {
+	import security
 	encode zstd gzip
 	reverse_proxy backend:8000
 }
 
 {$MEILISEARCH_DOMAIN} {
+	import security
 	encode zstd gzip
 	reverse_proxy meilisearch:7700
 }
@@ -40,6 +71,7 @@
 }
 
 https:// {
+	import security
 	tls {
 		on_demand
 	}
