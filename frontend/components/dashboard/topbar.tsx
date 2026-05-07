@@ -20,7 +20,6 @@ import { GlobalSearch } from "./global-search";
 import { TopbarMailIcon } from "./topbar-mail";
 import { TopbarNotificationsIcon } from "./topbar-notifications";
 import { ChatNotificationIcon } from "./chat-notification-icon";
-import { DemoNotificationBell } from "./demo-notification-bell";
 import { getAccessToken, getBackendApiRoot, getTenantHeaders, isTenantSession } from "@/lib/runtime-context";
 import { clearHiveSession, handleAuthFailureResponse } from "@/lib/auth-sync";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -247,7 +246,6 @@ export function DashboardTopbar() {
                 <ChatNotificationIcon />
                 <TopbarNotificationsIcon activeUser={activeUser} />
                 <TopbarMailIcon activeUser={activeUser} />
-                {hasAnyPermission(['manage_tenants', 'manage_payment_settings']) && <DemoNotificationBell />}
               </div>
 
               <DropdownMenu>

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/store/use-translation";
+import { api } from "@/modules/shared/api/http";
 
 const COMPANY_SIZES = [
   { value: "1-10", label: "1-10 employees" },
@@ -80,31 +81,41 @@ export default function RequestDemoPage() {
     setError("");
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/public/demo-requests`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          email: formData.email,
-          phone: formData.phone || undefined,
-          company: formData.company,
-          company_size: formData.companySize || undefined,
-          interests: formData.interests,
-          message: formData.message || undefined,
-        }),
-      });
+      const payload = {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone: formData.phone || undefined,
+        company: formData.company,
+        company_size: formData.companySize || undefined,
+        interests: formData.interests,
+        message: formData.message || undefined,
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to submit request');
-      }
+      console.log("Submitting demo request:", payload);
+      console.log("API Base URL:", api.defaults.baseURL);
 
+      const response = await api.post("/public/demo-requests", payload);
+
+      console.log("Demo request response:", response.data);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || "Failed to submit request. Please try again.");
+      console.error("Demo request error:", err);
+      console.error("Error response:", err.response);
+      
+      let message = "Failed to submit request. Please try again.";
+      
+      if (err.response?.data) {
+        if (typeof err.response.data === 'string') {
+          message = `Server error (not JSON): ${err.response.data.substring(0, 100)}...`;
+        } else {
+          message = err.response.data.message || err.response.data.error || message;
+        }
+      } else if (err.message) {
+        message = err.message;
+      }
+      
+      setError(message);
     } finally {
       setLoading(false);
     }

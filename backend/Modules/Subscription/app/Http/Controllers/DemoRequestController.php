@@ -6,9 +6,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Modules\Identity\Models\User;
 use Modules\Subscription\Models\DemoRequest;
 use Modules\Subscription\Mail\DemoRequestNotification;
-use Modules\Subscription\Events\DemoRequestSubmitted;
+use Modules\Subscription\Notifications\DemoRequestSubmittedNotification;
 
 class DemoRequestController extends Controller
 {
@@ -39,9 +40,9 @@ class DemoRequestController extends Controller
         ]);
 
         try {
-            // Notify sales team
+            // Notify sales team via email
             Mail::to(config('app.sales_email', config('app.admin_email', 'sales@hive.et')))
-                ->send(new DemoRequestNotification($demoRequest));
+                ->send(new \Modules\Subscription\Mail\DemoRequestNotification($demoRequest));
         } catch (\Throwable $e) {
             Log::warning('Demo request notification email failed: ' . $e->getMessage(), [
                 'demo_request_id' => $demoRequest->id,
@@ -49,10 +50,21 @@ class DemoRequestController extends Controller
             ]);
         }
 
-        // Broadcast to admin users in real-time
+        // Send Laravel notification to admin users (appears in existing notification bell)
         try {
-            DemoRequestSubmitted::dispatch($demoRequest);
+            $adminUsers = User::whereHas('permissions', function ($query) {
+                $query->whereIn('name', ['manage_tenants', 'manage_payment_settings', 'manage_general_settings']);
+            })->get();
+
+            foreach ($adminUsers as $admin) {
+                $admin->notify(new DemoRequestSubmittedNotification($demoRequest));
+            }
         } catch (\Throwable $e) {
+            Log::warning('Demo request Laravel notification failed: ' . $e->getMessage(), [
+                'demo_request_id' => $demoRequest->id,
+                'exception' => $e,
+            ]);
+        }
             Log::warning('Demo request notification email failed: ' . $e->getMessage(), [
                 'demo_request_id' => $demoRequest->id,
                 'exception' => $e,

@@ -255,12 +255,14 @@ export function TopbarNotificationsIcon({ activeUser }: { activeUser: any }) {
                       notification.category === 'chat' ? "bg-blue-50 border-blue-100 text-blue-600" :
                       notification.category === 'mail' ? "bg-amber-50 border-amber-100 text-amber-600" :
                       notification.category === 'workflow' ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
+                      notification.category === 'demo' ? "bg-purple-50 border-purple-100 text-purple-600" :
                       "bg-slate-50 border-slate-100 text-slate-600"
                     )}>
                       {notification.category === 'chat' ? <MessageSquare className="h-4 w-4" /> :
-                       notification.category === 'mail' ? <Mail className="h-4 w-4" /> :
-                       notification.category === 'workflow' ? <ClipboardCheck className="h-4 w-4" /> :
-                       <AlertCircle className="h-4 w-4" />}
+                        notification.category === 'mail' ? <Mail className="h-4 w-4" /> :
+                        notification.category === 'workflow' ? <ClipboardCheck className="h-4 w-4" /> :
+                        notification.category === 'demo' ? <Bell className="h-4 w-4" /> :
+                        <AlertCircle className="h-4 w-4" />}
                     </div>
                   
                   <div className="flex-1 min-w-0 flex flex-col gap-0.5">

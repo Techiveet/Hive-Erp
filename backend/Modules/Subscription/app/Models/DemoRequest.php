@@ -35,4 +35,12 @@ class DemoRequest extends Model
     const STATUS_SCHEDULED = 'scheduled';
     const STATUS_COMPLETED = 'completed';
     const STATUS_DECLINED = 'declined';
+
+    /**
+     * Use central connection for migration
+     */
+    public function getConnectionName()
+    {
+        return config('tenancy.central_connection') ?: 'central';
+    }
 }

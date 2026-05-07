@@ -3,8 +3,6 @@
 namespace Modules\Subscription\Providers;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
-use Modules\Subscription\Events\DemoRequestSubmitted;
-use Modules\Subscription\Listeners\BroadcastDemoRequestNotification;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -13,11 +11,7 @@ class EventServiceProvider extends ServiceProvider
      *
      * @var array<string, array<int, string>>
      */
-    protected $listen = [
-        DemoRequestSubmitted::class => [
-            BroadcastDemoRequestNotification::class,
-        ],
-    ];
+    protected $listen = [];
 
     /**
      * Indicates if events should be discovered.
