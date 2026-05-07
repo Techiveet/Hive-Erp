@@ -106,9 +106,13 @@ class TenantSubscriptionController extends Controller
         }
 
         $validated = $request->validate(TenantModuleCatalog::validationRules());
+        
+        // Ensure we have the module_subscriptions payload, falling back to empty array if not set
+        $moduleSubscriptions = $validated['module_subscriptions'] ?? ['enabled_modules' => [], 'custom_modules' => []];
+        
         $currentResolved = $this->subscriptions->currentForTenant($tenant)['module_subscriptions'];
         $requestedResolved = TenantModuleCatalog::resolve(
-            $validated['module_subscriptions'] ?? null,
+            $moduleSubscriptions,
             $tenant->plan
         );
 

@@ -70,10 +70,15 @@ class TenantSubscriptionService
 
     public function updateModules(Tenant $tenant, ?array $payload, ?string $updatedBy = null): TenantSubscription
     {
-        $subscription = $this->ensureForTenant($tenant, null, $updatedBy);
-        $subscription->module_subscriptions = TenantModuleCatalog::normalizeForStorage($payload, $subscription->plan, $updatedBy, $tenant->business_type);
+        // Pass the payload to ensureForTenant so it properly updates module_subscriptions
+        // instead of preserving the existing payload
+        $subscription = $this->ensureForTenant($tenant, $payload, $updatedBy);
         $subscription->updated_by = $updatedBy;
-        $subscription->save();
+        
+        // Only save if module_subscriptions was actually changed
+        if ($subscription->isDirty('module_subscriptions')) {
+            $subscription->save();
+        }
 
         return $subscription->refresh();
     }
@@ -250,27 +255,26 @@ class TenantSubscriptionService
     public function buildModuleAccess(Tenant $tenant): array
     {
         $current = $this->currentForTenant($tenant);
-        $modules = $current['module_subscriptions'];
         $subscriptionAllowsAccess = in_array($current['status'], self::ACCESS_STATUSES, true);
+        
+        $baseAccess = TenantModuleCatalog::buildModuleAccess(
+            $current['module_subscriptions'],
+            $current['plan']
+        );
 
-        return [
-            'plan' => $current['plan'],
+        return array_merge($baseAccess, [
             'subscription_status' => $current['status'],
             'expires_at' => $current['expires_at'],
             'grace_ends_at' => $current['grace_ends_at'],
             'needs_renewal' => $current['needs_renewal'],
-            'active_modules' => $subscriptionAllowsAccess ? $modules['enabled_modules'] : [],
-            'statuses' => collect($modules['catalog_modules'])
-                ->mapWithKeys(fn (array $module) => [
-                    $module['slug'] => [
-                        'active' => $subscriptionAllowsAccess && $module['status'] === 'active',
-                        'included_in_plan' => (bool) $module['included_in_plan'],
-                        'name' => $module['name'],
-                        'monthly_price_etb' => (float) $module['monthly_price_etb'],
-                    ],
-                ])
+            // Re-apply subscription allows access logic to the active status
+            'statuses' => collect($baseAccess['statuses'])
+                ->map(fn ($status) => array_merge($status, [
+                    'active' => ($baseAccess['bypass_checks'] ?? false) || ($status['active'] && $subscriptionAllowsAccess)
+                ]))
                 ->all(),
-        ];
+            'active_modules' => (($baseAccess['bypass_checks'] ?? false) || $subscriptionAllowsAccess) ? $baseAccess['active_modules'] : [],
+        ]);
     }
 
     protected function preserveStoredPayload(?array $payload, ?string $plan = null, ?string $updatedBy = null, ?string $businessType = null): array
@@ -279,8 +283,7 @@ class TenantSubscriptionService
         $storedVersion = (int) ($payload['catalog_version'] ?? 0);
         $enabledModules = $payload['enabled_modules'] ?? [];
 
-        $needsRefresh = $storedVersion < $currentVersion 
-            || !in_array('hospitality', $enabledModules, true);
+        $needsRefresh = $storedVersion < $currentVersion;
 
         if ($needsRefresh) {
             return TenantModuleCatalog::normalizeForStorage(null, $plan, $updatedBy, null);

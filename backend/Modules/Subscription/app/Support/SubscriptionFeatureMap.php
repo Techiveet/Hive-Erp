@@ -243,6 +243,8 @@ class SubscriptionFeatureMap
             $this->frontendPageFeature('warehouse-api-warehouses', 'Warehouses API', 'api/v1/warehouse/warehouses', 'warehouses', 'warehouse_management', 'view_inventory|manage_inventory', 'route', ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
             $this->frontendPageFeature('warehouse-api-locations', 'Warehouse Locations API', 'api/v1/warehouse/locations', 'locations', 'warehouse_management', 'view_inventory|manage_inventory', 'route', ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
             $this->frontendPageFeature('warehouse-api-stocks', 'Warehouse Stock API', 'api/v1/warehouse/stocks', 'stock-movements', 'warehouse_management', 'view_inventory|manage_inventory', 'route', ['GET']),
+            // Hospitality pages
+            $this->frontendPageFeature('hospitality-dashboard', 'Hospitality Dashboard', 'dashboard/hospitality', 'hospitality', 'hospitality', 'view_hospitality|manage_hospitality'),
         ];
     }
 
