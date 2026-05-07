@@ -93,6 +93,7 @@ export default function RequestDemoPage() {
       };
 
       console.log("Submitting demo request:", payload);
+      console.log("Submitting to:", `/public/demo-requests`);
       console.log("API Base URL:", api.defaults.baseURL);
 
       const response = await api.post("/public/demo-requests", payload);
@@ -101,13 +102,17 @@ export default function RequestDemoPage() {
       setSuccess(true);
     } catch (err: any) {
       console.error("Demo request error:", err);
+      console.error("Error code:", err.code);
+      console.error("Error message:", err.message);
       console.error("Error response:", err.response);
       
       let message = "Failed to submit request. Please try again.";
       
-      if (err.response?.data) {
+      if (err.code === "ECONNREFUSED" || err.message === "Network Error") {
+        message = "Cannot connect to server. Please make sure the backend is running on port 8000.";
+      } else if (err.response?.data) {
         if (typeof err.response.data === 'string') {
-          message = `Server error (not JSON): ${err.response.data.substring(0, 100)}...`;
+          message = `Server error (not JSON response)`;
         } else {
           message = err.response.data.message || err.response.data.error || message;
         }
