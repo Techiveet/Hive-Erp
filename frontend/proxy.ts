@@ -23,7 +23,7 @@ const extractHost = (value?: string | null): string | null => {
     }
 };
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
     const url = req.nextUrl;
     
     // Get the hostname (e.g., 'techive.gulfingot.com' or 'localhost')
